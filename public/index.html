@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>FIT.AI — Seu personal com IA</title>
+  <meta name="description" content="FIT.AI: monte seu plano de treino, acompanhe sua evolução e tire dúvidas com um Coach AI disponível 24h.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@600&family=Inter+Tight:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="assets/sparkles-blue.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="device">
+    <main id="app" class="app" aria-live="polite"></main>
+    <nav id="toolbar" class="toolbar" aria-label="Navegação principal" hidden>
+      <a href="#/home" class="tb-item" data-tab="home" aria-label="Início">
+        <img src="assets/house-inactive.svg" data-on="assets/house.svg" data-off="assets/house-inactive.svg" width="24" height="24" alt="">
+      </a>
+      <a href="#/plano" class="tb-item" data-tab="plano" aria-label="Plano de treino">
+        <img src="assets/calendar.svg" data-on="assets/calendar-active.svg" data-off="assets/calendar.svg" width="24" height="24" alt="">
+      </a>
+      <button type="button" class="tb-ai" data-open-chat aria-label="Abrir Coach AI">
+        <img src="assets/sparkles-white.svg" width="24" height="24" alt="">
+      </button>
+      <a href="#/evolucao" class="tb-item" data-tab="evolucao" aria-label="Evolução">
+        <img src="assets/chart.svg" data-on="assets/chart-active.svg" data-off="assets/chart.svg" width="24" height="24" alt="">
+      </a>
+      <a href="#/perfil" class="tb-item" data-tab="perfil" aria-label="Perfil">
+        <img src="assets/user.svg" data-on="assets/user-active.svg" data-off="assets/user.svg" width="24" height="24" alt="">
+      </a>
+    </nav>
+    <div id="chat-layer" class="chat-layer" hidden>
+      <div class="chat-backdrop" data-close-chat></div>
+      <section class="chat-sheet" role="dialog" aria-modal="true" aria-label="Coach AI">
+        <header class="chat-head">
+          <div class="coach">
+            <span class="coach-avatar"><img src="assets/sparkles-blue.svg" width="18" height="18" alt=""></span>
+            <span class="coach-txt"><strong>Coach AI</strong><span class="online"><img src="assets/dot-online.svg" width="8" height="8" alt="">Online</span></span>
+          </div>
+          <button type="button" class="icon-btn" data-close-chat aria-label="Fechar chat"><img src="assets/x.svg" width="24" height="24" alt=""></button>
+        </header>
+        <div class="chat-msgs" id="chat-msgs"></div>
+        <div class="chat-foot">
+          <div class="chips" id="chat-chips"></div>
+          <form class="composer" id="chat-form" autocomplete="off">
+            <input type="text" id="chat-input" placeholder="Digite sua mensagem" aria-label="Mensagem para o Coach AI">
+            <button type="submit" class="send" aria-label="Enviar"><img src="assets/arrow-up.svg" width="20" height="20" alt=""></button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+  <p class="credit">FIT.AI · projeto de portfólio · desenvolvido por Eduardo</p>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- programa pessoal (fora do GitHub); sem ele o app usa o programa de exemplo -->
+  <script src="programa-pessoal.js" onerror="this.remove()"></script>
+  <script src="app.js"></script>
+</body>
+</html>

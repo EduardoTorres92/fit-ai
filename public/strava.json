@@ -1,0 +1,23 @@
+{
+ "atualizado": "2026-11-08T10:47:18.909089-03:00",
+ "corridas": [
+  {
+   "id": "20624675599",
+   "nome": "Full body + corrida",
+   "data": "2026-10-17",
+   "hora": "13:36",
+   "dist": 3206.4,
+   "tempo": 1545,
+   "elev": 19.8
+  },
+  {
+   "id": "20467074623",
+   "nome": "Primeira de mtas",
+   "data": "2026-10-05",
+   "hora": "19:32",
+   "dist": 4959.5,
+   "tempo": 2630,
+   "elev": 56.8
+  }
+ ]
+}
