@@ -6,7 +6,7 @@
 //    e limite geral por dia (contadores no Netlify Blobs).
 // A chave da Anthropic fica só no servidor (variável ANTHROPIC_API_KEY), nunca no navegador.
 import Anthropic from "@anthropic-ai/sdk";
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/blobs.mjs";
 import { createHash } from "node:crypto";
 import { lerToken, ehTokenProprio, ehEmailDono } from "../lib/sessao.mjs";
 
