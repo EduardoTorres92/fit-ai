@@ -130,15 +130,17 @@
 
   /* ---------- Estado ---------- */
   const KEY = "fitai-state-v1";
-  const padrao = { user: null, logado: false, onboarded: false, inicio: keyOf(mondayOf(hoje)), logs: {}, perfil: { peso: "", altura: "", idade: "" } };
+  const padrao = { user: null, logado: false, onboarded: false, inicio: keyOf(mondayOf(hoje)), logs: {}, perfil: { peso: "", altura: "", idade: "" }, insanity: { inicio: null, logs: {} } };
   let S = load();
   function load() {
     try {
       const s = { ...padrao, ...JSON.parse(localStorage.getItem(KEY) || "{}") };
       if (!s.logs || typeof s.logs !== "object") s.logs = {};
       s.perfil = { ...padrao.perfil, ...(s.perfil || {}) };
+      s.insanity = { inicio: null, logs: {}, ...(s.insanity || {}) };
+      if (!s.insanity.logs || typeof s.insanity.logs !== "object") s.insanity.logs = {};
       return s;
-    } catch { return { ...padrao }; }
+    } catch { return { ...padrao, insanity: { inicio: null, logs: {} } }; }
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
 
@@ -150,16 +152,16 @@
   const logHoje = () => S.logs[hojeKey];
   const ativoHoje = () => { const l = logHoje(); if (l) return { w: l.w, d: l.d }; const w = semanaDe(hoje); return { w: Math.max(w, 0), d: hojeDia }; };
   const soma = (a) => a.reduce((x, y) => x + y, 0);
-  const feito = (k) => !!(S.logs[k] && S.logs[k].done);
-  const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length));
+  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || insFeito(k);
+  const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || insParcial(k);
 
   function sequencia() {
     let d = feito(hojeKey) ? hoje : addDays(hoje, -1), c = 0;
     while (feito(keyOf(d))) { c++; d = addDays(d, -1); }
     return c;
   }
-  const treinosFeitos = () => Object.keys(S.logs).filter(feito).length;
-  const tempoTotal = () => soma(Object.values(S.logs).map((l) => l.dur || 0));
+  const treinosFeitos = () => [...new Set([...Object.keys(S.logs), ...Object.keys(S.insanity.logs)])].filter(feito).length;
+  const tempoTotal = () => soma(Object.values(S.logs).map((l) => l.dur || 0)) + soma(Object.values(S.insanity.logs).flatMap((l) => (l.feitos || []).map((id) => (INSV[id]?.min || 0) * 60)));
   function taxaConclusao() {
     const dias = diffDays(parseKey(S.inicio), hoje) + (feito(hojeKey) ? 1 : 0);
     if (dias <= 0) return treinosFeitos() ? 100 : 0;
@@ -172,8 +174,31 @@
   const menorMelhor = (id) => EXI[id] && EXI[id].un === "tiro";
   const anterior = (id) => historico(id).filter((h) => h.k < hojeKey).pop();
   const recorde = (id) => { const b = historico(id).map((h) => h.best); return b.length ? (menorMelhor(id) ? Math.min(...b) : Math.max(...b)) : 0; };
-  function ultimoTreino() { const ks = Object.keys(S.logs).filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
+  function ultimoTreino() { const ks = [...new Set([...Object.keys(S.logs), ...Object.keys(S.insanity.logs)])].filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
   const fmtDur = (seg) => { const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60); return h ? `${h}h${pad(m)}m` : `${m}min`; };
+
+  /* ---------- Insanity MAX:30 (public/insanity.js; vídeos em public/insanity-videos.js, fora do GitHub) ---------- */
+  const INS = window.FITAI_INSANITY || { nome: "Insanity MAX:30", videos: [], semanas: [], trocas: {}, nota: "" };
+  const INS_VID = window.FITAI_INSANITY_VIDEOS || {};
+  const INSV = Object.fromEntries(INS.videos.map((v) => [v.id, v]));
+  const insLink = (id) => (INS_VID[id] ? `https://drive.google.com/file/d/${encodeURIComponent(INS_VID[id])}/view` : "");
+  const insSemanaDe = (d) => (S.insanity.inicio ? Math.floor(diffDays(parseKey(S.insanity.inicio), d) / 7) : -1);
+  const insDia = (w, d) => (INS.semanas[w] ? INS.semanas[w].dias[d] : null);
+  const insData = (w, d) => keyOf(addDays(parseKey(S.insanity.inicio), w * 7 + d));
+  const insHoje = () => { const w = insSemanaDe(hoje); return w >= 0 && w < INS.semanas.length ? { w, d: hojeDia } : null; };
+  const insAlt = (w, id) => (w < 4 && INS.trocas[id]) || null; // Sweat Fest pode substituir o Sweat Intervals no mês 1
+  function insFeito(k) {
+    const l = S.insanity.logs[k];
+    if (!l) return false;
+    const t = insDia(l.w, l.d);
+    return !!(t && t.ids.length && t.ids.every((id) => l.feitos.includes(id) || (insAlt(l.w, id) && l.feitos.includes(insAlt(l.w, id)))));
+  }
+  const insParcial = (k) => !!(S.insanity.logs[k] && S.insanity.logs[k].feitos.length);
+  const segDe = (txt) => { const m = String(txt).trim().match(/^(\d{1,2})(?:[:.,h](\d{1,2}))?$/); return m && +(m[2] || 0) < 60 ? +m[1] * 60 + +(m[2] || 0) : null; };
+  const mmss = (seg) => `${Math.floor(seg / 60)}:${pad(seg % 60)}`;
+  function insMaxHist(id) {
+    return Object.keys(S.insanity.logs).sort().filter((k) => S.insanity.logs[k].max?.[id]).map((k) => ({ k, seg: S.insanity.logs[k].max[id] }));
+  }
 
 
   /* ---------- Strava ----------
@@ -359,8 +384,51 @@
       <div class="stat-val"><strong>${val}</strong><span${up ? ' class="up"' : ""}>${lbl}</span></div></${tag}>`;
   }
 
+  /* Insanity: componentes */
+  const INS_IMG = { Cardio: "banner-home.jpg", Tabata: "login.jpg", Potência: "login.jpg", Força: "treino-superiores-2.jpg", Luta: "treino-inferiores-1.jpg", Recuperação: "treino-inferiores-2.jpg", Abdômen: "treino-inferiores-2.jpg" };
+  const progSwitch = (on) => `<nav class="seg prog" aria-label="Programa">
+      <a href="#/plano" class="${on === "plano" ? "on" : ""}"${on === "plano" ? ' aria-current="page"' : ""}>${esc(NOME_PROG)}</a>
+      <a href="#/insanity" class="${on === "insanity" ? "on" : ""}"${on === "insanity" ? ' aria-current="page"' : ""}>${esc(INS.nome)}</a></nav>`;
+  function insCard(w, d, { link = true } = {}) {
+    const t = insDia(w, d), tag = link ? "a" : "div";
+    const min = soma(t.ids.map((id) => INSV[id].min || 0));
+    const k = S.insanity.inicio ? insData(w, d) : null;
+    const ok = k && insFeito(k);
+    const meta = t.ids.length ? `<span>${icon("timer.svg")}${min ? `${min} min` : "vídeo"}</span><span>${icon("zap.svg")}${t.ids.length} ${t.ids.length > 1 ? "vídeos" : "vídeo"}</span>` : `<span>${t.fim ? "Programa concluído" : "Recupere o corpo"}</span>`;
+    return `<${tag} class="wcard${t.ids.length ? "" : " pending"}" ${link && t.ids.length ? `href="#/insanity/${w}/${d}"` : ""} aria-label="${esc(INS.nome)}, semana ${w + 1}, ${DIAS[d]}: ${esc(t.titulo)}">
+      <img class="cover" src="${A(INS_IMG[t.ids.length ? INSV[t.ids[0]].tipo : ""] || "banner-plano.jpg")}" alt="" loading="lazy">
+      <span class="pill glass">${icon("calendar-14.svg")}${DIAS[d]} · ${t.ids.length ? esc(INSV[t.ids[0]].tipo) : "Descanso"}${ok ? " · ✓" : ""}</span>
+      <div class="bottom"><div class="info"><h3>${esc(t.titulo)}</h3><div class="meta">${meta}</div></div></div></${tag}>`;
+  }
+  function insVideoCard(id, k, editavel, rotulo = "") {
+    const v = INSV[id], l = (k && S.insanity.logs[k]) || { feitos: [], max: {} };
+    const ok = l.feitos.includes(id);
+    const hist = insMaxHist(id), ant = hist.filter((h) => h.k < k).pop(), best = hist.length ? Math.max(...hist.map((h) => h.seg)) : 0;
+    const link = insLink(id);
+    return `<div class="ex ins${ok ? " done" : ""}" data-ins="${id}">
+      <div class="ex-top">
+        <span class="ex-name"><span class="ex-check">${check}</span><span>${rotulo ? `<small class="ins-rot">${esc(rotulo)}</small>` : ""}${esc(v.nome)}</span></span>
+        <button class="ask" data-ask-ins="${id}" aria-label="Perguntar ao Coach AI sobre ${esc(v.nome)}">${icon("circle-question.svg", 20)}</button>
+      </div>
+      <div class="ex-tags">
+        ${v.min ? `<span class="pill gray">${v.min} min</span>` : ""}<span class="pill gray">${esc(v.tipo)}</span>
+        ${ant ? `<span class="pill gray">Último Max Out ${mmss(ant.seg)}</span>` : ""}
+        ${best ? `<span class="pill gray">${icon("zap.svg")}Melhor ${mmss(best)}</span>` : ""}
+      </div>
+      <p class="ex-obs">${esc(v.desc)}</p>
+      ${link ? `<a class="btn btn-blue ins-play" href="${link}" target="_blank" rel="noopener">▶ Assistir no Drive</a>` : `<p class="ex-obs">Vídeo ainda não configurado neste aparelho.</p>`}
+      ${editavel ? `<div class="ins-row">
+        <form class="add-set ins-max" data-max="${id}">
+          <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
+          <button type="submit" class="btn btn-blue">Max Out</button>
+        </form>
+        <button class="btn btn-outline${ok ? " done" : ""} ins-feito" data-ins-feito="${id}" data-k="${k}">${ok ? "Feito ✓" : "Marcar feito"}</button>
+      </div>` : ""}
+    </div>`;
+  }
+
   /* ---------- Telas ---------- */
-  let planoSemana = null;
+  let planoSemana = null, insSemana = null;
   const telas = {
     login() {
       setToolbar(null);
@@ -423,6 +491,7 @@
           <div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t ? workoutCard(w, d) : ""}
+          ${insHome()}
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -441,6 +510,7 @@
             <h1>Plano de Treino</h1>
           </div>
         </div>
+        ${progSwitch("plano")}
         <div class="week-tabs" role="tablist">
           ${PROGRAMA.map((s, i) => `<a role="tab" aria-selected="${i === w}" class="wtab${i === w ? " on" : ""}" href="#/plano/${i}">
             <strong>Semana ${i + 1}${i === atual ? " •" : ""}</strong><span>${s.nome}</span></a>`).join("")}
@@ -474,6 +544,43 @@
         <div class="ex-list">${t.ex.map((e) => exCard(e, ehHoje)).join("")}</div>
         ${ehHoje ? `<button class="btn btn-outline${feito(hojeKey) ? " done" : ""}" id="concluir">${feito(hojeKey) ? "Treino concluído ✓" : "Marcar como concluído"}</button>` : ""}
         ${ehHoje && feito(hojeKey) ? `<button class="btn btn-outline btn-strava" id="resumo">Copiar resumo para o Strava</button>` : ""}
+        </div></section>`;
+    },
+
+    insanity(p1, p2) {
+      setToolbar("plano");
+      const total = INS.semanas.length;
+      if (p2 !== undefined) return telaInsanityDia(Number(p1), Number(p2));
+      const atual = insSemanaDe(hoje);
+      const w = p1 !== undefined && INS.semanas[p1] ? Number(p1) : insSemana ?? Math.min(Math.max(atual, 0), total - 1);
+      insSemana = w;
+      const status = !S.insanity.inicio ? `<p class="note week-note">Escolha em qual semana você está para o app montar o calendário e mostrar o treino do dia na tela inicial.</p>`
+        : atual >= total ? `<p class="note week-note"><b>Programa concluído! 🏆</b> Quer recomeçar? Escolha a semana abaixo.</p>`
+        : atual < 0 ? `<p class="note week-note">Seu Insanity começa na segunda, ${ddmm(S.insanity.inicio)}.</p>` : "";
+      return `<section class="screen has-toolbar">
+        <div class="banner" style="--grad: linear-gradient(238.09deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.8) 100%)">
+          <div class="banner-bg"><img class="plano-img" src="${A("banner-home.jpg")}" alt=""></div>
+          <span class="logo-txt">Fit.ai</span>
+          <div class="plano-title"><span class="pill blue">${icon("goal.svg", 16)}Ab Maximizer · 8 semanas</span><h1>${esc(INS.nome)}</h1></div>
+        </div>
+        ${progSwitch("insanity")}
+        <div class="week-tabs" role="tablist">
+          ${INS.semanas.map((s, i) => `<a role="tab" aria-selected="${i === w}" class="wtab${i === w ? " on" : ""}" href="#/insanity/${i}">
+            <strong>Semana ${i + 1}${i === atual ? " •" : ""}</strong><span>${s.nome.split(" · ")[0]}</span></a>`).join("")}
+        </div>
+        ${status}
+        <p class="note week-note">${INS.nota}</p>
+        <div class="list" style="padding-top:8px">${INS.semanas[w].dias.map((_, d) => insCard(w, d)).join("")}</div>
+        <div class="section">
+          <div class="sec-head"><h2>Sem tempo?</h2></div>
+          ${INS.extra ? insVideoCard(INS.extra, null, false) : ""}
+        </div>
+        <div class="section">
+          <div class="field">
+            <span class="field-lbl">Em qual semana do ${esc(INS.nome)} você está?</span>
+            <div class="seg seg8">${INS.semanas.map((_, i) => `<button class="${S.insanity.inicio && i === atual ? "on" : ""}" data-ins-semana="${i}">${i + 1}</button>`).join("")}</div>
+          </div>
+          ${S.insanity.inicio ? `<button class="btn btn-outline" id="ins-parar" style="margin-top:12px">Pausar ${esc(INS.nome)}</button>` : ""}
         </div></section>`;
     },
 
@@ -536,6 +643,32 @@
         </div></section>`;
     },
   };
+
+  function insHome() {
+    const h = insHoje();
+    if (!h) return S.insanity.inicio ? "" : `<a class="emerg" href="#/insanity"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(INS.nome)}</strong><small>Ab Maximizer · 8 semanas de vídeos · toque para começar</small></div></a>`;
+    return `<div class="sec-head" style="margin-top:8px"><h2>${esc(INS.nome)}</h2><a href="#/insanity/${h.w}">Semana ${h.w + 1} · ${INS.semanas[h.w].nome.split(" · ")[0]}</a></div>${insCard(h.w, h.d)}`;
+  }
+  function telaInsanityDia(w, d) {
+    const t = insDia(w, d);
+    if (!t || !t.ids.length) return telas.insanity(String(w));
+    const k = S.insanity.inicio ? insData(w, d) : null;
+    const editavel = !!k && k <= hojeKey;
+    const alt = t.ids.map((id) => insAlt(w, id)).filter(Boolean);
+    const quando = k ? (k === hojeKey ? "Hoje" : ddmm(k)) : "";
+    return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
+      <div class="page-head">
+        <a class="icon-btn" href="#/insanity/${w}" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a>
+        <h1>${k === hojeKey ? "Insanity de Hoje" : `Semana ${w + 1} · ${DIAS[d]}`}</h1><span class="spacer"></span></div>
+      ${insCard(w, d, { link: false })}
+      <div class="note-box"><p>${INS.nota}</p>${quando && !editavel ? `<p>Este treino está marcado para <b>${quando}</b>. Você poderá registrar o Max Out nesse dia.</p>` : ""}${!k ? "<p>Escolha sua semana na tela do Insanity para registrar os treinos.</p>" : ""}</div>
+      <div class="ex-list">
+        ${t.ids.map((id, i) => insVideoCard(id, k, editavel, t.ids.length > 1 ? (i ? "Depois" : "Principal") : "")).join("")}
+        ${alt.map((id) => insVideoCard(id, k, editavel, "Alternativa")).join("")}
+      </div>
+      ${editavel && insFeito(k) ? `<p class="note" style="text-align:center">Treino concluído! 🔥</p>` : ""}
+      </div></section>`;
+  }
 
   /* Mapa de consistência: últimas 15 semanas (seg→dom) */
   function heatmap() {
@@ -631,7 +764,9 @@
   }
 
   document.addEventListener("submit", (ev) => {
-    const f = ev.target.closest(".add-set");
+    const mx = ev.target.closest(".ins-max");
+    if (mx) { ev.preventDefault(); salvarMaxOut(mx); return; }
+    const f = ev.target.closest(".add-set[data-add]");
     if (!f) return;
     ev.preventDefault();
     const n = parseInt(f.querySelector("input").value, 10);
@@ -649,6 +784,37 @@
     refazerCard(id);
   });
 
+  /* ---------- Registro do Insanity ---------- */
+  function insLogDe(k) {
+    if (!S.insanity.logs[k]) {
+      const n = diffDays(parseKey(S.insanity.inicio), parseKey(k));
+      S.insanity.logs[k] = { w: Math.floor(n / 7), d: n % 7, feitos: [], max: {} };
+    }
+    return S.insanity.logs[k];
+  }
+  function insRefazer(id) {
+    const [, , w, d] = location.hash.split("/");
+    const k = insData(Number(w), Number(d)), el = document.querySelector(`.ex.ins[data-ins="${id}"]`);
+    if (!el) return render();
+    const rot = el.querySelector(".ins-rot")?.textContent || "";
+    el.outerHTML = insVideoCard(id, k, k <= hojeKey, rot);
+  }
+  function salvarMaxOut(f) {
+    const id = f.dataset.max, [, , w, d] = location.hash.split("/");
+    const k = insData(Number(w), Number(d));
+    const txt = f.querySelector("input").value, seg = segDe(txt);
+    const l = insLogDe(k), era = insFeito(k);
+    if (!txt.trim()) { delete l.max[id]; save(); insRefazer(id); return; }
+    if (seg === null || seg > 60 * 60) { toast("Digite o tempo como mm:ss (ex.: 12:30)."); return; }
+    const antes = insMaxHist(id).filter((h) => h.k !== k).map((h) => h.seg);
+    l.max[id] = seg;
+    if (!l.feitos.includes(id)) l.feitos.push(id);
+    save(); insRefazer(id);
+    if (antes.length && seg > Math.max(...antes)) toast(`Novo recorde de Max Out em ${INSV[id].nome}: ${mmss(seg)}! 🏆`);
+    else toast("Max Out salvo ✓");
+    if (insFeito(k) !== era) render();
+  }
+
   /* ---------- Router ---------- */
   function render() {
     let [, rota = "", p1, p2] = location.hash.split("/");
@@ -658,6 +824,7 @@
     if (rota === "treino" && (p2 === undefined || !treino(p1 === "E" ? "E" : Number(p1), Number(p2)))) rota = "home";
     let alvo = `#/${rota}`;
     if (rota === "treino") alvo += `/${p1}/${p2}`;
+    else if (rota === "insanity" && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
@@ -769,6 +936,24 @@
     else if (t.dataset.modo) { loginModo = t.dataset.modo; render(); }
     else if (t.id === "sair") { S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
     else if (t.id === "iniciar") t.textContent = toggleTimer();
+    else if (t.dataset.insFeito) {
+      const id = t.dataset.insFeito, k = t.dataset.k, l = insLogDe(k), era = insFeito(k);
+      const i = l.feitos.indexOf(id);
+      i >= 0 ? l.feitos.splice(i, 1) : l.feitos.push(id);
+      save();
+      if (insFeito(k) !== era) { render(); if (insFeito(k)) toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); }
+      else insRefazer(id);
+    } else if (t.dataset.insSemana !== undefined) {
+      const n = Number(t.dataset.insSemana);
+      S.insanity.inicio = keyOf(addDays(mondayOf(hoje), -n * 7));
+      insSemana = null; save(); render();
+      toast(`${INS.nome}: você está na Semana ${n + 1}.`);
+    } else if (t.id === "ins-parar") {
+      if (!confirm(`Pausar o ${INS.nome}? Seus registros continuam salvos.`)) return;
+      S.insanity.inicio = null; insSemana = null; save(); render();
+    } else if (t.dataset.askIns) {
+      openChat(`Como fazer o treino ${INSV[t.dataset.askIns].nome} do ${INS.nome}? Dicas para aguentar mais tempo antes do Max Out?`);
+    }
     else if (t.id === "trocar") {
       const l = logHoje();
       if (l && parcial(hojeKey) && !confirm("Você já registrou séries hoje em outro treino. Trocar para este? (as séries de hoje serão apagadas)")) return;
@@ -814,7 +999,7 @@
       planoSemana = null; save(); render();
       toast(`Você está na Semana ${Number(t.dataset.semana) + 1}.`);
     } else if (t.id === "exportar") {
-      const blob = new Blob([JSON.stringify({ app: "fitai", versao: 1, inicio: S.inicio, perfil: S.perfil, logs: S.logs }, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify({ app: "fitai", versao: 1, inicio: S.inicio, perfil: S.perfil, logs: S.logs, insanity: S.insanity }, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob); a.download = `fitai-backup-${hojeKey}.json`; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -832,6 +1017,7 @@
       const d = JSON.parse(await e.target.files[0].text());
       if (d.app !== "fitai" || typeof d.logs !== "object") throw 0;
       S.logs = { ...S.logs, ...d.logs }; if (d.inicio) S.inicio = d.inicio; if (d.perfil) S.perfil = { ...S.perfil, ...d.perfil };
+      if (d.insanity && typeof d.insanity.logs === "object") S.insanity = { inicio: d.insanity.inicio ?? S.insanity.inicio, logs: { ...S.insanity.logs, ...d.insanity.logs } };
       save(); render(); toast("Backup importado ✓");
     } catch { toast("Arquivo de backup inválido."); }
   });
@@ -917,8 +1103,12 @@
   function programaTexto() {
     const sem = PROGRAMA.map((s, w) => [`## Semana ${w + 1} · ${s.nome}`, s.nota.replace(/<[^>]+>/g, ""),
       ...s.dias.map((t, d) => `### ${DIAS[d]} · ${t.foco} · ${t.titulo}${t.obs ? ` (${t.obs})` : ""}\n${(t.ex || []).map((e) => "- " + linhaEx(e)).join("\n")}`)].join("\n"));
+    const ins = INS.semanas.length ? [`# Programa paralelo: ${INS.nome} (vídeos, 8 semanas, calendário com Ab Maximizer)`,
+      "O usuário registra o Max Out de cada vídeo (minuto em que precisou parar pela primeira vez; quanto mais tarde, melhor).",
+      ...INS.semanas.map((s, w) => `## Semana ${w + 1} (${s.nome}): ${s.dias.map((t, d) => `${DIAS[d]}: ${t.titulo}`).join(" | ")}`),
+      `Vídeos: ${INS.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}`).join("; ")}`].join("\n") : "";
     return [`# Programa: ${NOME_PROG}`, ...sem, `## Treino de emergência (15 min)\n${EMERGENCIA.ex.map((e) => "- " + linhaEx(e)).join("\n")}`,
-      CICLO].join("\n\n");
+      CICLO, ins].filter(Boolean).join("\n\n");
   }
   function contextoTexto(comCorridas) {
     const { w, d } = ativoHoje(), t = treino(w, d);
@@ -934,6 +1124,13 @@
     const recs = TODOS_EX.filter((e) => historico(e.id).length).map((e) => { const h = historico(e.id), u = UN[e.un] || "";
       return `- ${e.nome}: recorde ${recorde(e.id)}${u} (${menorMelhor(e.id) ? "melhor tiro" : "melhor série"}), último total ${h[h.length - 1].total}${u} em ${h[h.length - 1].k}, ${h.length} treinos`; });
     if (recs.length) out.push("Recordes por exercício:\n" + recs.join("\n"));
+    const ih = insHoje();
+    if (S.insanity.inicio) {
+      out.push(ih ? `${INS.nome}: semana ${ih.w + 1} de ${INS.semanas.length}. Hoje: ${insDia(ih.w, ih.d).titulo}${insFeito(hojeKey) ? " (feito)" : insParcial(hojeKey) ? " (em andamento)" : ""}.` : `${INS.nome}: fora do calendário (início ${S.insanity.inicio}).`);
+      const ik = Object.keys(S.insanity.logs).sort().slice(-21);
+      if (ik.length) out.push(`Registros do ${INS.nome}:\n` + ik.map((k) => { const l = S.insanity.logs[k];
+        return `- ${k}: ${l.feitos.map((id) => `${INSV[id]?.nome || id}${l.max[id] ? ` (Max Out ${mmss(l.max[id])})` : ""}`).join("; ") || "nada"}`; }).join("\n"));
+    }
     const cs = comCorridas ? corridas().slice(0, 10) : [];
     if (comCorridas) out.push("Corridas do Strava:\n" + (cs.length ? cs.map((c) => `- ${c.data} ${c.nome}: ${km(c.dist)} km, ${fmtDur(c.tempo)}, ritmo ${ritmo(c.tempo, c.dist)}/km${c.fc ? `, FC ${Math.round(c.fc)}` : ""}`).join("\n") : "- nenhuma sincronizada"));
     return out.join("\n");
