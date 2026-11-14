@@ -38,13 +38,13 @@ export default async (req) => {
   // Valor: "<id no Drive>" ou "<id no Drive>|<resourcekey>" (arquivos antigos do Drive exigem a resourcekey).
   let videos = {};
   const vars = Object.keys(process.env).filter((n) => n === "FITAI_INSANITY_VIDEOS" || n.startsWith("FITAI_VIDEOS_"));
-  const ruins = [];
+  const ruins = [], fontes = {}; // fontes: nome da variável -> quantos vídeos (só nomes, nunca valores)
   for (const n of vars) {
     const v = lerJson(process.env[n]);
-    if (v) Object.assign(videos, v); else ruins.push(n); // uma variável com problema não derruba as outras
+    if (v) { Object.assign(videos, v); fontes[n] = Object.keys(v).length; } else ruins.push(n); // uma variável com problema não derruba as outras
   }
   if (ruins.length) console.error("Variáveis de vídeo com JSON inválido:", ruins.join(", "));
   if (!Object.keys(videos).length && ruins.length) return json(500, { erro: "config", variaveis: ruins });
   const limpo = Object.fromEntries(Object.entries(videos).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && /^[\w-]{10,100}(\|[\w-]{1,100})?$/.test(String(v))));
-  return json(200, { videos: limpo, dono: !!ehEmailDono(email), ...(ruins.length ? { variaveis_com_erro: ruins } : {}) });
+  return json(200, { videos: limpo, dono: !!ehEmailDono(email), fontes, ...(ruins.length ? { variaveis_com_erro: ruins } : {}) });
 };

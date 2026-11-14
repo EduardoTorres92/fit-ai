@@ -327,12 +327,12 @@
   const nomeCompleto = () => (S.user && S.user.nome) || "Visitante";
   const fotoPerfil = () => (S.user && S.user.foto) || S.fotoLocal || A("avatar.jpg");
 
-  function toast(msg) {
+  function toast(msg, ms = 2500) {
     document.querySelectorAll(".toast").forEach((t) => t.remove());
     const t = document.createElement("div");
     t.className = "toast"; t.textContent = msg;
     $(".device").appendChild(t);
-    setTimeout(() => t.remove(), 2500);
+    setTimeout(() => t.remove(), ms);
   }
   function setToolbar(tab) {
     const tb = $("#toolbar");
@@ -851,8 +851,9 @@
   /* Vídeos do Insanity: vêm de /api/videos para quem está logado (interativo = avisa se der erro) */
   let souDono = false; // o servidor diz se a conta é a do dono (ALLOWED_EMAIL)
   const veCorridas = () => !uid || souDono; // as corridas do Strava são do dono; visitante vê como demonstração
-  async function carregarVideos(interativo = false) {
-    if (Object.keys(INS_VID).length || !uid || location.protocol === "file:") return false;
+  // idVideo: o vídeo cujo botão foi tocado (para explicar por que ele não veio)
+  async function carregarVideos(interativo = false, idVideo = null) {
+    if ((!interativo && Object.keys(INS_VID).length) || !uid || location.protocol === "file:") return false;
     const token = await tokenSB();
     if (!token) return false;
     try {
@@ -863,10 +864,18 @@
         return false;
       }
       const dados = await r.json();
-      if (dados.variaveis_com_erro && interativo) toast(`Alguns vídeos não carregaram: ${dados.variaveis_com_erro.join(", ")} com erro.`);
       Object.assign(INS_VID, dados.videos || {});
       souDono = !!dados.dono;
-      if (location.hash.startsWith("#/insanity")) render();
+      if (VP[location.hash.split("/")[1]]) render();
+      if (idVideo && !INS_VID[idVideo]) {
+        // O vídeo pedido não veio: diz o que o servidor encontrou, para achar o erro na configuração
+        const P = VPROGS.find((x) => x.videos.some((v) => v.id === idVideo));
+        const esperado = P && P.k !== "insanity" ? `FITAI_VIDEOS_${P.k === "insanity60" ? "INSANITY" : P.k.toUpperCase()}` : "FITAI_INSANITY_VIDEOS";
+        const lidas = Object.entries(dados.fontes || {}).map(([n, q]) => `${n} (${q} vídeos)`).join(", ") || "nenhuma";
+        const erro = (dados.variaveis_com_erro || []).length ? ` Com erro: ${dados.variaveis_com_erro.join(", ")}.` : "";
+        toast(`Esse vídeo não está na configuração. O servidor precisa de ${esperado}. Variáveis lidas: ${lidas}.${erro}`, 9000);
+        return false;
+      }
       return true;
     } catch { if (interativo) toast("Não consegui carregar os vídeos agora."); return false; }
   }
@@ -1634,7 +1643,7 @@
     } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = graficoMaxOut(); }
     else if (t.id === "sair") { if (sb && uid) sb.auth.signOut(); uid = null; S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
     else if (t.id === "iniciar") t.textContent = toggleTimer();
-    else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true).then((ok) => { if (ok) toast("Vídeos carregados ✓ Toque em Assistir."); else t.disabled = false; }); }
+    else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true, t.closest(".ex.ins")?.dataset.ins).then((ok) => { if (ok) toast("Vídeos carregados ✓ Toque em Assistir."); else t.disabled = false; }); }
     else if (t.hasAttribute("data-ins-play")) abrirVideo(t.dataset.insPlay);
     else if (t.hasAttribute("data-vt-toggle")) vtAlternar(t.closest(".vtimer"));
     else if (t.hasAttribute("data-vt-edit")) vtAjustar(t.closest(".vtimer"));
