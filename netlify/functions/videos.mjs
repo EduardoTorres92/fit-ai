@@ -41,7 +41,11 @@ export default async (req) => {
   const ruins = [], fontes = {}; // fontes: nome da variável -> quantos vídeos (só nomes, nunca valores)
   for (const n of vars) {
     const v = lerJson(process.env[n]);
-    if (v) { Object.assign(videos, v); fontes[n] = Object.keys(v).length; } else ruins.push(n); // uma variável com problema não derruba as outras
+    if (v) { Object.assign(videos, v); fontes[n] = Object.keys(v).length; }
+    else { // uma variável com problema não derruba as outras; o diagnóstico (tamanho e pontas) ajuda a achar o erro
+      const t = String(process.env[n] || "");
+      ruins.push(`${n} (${t.length} caracteres, termina em "${t.slice(-12)}")`);
+    }
   }
   if (ruins.length) console.error("Variáveis de vídeo com JSON inválido:", ruins.join(", "));
   if (!Object.keys(videos).length && ruins.length) return json(500, { erro: "config", variaveis: ruins });
