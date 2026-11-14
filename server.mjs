@@ -2,7 +2,7 @@
 // - Entrega os arquivos da pasta public/.
 // - /api/auth e /api/coach: as mesmas funções da pasta netlify/functions, chamadas daqui.
 // - Contas, segredo de sessão e limites do Coach ficam em arquivos (ver netlify/lib/blobs.mjs).
-// Variáveis: ANTHROPIC_API_KEY (obrigatória para o Coach), ALLOWED_EMAIL, LIMITE_VISITANTE_DIA,
+// Variáveis: ANTHROPIC_API_KEY (obrigatória para o Coach), ALLOWED_EMAIL, FITAI_INSANITY_VIDEOS, LIMITE_VISITANTE_DIA,
 // LIMITE_GERAL_DIA, DADOS_DIR, PORT. Iniciar: npm start.
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -14,10 +14,11 @@ import { fileURLToPath } from "node:url";
 process.env.FITAI_ARMAZENAMENTO = "arquivo";
 const { default: auth } = await import("./netlify/functions/auth.mjs");
 const { default: coach } = await import("./netlify/functions/coach.mjs");
+const { default: videos } = await import("./netlify/functions/videos.mjs");
 
 const RAIZ = fileURLToPath(new URL("./public/", import.meta.url));
 const PORTA = Number(process.env.PORT) || 3000;
-const ROTAS = { "/api/auth": auth, "/api/coach": coach };
+const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos };
 const MAX_CORPO = 512 * 1024; // o Coach manda programa + contexto; 512 KB sobra
 
 const TIPOS = {

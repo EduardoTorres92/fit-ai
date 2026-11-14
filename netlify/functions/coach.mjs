@@ -8,9 +8,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getStore } from "../lib/blobs.mjs";
 import { createHash } from "node:crypto";
-import { lerToken, ehTokenProprio, ehEmailDono } from "../lib/sessao.mjs";
+import { ehDono } from "../lib/dono.mjs";
 
-const GOOGLE_CLIENT_ID = "900778689263-mgkn7nbs66bk3h7cqi19gmo1t7o7ivne.apps.googleusercontent.com";
 const MODO = {
   dono: { model: "claude-opus-5-5", max_tokens: 16000, mensagens: 24, porMensagem: 4000, contexto: 40000, programa: 40000 },
   visitante: { model: "claude-haiku-5-5", max_tokens: 2000, mensagens: 10, porMensagem: 800, contexto: 8000, programa: 40000 },
@@ -35,19 +34,6 @@ const SISTEMA = {
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 const corta = (t, n) => String(t ?? "").slice(0, n);
 const hojeBR = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-
-async function ehDono(req) {
-  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) return false;
-  // Login com e-mail e senha do próprio app
-  if (ehTokenProprio(token)) return ehEmailDono(await lerToken(token));
-  // Login com Google
-  const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(token)}`);
-  if (!r.ok) return false;
-  const info = await r.json();
-  const permitido = (process.env.ALLOWED_EMAIL || "").trim().toLowerCase();
-  return info.aud === GOOGLE_CLIENT_ID && String(info.email_verified) === "true" && !!permitido && String(info.email).toLowerCase() === permitido;
-}
 
 // Conta uma pergunta do visitante. Devolve false se ele ou o app já passaram do limite de hoje.
 // (Os contadores não são atômicos; numa corrida de requisições pode passar 1 ou 2 do limite, o que é aceitável aqui.)
