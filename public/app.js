@@ -177,7 +177,7 @@
   function ultimoTreino() { const ks = [...new Set([...Object.keys(S.logs), ...Object.keys(S.insanity.logs)])].filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
   const fmtDur = (seg) => { const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60); return h ? `${h}h${pad(m)}m` : `${m}min`; };
 
-  /* ---------- Insanity MAX:30 (public/insanity.js; vídeos em public/insanity-videos.js, fora do GitHub) ---------- */
+  /* ---------- Insanity MAX:30 (public/insanity.js; IDs dos vídeos vêm de /api/videos) ---------- */
   const INS = window.FITAI_INSANITY || { nome: "Insanity MAX:30", videos: [], semanas: [], trocas: {}, nota: "" };
   const INS_VID = { ...(window.FITAI_INSANITY_VIDEOS || {}) };
   const INSV = Object.fromEntries(INS.videos.map((v) => [v.id, v]));
@@ -418,8 +418,8 @@
         ${best ? `<span class="pill gray">${icon("zap.svg")}Melhor ${mmss(best)}</span>` : ""}
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
-      ${link ? `<a class="btn btn-blue ins-play" href="${link}" target="_blank" rel="noopener">▶ Assistir no Drive</a>`
-        : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Liberar vídeos</button>` : `<p class="ex-obs">Os vídeos aparecem para o dono do app, logado.</p>`}
+      ${link ? `<button class="btn btn-blue ins-play" data-ins-play="${id}">▶ Assistir</button>`
+        : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Carregar vídeos</button>` : `<p class="ex-obs">Entre com sua conta para assistir aos vídeos.</p>`}
       ${editavel ? `<div class="ins-row">
         <form class="add-set ins-max" data-max="${id}">
           <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
@@ -797,8 +797,8 @@
     refazerCard(id);
   });
 
-  /* Vídeos do Insanity: vêm de /api/videos, só para o dono logado (interativo = pode abrir o login do Google) */
-  let souDono = false; // vira true quando o servidor libera os vídeos (só o ALLOWED_EMAIL)
+  /* Vídeos do Insanity: vêm de /api/videos para quem está logado (interativo = avisa se der erro) */
+  let souDono = false; // o servidor diz se a conta é a do dono (ALLOWED_EMAIL)
   const veCorridas = () => !uid || souDono; // as corridas do Strava são do dono; visitante vê como demonstração
   async function carregarVideos(interativo = false) {
     if (Object.keys(INS_VID).length || !uid || location.protocol === "file:") return false;
@@ -806,12 +806,36 @@
     if (!token) return false;
     try {
       const r = await fetch("/api/videos", { headers: { authorization: `Bearer ${token}` } });
-      if (!r.ok) { if (interativo) toast(r.status === 403 ? "Os vídeos são só para o dono do app." : "Não consegui carregar os vídeos agora."); return false; }
-      Object.assign(INS_VID, (await r.json()).videos || {});
-      souDono = true;
+      if (!r.ok) { if (interativo) toast(r.status === 401 ? "Entre de novo na sua conta para ver os vídeos." : "Não consegui carregar os vídeos agora."); return false; }
+      const dados = await r.json();
+      Object.assign(INS_VID, dados.videos || {});
+      souDono = !!dados.dono;
       if (location.hash.startsWith("#/insanity")) render();
       return true;
     } catch { if (interativo) toast("Não consegui carregar os vídeos agora."); return false; }
+  }
+
+  /* Player dos vídeos dentro do app (pré-visualização do Google Drive; o arquivo precisa estar
+     compartilhado como "qualquer pessoa com o link") */
+  function abrirVideo(id) {
+    const v = INSV[id], drive = INS_VID[id];
+    if (!v || !drive) return;
+    let dlg = document.getElementById("video-dlg");
+    if (!dlg) {
+      dlg = document.createElement("dialog");
+      dlg.id = "video-dlg"; dlg.className = "video-dlg";
+      dlg.addEventListener("close", () => { dlg.innerHTML = ""; }); // para o vídeo ao fechar
+      dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-video-fechar]")) dlg.close(); });
+      $(".device").appendChild(dlg);
+    }
+    const f = encodeURIComponent(drive);
+    dlg.setAttribute("aria-label", v.nome);
+    dlg.innerHTML = `<div class="video-box">
+        <div class="video-head"><strong>${esc(v.nome)}</strong><button class="video-x" data-video-fechar aria-label="Fechar vídeo">✕</button></div>
+        <div class="video-frame"><iframe src="https://drive.google.com/file/d/${f}/preview" title="${esc(v.nome)}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
+        <a class="video-alt" href="https://drive.google.com/file/d/${f}/view" target="_blank" rel="noopener">Não carregou? Abrir no Google Drive</a>
+      </div>`;
+    dlg.showModal();
   }
 
   /* ---------- Registro do Insanity ---------- */
@@ -1433,7 +1457,8 @@
     } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = graficoMaxOut(); }
     else if (t.id === "sair") { if (sb && uid) sb.auth.signOut(); uid = null; S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
     else if (t.id === "iniciar") t.textContent = toggleTimer();
-    else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true).then((ok) => { if (ok) toast("Vídeos liberados ✓ Toque em Assistir."); else t.disabled = false; }); }
+    else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true).then((ok) => { if (ok) toast("Vídeos carregados ✓ Toque em Assistir."); else t.disabled = false; }); }
+    else if (t.hasAttribute("data-ins-play")) abrirVideo(t.dataset.insPlay);
     else if (t.dataset.insFeito) {
       const id = t.dataset.insFeito, k = t.dataset.k, l = insLogDe(k), era = insFeito(k);
       const i = l.feitos.indexOf(id);
