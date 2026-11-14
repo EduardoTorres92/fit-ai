@@ -14,7 +14,7 @@
     return { id, nome, s, r, un: o.un || "reps", lado: !!o.lado, obs: o.obs || "", meta: o.un === "tiro" ? s : s * min };
   };
   const D = (foco, titulo, ex, obs = "") => ({ foco, titulo, ex, obs });
-  // Programa de EXEMPLO (aberto, para o GitHub). Se existir public/programa-pessoal.js, ele substitui este.
+  // Programa de EXEMPLO. Se existir public/programa-pessoal.js (Treino da Fera), ele substitui este.
   const EXEMPLO = (E, D) => {
     const BASE = D("Fullbody", "Circuito Base", [E("flexao", "Flexões", 3, "10–15"), E("agachamento", "Agachamentos", 3, "15–20"), E("abdominal", "Abdominais", 3, "15–20")], "60 s de descanso entre as séries.");
     const LIVRE = D("Opcional", "Descanso ativo", [E("caminhada", "Caminhada leve", 1, 20, { un: "min" }), E("alongamento", "Alongamento geral", 1, 10, { un: "min" })], "Dia leve: movimente o corpo sem cansar.");
