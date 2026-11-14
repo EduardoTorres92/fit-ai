@@ -573,3 +573,14 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .vt-btns { display: flex; gap: 8px; }
 .vt-btns .btn { white-space: nowrap; }
 .ex-obs.avulso { font-size: 12px; color: var(--blue); }
+
+/* Recordes (perfil e perfil de membro do grupo) */
+.rec-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rec-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; }
+.rec-list li span { display: flex; flex-direction: column; font-size: 14px; font-weight: 600; }
+.rec-list li small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.rec-list li strong { display: flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.rank li[data-membro] { cursor: pointer; }
+.rank li[data-membro]:hover { background: var(--secondary); }
+.rank li.eu[data-membro]:hover { background: var(--blue-08); }
+.perfil-rec { display: flex; flex-direction: column; gap: 8px; }

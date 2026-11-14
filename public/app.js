@@ -640,6 +640,10 @@
             ${stat("user-small.svg", P.idade || "—", "Anos", { up: true, edit: "idade" })}
             ${stat("circle-check.svg", treinosFeitos(), "Treinos", { up: true })}
           </div>
+          <div class="perfil-rec">
+            <div class="sec-head"><h2>Meus recordes</h2>${uid ? `<span>visíveis para o seu grupo</span>` : ""}</div>
+            ${recordesHtml(linhasLocais(), "Registre o Max Out no MAX:30 ou faça o Fit Test do Insanity para ver seus recordes aqui.")}
+          </div>
           <div class="field">
             <span class="field-lbl">Em qual semana do programa você está?</span>
             <div class="seg">${PROGRAMA.map((s, i) => `<button class="${i === w ? "on" : ""}" data-semana="${i}">${i + 1}</button>`).join("")}</div>
@@ -983,16 +987,9 @@
     toast(ant ? `Fit Test salvo ✓ ${tot} reps (${dif >= 0 ? "+" : ""}${dif} desde o último)` : `Fit Test salvo ✓ ${tot} reps no total`);
     if (insFeito(p, k) !== era) render();
   }
-  // Evolução: tabela com os Fit Tests (linhas = movimentos, colunas = testes)
-  function tabelaFitTest(p) {
-    const h = fitHist(p).slice(-5), mov = VP[p].fitTest;
-    const tot = (f) => soma(f.map((n) => n || 0));
-    return `<div class="fit-tab-wrap"><table class="fit-tab">
-      <thead><tr><th>Movimento</th>${h.map((x, i) => `<th>${i + 1}º<small>${ddmm(x.k)}</small></th>`).join("")}</tr></thead>
-      <tbody>${mov.map((m, i) => `<tr><td>${esc(m)}</td>${h.map((x) => `<td>${x.fit[i] ?? "—"}</td>`).join("")}</tr>`).join("")}
-      <tr class="tot"><td>Total</td>${h.map((x) => `<td>${tot(x.fit)}</td>`).join("")}</tr></tbody></table></div>
-      ${h.length > 1 ? `<p class="note small">Do 1º ao último teste: ${tot(h[h.length - 1].fit) - tot(h[0].fit) >= 0 ? "+" : ""}${tot(h[h.length - 1].fit) - tot(h[0].fit)} repetições no total.</p>` : ""}`;
-  }
+  // Evolução: tabela com os meus Fit Tests (linhas = movimentos, colunas = testes)
+  const tabelaFitTest = (p) => tabelaFit(fitTests(linhasLocais()).filter((x) => x.p === p), VP[p].fitTest);
+
 
   /* ==========================================================
      Comunidade (Supabase): sincronização, métricas, medalhas, grupos, foto
@@ -1084,9 +1081,37 @@
   }
   const maxOuts = (rows) => rows.filter((r) => VP[r.programa]?.maxOut)
     .flatMap((r) => Object.entries(r.detalhes?.max || {}).map(([v, s]) => ({ k: r.data, v, s: Number(s) || 0 }))).filter((m) => m.s > 0 && INSV[m.v]);
+  // Fit Tests das linhas (Insanity): [{ k, p, fit, total }] em ordem de data
+  const fitTests = (rows) => rows.filter((r) => VP[r.programa]?.fitTest && Array.isArray(r.detalhes?.fit) && r.detalhes.fit.some((n) => n > 0))
+    .map((r) => ({ k: r.data, p: r.programa, fit: r.detalhes.fit, total: soma(r.detalhes.fit.map((n) => Number(n) || 0)) })).sort((a, b) => a.k.localeCompare(b.k));
+  // Melhor Max Out por vídeo: [{ v, best, ultimo, n }]
+  function melhoresMax(rows) {
+    const por = {};
+    maxOuts(rows).sort((a, b) => a.k.localeCompare(b.k)).forEach((m) => { const x = (por[m.v] = por[m.v] || { v: m.v, best: 0, ultimo: 0, n: 0 }); x.best = Math.max(x.best, m.s); x.ultimo = m.s; x.n++; });
+    return Object.values(por).sort((a, b) => b.best - a.best);
+  }
+  function tabelaFit(lista, mov) {
+    const h = lista.slice(-5), tot = (f) => soma(f.map((n) => Number(n) || 0));
+    return `<div class="fit-tab-wrap"><table class="fit-tab">
+      <thead><tr><th>Movimento</th>${h.map((x, i) => `<th>${i + 1}º<small>${ddmm(x.k)}</small></th>`).join("")}</tr></thead>
+      <tbody>${mov.map((m, i) => `<tr><td>${esc(m)}</td>${h.map((x) => `<td>${x.fit[i] ?? "—"}</td>`).join("")}</tr>`).join("")}
+      <tr class="tot"><td>Total</td>${h.map((x) => `<td>${tot(x.fit)}</td>`).join("")}</tr></tbody></table></div>
+      ${h.length > 1 ? `<p class="note small">Do 1º ao último teste: ${tot(h[h.length - 1].fit) - tot(h[0].fit) >= 0 ? "+" : ""}${tot(h[h.length - 1].fit) - tot(h[0].fit)} repetições no total.</p>` : ""}`;
+  }
+  // Bloco "Recordes": Max Out (melhor por vídeo) e Fit Test. Usado no meu perfil e no perfil de quem está no grupo.
+  function recordesHtml(rows, vazio) {
+    const mb = melhoresMax(rows), ft = fitTests(rows);
+    if (!mb.length && !ft.length) return `<p class="note">${vazio}</p>`;
+    const max = mb.length ? `<div class="sec-head" style="margin-top:4px"><h2>Max Out</h2><span>${mb.length} ${mb.length === 1 ? "vídeo" : "vídeos"}</span></div>
+      <ul class="rec-list">${mb.map((x) => `<li><span>${esc(INSV[x.v].nome)}<small>${x.n} ${x.n === 1 ? "registro" : "registros"} · último ${mmss(x.ultimo)}</small></span><strong>${icon("zap.svg")}${mmss(x.best)}</strong></li>`).join("")}</ul>` : "";
+    const fit = VPROGS.filter((P) => P.fitTest).map((P) => { const l = ft.filter((x) => x.p === P.k); return l.length ? `<div class="sec-head" style="margin-top:12px"><h2>Fit Test · ${esc(P.nome)}</h2><span>${l[l.length - 1].total} reps</span></div>${tabelaFit(l, P.fitTest)}` : ""; }).join("");
+    return max + fit;
+  }
   function kpis(rows) {
     const f = feitas(rows), mx = maxOuts(rows);
-    return { treinos: f.length, minutos: soma(f.map((r) => r.minutos || 0)), dias: new Set(f.map((r) => r.data)).size, maxMedio: mx.length ? Math.round(soma(mx.map((m) => m.s)) / mx.length) : 0, maxouts: mx.length };
+    const ft = fitTests(rows);
+    return { treinos: f.length, minutos: soma(f.map((r) => r.minutos || 0)), dias: new Set(f.map((r) => r.data)).size, maxMedio: mx.length ? Math.round(soma(mx.map((m) => m.s)) / mx.length) : 0, maxouts: mx.length,
+      fit: ft.length ? ft[ft.length - 1].total : 0, fitEvo: ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0, fits: ft.length };
   }
   const PERIODOS = {
     semana: ["Semana", () => keyOf(mondayOf(hoje))],
@@ -1130,7 +1155,8 @@
     mx.forEach((m) => { if (best[m.v] && m.s > best[m.v]) recordes++; best[m.v] = Math.max(best[m.v] || 0, m.s); });
     return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
       melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
-      insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length };
+      insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length, fits: fitTests(rows).length,
+      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })() };
   }
   const CONQ = [
     ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
@@ -1149,6 +1175,9 @@
     ["maxrec", "📈", "Recorde de Max Out", (m) => [m.recordes, 1]],
     ["ins24", "🌀", "24 treinos de Insanity", (m) => [m.insanity, 24]],
     ["ins48", "💀", "Insanity completo (48)", (m) => [m.insanity, 48]],
+    ["fit1", "📋", "Primeiro Fit Test", (m) => [m.fits, 1]],
+    ["fit50", "📈", "+50 reps no Fit Test", (m) => [m.fitEvo, 50]],
+    ["fit5", "🏁", "5 Fit Tests (Insanity completo)", (m) => [m.fits, 5]],
     ["grupo", "🤝", "Entrou num grupo", (m) => [m.grupos, 1]],
   ];
   const CONQI = Object.fromEntries(CONQ.map((c) => [c[0], c]));
@@ -1320,17 +1349,21 @@
     minutos: ["Tempo", (k) => k.minutos, (v) => fmtMin(v)],
     sequencia: ["Sequência", (k) => k.seq, (v) => `${v} ${v === 1 ? "dia" : "dias"}`],
     maxout: ["Max Out", (k) => k.maxMedio, (v) => (v ? mmss(v) : "—")],
+    fit: ["Fit Test", (k) => k.fit, (v) => (v ? `${v} reps` : "—")],
+    fitevo: ["Evolução Fit Test", (k) => k.fitEvo, (v) => (v ? `${v > 0 ? "+" : ""}${v} reps` : "—")],
   };
   function ranking() {
     const [, val, fmt] = RANKS[G.rank];
     const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual } }; })
       .sort((a, b) => val(b.k) - val(a.k) || b.k.treinos - a.k.treinos);
     const med = ["🥇", "🥈", "🥉"];
-    return `<ol class="rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}">
+    return `<ol class="rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}" data-membro="${x.id}" role="link" tabindex="0" aria-label="Ver perfil de ${esc(x.p?.nome || "Atleta")}">
       <span class="pos">${val(x.k) && i < 3 ? med[i] : i + 1}</span>${avatar(x.p, 36)}
       <span class="nome">${esc(x.p?.nome || "Atleta")}${x.id === uid ? " <small>(você)</small>" : ""}</span>
       <strong>${fmt(val(x.k))}</strong></li>`).join("")}</ol>
       ${G.rank === "maxout" ? `<p class="note small">Média do Max Out nos vídeos do ${esc(NOMES_MAXOUT)} no período: quanto mais tarde a pessoa cansou, melhor.</p>` : ""}
+      ${G.rank === "fit" ? `<p class="note small">Total de repetições no último Fit Test do Insanity feito no período.</p>` : ""}
+      ${G.rank === "fitevo" ? `<p class="note small">Quantas repetições a pessoa ganhou do primeiro ao último Fit Test do período.</p>` : ""}
       ${G.rank === "minutos" ? `<p class="note small">Tempo dos vídeos concluídos e do cronômetro. Na calistenia sem cronômetro, conta 3 min por série.</p>` : ""}`;
   }
   const evoSwitch = (on) => `<nav class="seg prog" aria-label="Evolução">
@@ -1339,6 +1372,7 @@
   function telaGrupo(p1, p2) {
     setToolbar("evolucao");
     if (p1 === "entrar" && p2) { setTimeout(() => entrarComCodigo(p2), 0); return `<section class="screen has-toolbar"><p class="note" style="padding:40px 20px">Entrando no grupo…</p></section>`; }
+    if (p1 === "membro" && p2 && uid && G.grupos) return telaMembro(p2);
     const head = `<header class="header"><span class="logo-txt dark">Fit.ai</span></header>${evoSwitch("grupo")}`;
     if (!uid) return `<section class="screen has-toolbar">${head}<div class="section">
       <p class="note">Os grupos juntam amigos num ranking de treinos, tempo, sequência e Max Out. Para participar, entre com uma conta.</p>
@@ -1386,6 +1420,19 @@
       <div class="section"><div class="sec-head"><h2>Atividade recente</h2><button class="lnk-btn" id="g-atualizar">Atualizar</button></div>${atividade()}</div>
       <div class="section"><button class="btn btn-outline" id="g-sair">Sair do grupo</button></div>
     </section>`;
+  }
+  // Perfil de alguém do grupo: números, Max Out e Fit Test (o que a pessoa sincronizou)
+  function telaMembro(id) {
+    const p = G.perfis[id];
+    if (!p || !G.membros.includes(id)) return telaGrupo();
+    const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows);
+    return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
+      <div class="page-head"><a class="icon-btn" href="#/grupo" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a><h1>Perfil</h1><span class="spacer"></span></div>
+      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""}</strong><span>${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
+      <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
+      <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
+      <div>${recordesHtml(rows, `${esc((p.nome || "Essa pessoa").split(" ")[0])} ainda não registrou Max Out nem Fit Test.`)}</div>
+      </div></section>`;
   }
   function grupoHome() {
     if (!uid) return "";
@@ -1435,7 +1482,7 @@
     let alvo = `#/${rota}`;
     if (rota === "treino") alvo += `/${p1}/${p2}`;
     else if (VP[rota] && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
-    else if (rota === "grupo" && p1 === "entrar" && p2) alvo += `/entrar/${p2}`;
+    else if (rota === "grupo" && (p1 === "entrar" || p1 === "membro") && p2) alvo += `/${p1}/${p2}`;
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
@@ -1558,7 +1605,7 @@
 
   /* ---------- Cliques ---------- */
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("button, a");
+    const t = e.target.closest("button, a, [data-membro]");
     if (!t) return;
     if (t.id === "google") loginGoogle(t);
     else if (t.id === "visitante") entrar(null);
@@ -1575,6 +1622,7 @@
     else if (t.id === "g-convidar") convidar(grupoSel());
     else if (t.dataset.gPeriodo) { G.periodo = t.dataset.gPeriodo; render(); }
     else if (t.dataset.gRank) { G.rank = t.dataset.gRank; render(); }
+    else if (t.dataset.membro) location.hash = `#/grupo/membro/${t.dataset.membro}`;
     else if (t.id === "g-atualizar") { carregarGrupos(true); toast("Atualizando…"); }
     else if (t.id === "g-meta") {
       const g = grupoSel(), n = parseInt(prompt("Meta de treinos do grupo por semana:", g.meta_semanal), 10);
@@ -1679,7 +1727,10 @@
     } catch { toast("Arquivo de backup inválido."); }
   });
   $(".chat-backdrop").addEventListener("click", () => closeChat());
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeChat();
+    if ((e.key === "Enter" || e.key === " ") && e.target.dataset?.membro) { e.preventDefault(); location.hash = `#/grupo/membro/${e.target.dataset.membro}`; }
+  });
 
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
