@@ -56,6 +56,9 @@
   };
   const P = (typeof window.FITAI_PROGRAMA === "function" ? window.FITAI_PROGRAMA : EXEMPLO)(E, D);
   const PROGRAMA = P.programa, EMERGENCIA = P.emergencia, NOME_PROG = P.nome, CICLO = P.ciclo;
+  // Calistenia no catálogo de programas (nível e descrição podem vir do programa pessoal)
+  const CALI = { k: "plano", nome: NOME_PROG, curto: NOME_PROG, nivel: P.nivel || "Avançado", ordem: P.ordem || 3,
+    sobre: P.sobre || "Calistenia com barra: flexões, barras, agachamentos e core, anotando as repetições de cada série com progressão semana a semana. Pede força de base (conseguir fazer algumas barras ajuda muito)." };
   const IMG = { Empurrar: "login.jpg", Superior: "login.jpg", Puxar: "treino-superiores-2.jpg", Pernas: "treino-inferiores-1.jpg",
     Perna: "treino-inferiores-1.jpg", Inferior: "treino-inferiores-1.jpg", Core: "treino-inferiores-2.jpg", Tiro: "treino-inferiores-1.jpg" };
   const imgDe = (t) => A(IMG[t.foco] || "banner-home.jpg");
@@ -135,6 +138,23 @@
   const VP = Object.fromEntries(VPROGS.map((p) => [p.k, p]));
   const VKEYS = VPROGS.map((p) => p.k);
   const vazioVP = () => ({ inicio: null, logs: {} });
+  // Catálogo em ordem de nível: o caminho natural é do primeiro ao último (MAX:30 → Insanity → calistenia)
+  const CATALOGO = [...VPROGS, CALI].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
+  const progDe = (k) => CATALOGO.find((x) => x.k === k) || null;
+  const NIVEIS = [
+    ["Iniciante", "Estou começando ou voltando agora"],
+    ["Intermediário", "Já treino com regularidade"],
+    ["Avançado", "Treino pesado há tempo (faço barra)"],
+  ];
+  const recomendado = (nivel) => CATALOGO.find((x) => x.nivel === nivel) || CATALOGO[0];
+  const caminhoTxt = () => CATALOGO.map((x) => x.nome).join(" → ");
+  // Programa de vídeo começa na segunda desta semana; de sexta em diante, na próxima segunda
+  const inicioNovo = () => keyOf(hojeDia >= 4 ? addDays(mondayOf(hoje), 7) : mondayOf(hoje));
+  function escolherPrograma(k) {
+    S.principal = k;
+    if (VP[k] && !S[k].inicio) S[k].inicio = inicioNovo();
+    save();
+  }
 
   /* ---------- Estado ---------- */
   const KEY = "fitai-state-v1";
@@ -166,6 +186,7 @@
   const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k));
   const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || VKEYS.some((p) => insParcial(p, k));
   const diasVideo = () => VKEYS.flatMap((p) => Object.keys(S[p].logs));
+  const principal = () => (S.principal && progDe(S.principal) ? S.principal : "plano");
 
   function sequencia() {
     let d = feito(hojeKey) ? hoje : addDays(hoje, -1), c = 0;
@@ -337,6 +358,8 @@
   function setToolbar(tab) {
     const tb = $("#toolbar");
     tb.hidden = !tab;
+    const plano = tb.querySelector('[data-tab="plano"]'); // o botão de calendário abre o programa principal
+    if (plano) plano.setAttribute("href", `#/${principal()}`);
     tb.querySelectorAll(".tb-item").forEach((a) => {
       const on = a.dataset.tab === tab, img = a.querySelector("img");
       img.src = on ? img.dataset.on : img.dataset.off;
@@ -515,7 +538,7 @@
           <span class="logo-txt">Fit.ai</span>
           <div class="banner-row">
             <div class="hello"><h1>Olá, ${esc(primeiroNome())}</h1><p>${sub}</p></div>
-            <a class="btn btn-blue" href="#/treino/${w}/${d}">Bora!</a>
+            <a class="btn btn-blue" href="${principal() === "plano" ? `#/treino/${w}/${d}` : linkHojeVideo(principal())}">Bora!</a>
           </div>
         </div>
         <div class="section">
@@ -527,10 +550,10 @@
         </div>
         <div class="section">
           ${grupoHome()}
-          <div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>
+          ${principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : treinoHojeVideo(principal())}
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
-          ${t ? workoutCard(w, d) : ""}
-          ${videoHome()}
+          ${t && principal() === "plano" ? workoutCard(w, d) : ""}
+          ${videoHome(principal())}
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -640,6 +663,11 @@
             ${stat("user-small.svg", P.idade || "—", "Anos", { up: true, edit: "idade" })}
             ${stat("circle-check.svg", treinosFeitos(), "Treinos", { up: true })}
           </div>
+          <div class="field">
+            <span class="field-lbl">Seu programa principal · caminho: ${esc(caminhoTxt())}</span>
+            <div class="prog-cat">${CATALOGO.map((x, i) => `<button class="prog-opt${principal() === x.k ? " on" : ""}" data-principal="${x.k}">
+              <span class="po-n">${i + 1}</span><span class="po-txt"><strong>${esc(x.nome)}</strong><small>${esc(x.nivel)}${S.nivel === x.nivel ? " · seu nível" : ""}</small></span>${principal() === x.k ? "<b>✓</b>" : ""}</button>`).join("")}</div>
+          </div>
           <div class="perfil-rec">
             <div class="sec-head"><h2>Meus recordes</h2>${uid ? `<span>visíveis para o seu grupo</span>` : ""}</div>
             ${recordesHtml(linhasLocais(), "Registre o Max Out no MAX:30 ou faça o Fit Test do Insanity para ver seus recordes aqui.")}
@@ -701,10 +729,21 @@
         ${S[p].inicio ? `<button class="btn btn-outline" id="ins-parar" data-p="${p}" style="margin-top:12px">Pausar ${esc(P.nome)}</button>` : ""}
       </div></section>`;
   }
-  // Tela inicial: o treino de hoje de cada programa em vídeo em andamento (ou atalhos, se nenhum começou)
-  function videoHome() {
-    const ativos = VPROGS.filter((P) => S[P.k].inicio);
-    if (!ativos.length) return VPROGS.map((P) => `<a class="emerg" href="#/${P.k}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)}</strong><small>${esc(P.resumo || "Programa em vídeo · toque para começar")}</small></div></a>`).join("");
+  // Tela inicial: o treino de hoje do programa principal, quando ele é em vídeo
+  const linkHojeVideo = (p) => { const h = insHoje(p); return h ? `#/${p}/${h.w}/${h.d}` : `#/${p}`; };
+  function treinoHojeVideo(p) {
+    const P = VP[p], h = insHoje(p), w = insSemanaDe(p, hoje);
+    const head = `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/${p}${h ? `/${h.w}` : ""}">${esc(P.curto)}${h ? ` · Semana ${h.w + 1}` : ""}</a></div>`;
+    if (h) return head + insCard(p, h.w, h.d);
+    if (S[p].inicio && w < 0) return head + `<a class="emerg" href="#/${p}"><span>${icon("calendar-14.svg", 20)}</span><div><strong>Seu ${esc(P.nome)} começa na segunda, ${ddmm(S[p].inicio)}</strong><small>Toque para ver o calendário da semana 1</small></div></a>`;
+    if (S[p].inicio) return head + `<a class="emerg" href="#/${p}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)} concluído! 🏆</strong><small>Próximo passo do caminho: ${esc(proximoDe(p)?.nome || "repetir o programa")}</small></div></a>`;
+    return head + `<a class="emerg" href="#/${p}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)}</strong><small>Toque para escolher a semana e começar</small></div></a>`;
+  }
+  const proximoDe = (k) => { const i = CATALOGO.findIndex((x) => x.k === k); return i >= 0 ? CATALOGO[i + 1] || null : null; };
+  // Tela inicial: o treino de hoje dos outros programas em vídeo em andamento (ou atalhos, se nenhum começou)
+  function videoHome(excluir = null) {
+    const ativos = VPROGS.filter((P) => S[P.k].inicio && P.k !== excluir);
+    if (!ativos.length) return excluir ? "" : VPROGS.map((P) => `<a class="emerg" href="#/${P.k}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)}</strong><small>${esc(P.resumo || "Programa em vídeo · toque para começar")}</small></div></a>`).join("");
     return ativos.map((P) => {
       const h = insHoje(P.k);
       return h ? `<div class="sec-head" style="margin-top:8px"><h2>${esc(P.nome)}</h2><a href="#/${P.k}/${h.w}">Semana ${h.w + 1} · ${P.semanas[h.w].nome.split(" · ")[0]}</a></div>${insCard(P.k, h.w, h.d)}` : "";
@@ -1044,7 +1083,7 @@
         const { error } = await sb.from("treinos").upsert(linhas.map((r) => ({ ...r, usuario_id: uid, atualizado_em: agora })));
         if (!error) { linhas.forEach((r) => (enviados[chave(r)] = JSON.stringify(r))); guardarEnviados(); G.carregadoEm = 0; }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])) };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -1595,6 +1634,9 @@
     if (perfil?.config) {
       if (perfil.config.inicio && !Object.keys(S.logs).length) S.inicio = perfil.config.inicio;
       for (const p of VKEYS) if (perfil.config[p] !== undefined && !Object.keys(S[p].logs).length) S[p].inicio = perfil.config[p];
+      if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
+      if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
+      if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
     else { S.user = user; save(); }
@@ -1632,6 +1674,13 @@
     else if (t.dataset.gPeriodo) { G.periodo = t.dataset.gPeriodo; render(); }
     else if (t.dataset.gRank) { G.rank = t.dataset.gRank; render(); }
     else if (t.dataset.membro) location.hash = `#/grupo/membro/${t.dataset.membro}`;
+    else if (t.dataset.principal) {
+      const x = progDe(t.dataset.principal);
+      if (!x || x.k === principal()) return;
+      escolherPrograma(x.k);
+      toast(VP[x.k] && insSemanaDe(x.k, hoje) < 0 ? `${x.nome} é seu programa principal. Começa na segunda, ${ddmm(S[x.k].inicio)}. 💪` : `${x.nome} é seu programa principal agora. 💪`, 4000);
+      render();
+    }
     else if (t.id === "g-atualizar") { carregarGrupos(true); toast("Atualizando…"); }
     else if (t.id === "g-meta") {
       const g = grupoSel(), n = parseInt(prompt("Meta de treinos do grupo por semana:", g.meta_semanal), 10);
@@ -1747,7 +1796,8 @@
   let chatLog = [];
   let busy = false;
 
-  const bubbleHTML = (m) => `<div class="msg${m.me ? " me" : ""}"><div class="bubble">${m.html}</div></div>`;
+  // Texto solto (com <b>, <br>…) vai dentro de um <p>: a bolha é flex em coluna e quebraria a frase em pedaços
+  const bubbleHTML = (m) => `<div class="msg${m.me ? " me" : ""}"><div class="bubble">${/^\s*<(p|ul|ol|div|h\d)\b/i.test(m.html) ? m.html : `<p>${m.html}</p>`}</div></div>`;
   function addMsg(box, html, me = false, log = null) {
     const m = { html, me };
     if (log) log.push(m);
@@ -1824,7 +1874,13 @@
       P.coach || "",
       ...P.semanas.map((s, w) => `## Semana ${w + 1} (${s.nome}): ${s.dias.map((t, d) => `${DIAS[d]}: ${t.titulo}`).join(" | ")}`),
       `Vídeos: ${P.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}`).join("; ")}`].filter(Boolean).join("\n")).join("\n\n");
-    return [`# Programa: ${NOME_PROG}`, ...sem, `## Treino de emergência (15 min)\n${EMERGENCIA.ex.map((e) => "- " + linhaEx(e)).join("\n")}`,
+    const caminho = [`# Programas do app e caminho recomendado (do mais acessível ao mais avançado)`,
+      ...CATALOGO.map((x, i) => `${i + 1}. ${x.nome} — nível ${x.nivel}. ${x.sobre}`),
+      `Caminho natural: ${caminhoTxt()}. Quem está começando ou voltando começa pelo ${CATALOGO[0].nome}.`,
+      "Como recomendar: pergunte (ou use o contexto) o nível e a rotina da pessoa e indique UM programa para começar, explicando o porquê em uma frase. Iniciante → 1º programa; já treina com regularidade → 2º; treina pesado e faz barra → 3º. Na dúvida, o mais acessível.",
+      "Quando avançar: ao terminar o programa atual com constância (poucas faltas) e evolução clara (Max Out mais tarde nos vídeos do MAX:30; mais repetições no Fit Test do Insanity), sugira o próximo do caminho. Se a pessoa falhou muitos treinos ou parou mais de 2 semanas, sugira repetir o programa atual em vez de avançar.",
+      "Para trocar o programa principal no app: Perfil → Seu programa principal."].join("\n");
+    return [caminho, `# Programa: ${NOME_PROG} (nível ${CALI.nivel})`, ...sem, `## Treino de emergência (15 min)\n${EMERGENCIA.ex.map((e) => "- " + linhaEx(e)).join("\n")}`,
       CICLO, ins].filter(Boolean).join("\n\n");
   }
   function contextoTexto(comCorridas) {
@@ -1832,6 +1888,7 @@
     const P = S.perfil, out = [];
     out.push(`Hoje: ${DIAS[hojeDia]}, ${hojeKey}. ${nomeSemana(w)}, ciclo ${cicloDe(hoje)}. Treino de hoje: ${t ? t.titulo : "—"}.`);
     out.push(`Perfil: ${P.peso || "?"} kg, ${P.altura || "?"} cm, ${P.idade || "?"} anos. Sequência atual: ${sequencia()} dias. Treinos concluídos: ${treinosFeitos()}.`);
+    out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
     const lh = logHoje();
     if (lh) out.push(`Registrado hoje (${lh.done ? "concluído" : "em andamento"}): ${Object.entries(lh.sets || {}).filter(([, v]) => v.length).map(([id, v]) => `${EXI[id]?.nome || id} ${v.join("+")}`).join("; ") || "nada ainda"}.`);
     const dias = Object.keys(S.logs).sort().filter((k) => k < hojeKey).slice(-21);
@@ -1919,6 +1976,10 @@
       const quando = w === "E" ? "Hoje você escolheu o <b>Treino de emergência</b>" : `Hoje é <b>${DIAS[d]} da Semana ${w + 1} (${PROGRAMA[w].nome})</b>`;
       return { html: `${quando}: <b>${esc(tr.titulo)}</b>.<br>${tr.ex.map((e) => `• ${esc(e.nome)}: ${prescricao(e)}`).join("<br>")}${tr.obs ? `<br><br>${esc(tr.obs)}` : ""}<br><br>Anote cada série no treino. Bora! 🔥` };
     }
+    if (t.includes("comec") || t.includes("nivel") || t.includes("qual programa") || t.includes("qual treino") || t.includes("iniciante") || t.includes("proximo programa")) {
+      const r = recomendado(S.nivel || "Iniciante");
+      return { html: `O caminho natural no FIT.AI é <b>${esc(caminhoTxt())}</b>.<br>${CATALOGO.map((x, i) => `${i + 1}. <b>${esc(x.nome)}</b> (${esc(x.nivel)}): ${esc(x.sobre)}`).join("<br>")}<br><br>${S.nivel ? `Pelo seu nível (${esc(S.nivel)}), comece pelo <b>${esc(r.nome)}</b>.` : `Começando ou voltando? Vá de <b>${esc(CATALOGO[0].nome)}</b>.`} Para trocar: Perfil → Seu programa principal.` };
+    }
     if (t.includes("programa") || t.includes("funciona") || t.includes("semana")) {
       return { html: `O <b>${esc(NOME_PROG)}</b> tem ${PROGRAMA.length} semanas: ${PROGRAMA.map((s, i) => `<b>${i + 1}. ${s.nome}</b>`).join(", ")}. Você está na <b>Semana ${Math.max(0, semanaDe(hoje)) + 1}</b>${cicloDe(hoje) > 1 ? ` do ciclo ${cicloDe(hoje)}` : ""}. ${esc(CICLO)} Só aumente a dificuldade quando ficar claramente fácil.` };
     }
@@ -1935,30 +1996,59 @@
     const SEMANAS = PROGRAMA.map((s, i) => `Semana ${i + 1} · ${s.nome}`);
     const intro = [
       S.user ? `Bem-vindo ao FIT.AI, ${esc(primeiroNome())}! 🎉` : "Bem-vindo ao FIT.AI! 🎉",
-      `Aqui você segue o ${esc(NOME_PROG)}, registra as repetições de cada série e acompanha sua evolução semana a semana — com uma IA disponível 24h para te guiar em cada exercício.`,
-      "Vamos configurar seu perfil?",
+      `Aqui tem ${CATALOGO.length} programas, do mais acessível ao mais puxado: <b>${esc(caminhoTxt())}</b>. Você registra cada treino, acompanha a evolução e tem uma IA disponível 24h para te guiar.`,
+      "Vou te indicar por onde começar. Como está seu condicionamento hoje?",
     ];
     for (const [i, m] of intro.entries()) await falar(m, i === 1 ? 1000 : 600);
-    setChips(chips, ["Começar!"], true);
+    setChips(chips, NIVEIS.map(([, txt]) => txt));
+    etapa = "nivel";
+
+    async function escolhido(x) {
+      chips.innerHTML = "";
+      if (x.k === "plano") {
+        S.principal = "plano"; save();
+        etapa = "semana";
+        await falar(`Fechado: <b>${esc(x.nome)}</b>! Em qual semana dele você está agora?`);
+        setChips(chips, SEMANAS);
+        return;
+      }
+      escolherPrograma(x.k);
+      etapa = "fim";
+      const w = insSemanaDe(x.k, hoje);
+      await falar(w < 0
+        ? `Fechado: <b>${esc(x.nome)}</b>! Sua semana 1 começa na <b>segunda, ${ddmm(S[x.k].inicio)}</b>. Até lá, dá para conhecer os vídeos e fazer um extra: tudo conta. 💪`
+        : `Fechado: <b>${esc(x.nome)}</b>! Você está na <b>semana 1</b>. Abra o treino de hoje, toque em Assistir e marque cada vídeo como feito. ${VP[x.k].maxOut ? "Anote também o seu <b>Max Out</b>: é ele que mostra a sua evolução." : "Nos dias de <b>Fit Test</b>, anote as repetições de cada movimento."} 🔥`, 1100);
+      setChips(chips, ["Ver meu programa"], true);
+    }
 
     async function responder(txt) {
       const t = norm(txt);
-      if (etapa === "inicio") {
-        etapa = "semana"; chips.innerHTML = "";
+      if (etapa === "nivel") {
         addMsg(box, esc(txt), true);
-        await falar(`Em qual semana do ${esc(NOME_PROG)} você está agora?`);
-        setChips(chips, SEMANAS);
+        const n = NIVEIS.find(([, frase]) => norm(frase) === t) || NIVEIS.find(([nv]) => t.includes(norm(nv)));
+        if (!n) return falar("Toque numa das opções abaixo. 😉");
+        S.nivel = n[0]; save();
+        const r = recomendado(n[0]);
+        etapa = "programa"; chips.innerHTML = "";
+        await falar(`Pelo que você disse, comece pelo <b>${esc(r.nome)}</b>: ${esc(r.sobre)}`, 1100);
+        if (r !== CATALOGO[0]) await falar(`Se preferir ir com calma, o caminho natural começa pelo <b>${esc(CATALOGO[0].nome)}</b>.`);
+        setChips(chips, [`Começar o ${r.nome}`, ...CATALOGO.filter((x) => x !== r).map((x) => `Prefiro o ${x.nome}`)]);
+      } else if (etapa === "programa") {
+        addMsg(box, esc(txt), true);
+        const x = CATALOGO.find((p) => t.endsWith(norm(p.nome)));
+        if (!x) return falar("Toque numa das opções abaixo. 😉");
+        await escolhido(x);
       } else if (etapa === "semana") {
         addMsg(box, esc(txt), true);
-        const n = Number((t.match(/[1-4]/) || [])[0]);
-        if (!n) return falar("Toque em uma das semanas abaixo. 😉");
+        const n = Number((t.match(/[1-9]/) || [])[0]);
+        if (!n || n > PROGRAMA.length) return falar("Toque em uma das semanas abaixo. 😉");
         S.inicio = keyOf(addDays(mondayOf(hoje), -(n - 1) * 7));
         etapa = "fim"; chips.innerHTML = "";
         const tr = treino(n - 1, hojeDia);
         await falar(`Perfeito! Hoje é <b>${DIAS[hojeDia]} da Semana ${n}</b>: <b>${esc(tr.titulo)}</b>. Em cada exercício, anote as repetições de cada série. Eu comparo com o treino anterior e te mostro a evolução. 🔥`, 1100);
         setChips(chips, ["Ver treino de hoje"], true);
       } else if (etapa === "fim") {
-        S.onboarded = true; save(); location.hash = "#/home";
+        S.onboarded = true; save(); location.hash = principal() === "plano" ? "#/home" : `#/${principal()}`;
       }
     }
     chips.addEventListener("click", (e) => { const c = e.target.closest("[data-chip]"); if (c) responder(c.dataset.chip); });

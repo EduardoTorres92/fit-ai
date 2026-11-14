@@ -584,3 +584,13 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .rank li[data-membro]:hover { background: var(--secondary); }
 .rank li.eu[data-membro]:hover { background: var(--blue-08); }
 .perfil-rec { display: flex; flex-direction: column; gap: 8px; }
+
+/* Perfil: programa principal (caminho MAX:30 → Insanity → calistenia) */
+.prog-cat { display: flex; flex-direction: column; gap: 6px; }
+.prog-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; text-align: left; transition: border-color 160ms ease, background-color 160ms ease; }
+.prog-opt.on { border-color: var(--blue); background: var(--blue-08); }
+.prog-opt .po-n { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 99px; background: var(--secondary); font-size: 13px; font-weight: 700; flex: none; }
+.prog-opt.on .po-n { background: var(--blue); color: #fff; }
+.prog-opt .po-txt { display: flex; flex-direction: column; flex: 1; font-size: 14px; }
+.prog-opt .po-txt small { font-size: 12px; color: var(--muted); }
+.prog-opt b { color: var(--blue); }
