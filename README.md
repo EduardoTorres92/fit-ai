@@ -26,6 +26,15 @@ App web mobile para seguir um programa de calistenia, registrar as repetições 
   - `/api/auth` cuida das contas, guardadas no Netlify Blobs.
 - **Custos sob controle**: visitantes usam um modelo menor, só sobre treino, com limite de perguntas por dia (por visitante e geral).
 
+## Hospedar fora da Netlify (Hostinger ou qualquer Node.js)
+
+`server.mjs` entrega a pasta `public/` e as rotas `/api/auth` e `/api/coach` com as mesmas funções da Netlify. Contas e limites do Coach ficam em arquivos JSON em `DADOS_DIR` (padrão `~/fitai-dados`, fora da pasta do app).
+
+```bash
+npm install
+ANTHROPIC_API_KEY=... ALLOWED_EMAIL=voce@exemplo.com npm start   # porta em PORT, padrão 3000
+```
+
 ## Rodar no seu computador
 
 ```bash
