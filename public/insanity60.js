@@ -20,6 +20,24 @@ window.FITAI_INSANITY60 = (() => {
     V("insane-abs", "Insane Abs", 31, "Abdômen", "Mês 2: abdômen e core em alta intensidade."),
     V("upper-body-weight-training", "Upper Body Weight Training", 50, "Força", "Bônus: treino de superiores com halteres. Fora do calendário."),
   ];
+  // Músculos trabalhados (análise do conteúdo de cada treino) e o mapa usado na imagem (assets/musculos/<mapa>.webp)
+  const MUSC = {
+    "fit-test": ["corpo", "Corpo inteiro: pernas, glúteos, core, ombros, peitoral e tríceps"],
+    "plyometric-cardio-circuit": ["pernas", "Quadríceps, glúteos, posteriores e panturrilhas (saltos), com core"],
+    "cardio-power-resistance": ["forca", "Peitoral, ombros, tríceps, quadríceps, glúteos e abdômen"],
+    "cardio-recovery": ["estabilidade", "Quadríceps e glúteos (isometria), abdômen e lombar, com alongamento"],
+    "pure-cardio": ["pernas", "Pernas, glúteos, panturrilhas e core, sem pausa"],
+    "cardio-abs": ["core", "Reto abdominal, oblíquos e flexores do quadril"],
+    "core-cardio-balance": ["estabilidade", "Abdômen, oblíquos, lombar, glúteos e equilíbrio"],
+    "max-interval-circuit": ["corpo", "Corpo inteiro: pernas, glúteos, core, peitoral, ombros e tríceps"],
+    "max-interval-plyo": ["forca", "Quadríceps, glúteos e panturrilhas (pliometria), peitoral, ombros e tríceps"],
+    "max-cardio-conditioning": ["pernas", "Quadríceps, glúteos, posteriores, panturrilhas e abdômen"],
+    "max-recovery": ["estabilidade", "Quadríceps e glúteos (isometria), core e ombros, com alongamento"],
+    "max-interval-sports-training": ["luta", "Pernas, glúteos, panturrilhas, oblíquos e ombros (agilidade e saltos)"],
+    "insane-abs": ["core", "Abdômen, oblíquos, lombar e flexores do quadril"],
+    "upper-body-weight-training": ["superior", "Peitoral, costas, ombros, bíceps e tríceps (com halteres)"],
+  };
+  VIDEOS.forEach((v) => { if (MUSC[v.id]) [v.mapa, v.musculos] = MUSC[v.id]; });
   const N = Object.fromEntries(VIDEOS.map((v) => [v.id, v.nome]));
   const OFF = { titulo: "Descanso", ids: [] };
   const d = (...ids) => ({ titulo: ids.map((i) => N[i]).join(" + "), ids });

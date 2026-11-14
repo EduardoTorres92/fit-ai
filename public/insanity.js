@@ -20,6 +20,26 @@ window.FITAI_INSANITY = (() => {
     V("360-abs", "360° Abs", 16, "Abdômen", "Ab Maximizer: abdômen e core no chão, em prancha e mais."),
     V("max-out-15", "Max Out 15", 15, "Cardio", "15 min de cardio intenso. Bom para dias sem tempo."),
   ];
+  // Músculos trabalhados (análise do conteúdo de cada treino) e o mapa usado na imagem (assets/musculos/<mapa>.webp)
+  const MUSC = {
+    "cardio-challenge": ["pernas", "Quadríceps, glúteos, posteriores, panturrilhas e abdômen"],
+    "tabata-power": ["pernas", "Quadríceps, glúteos, posteriores e panturrilhas (saltos), com o core firme"],
+    "sweat-intervals": ["pernas", "Pernas, glúteos e abdômen, com ombros nos movimentos de braço"],
+    "sweat-fest": ["pernas", "Pernas, glúteos e abdômen, com ombros nos movimentos de braço"],
+    "tabata-strength": ["forca", "Peitoral, ombros, tríceps, quadríceps, glúteos e abdômen"],
+    "friday-fight-1": ["luta", "Ombros, oblíquos, abdômen, glúteos, quadríceps e panturrilhas"],
+    "pulse": ["estabilidade", "Abdômen, oblíquos, lombar, glúteos e quadríceps, em ritmo moderado"],
+    "max-out-cardio": ["pernas", "Quadríceps, glúteos, posteriores, panturrilhas e abdômen"],
+    "max-out-power": ["pernas", "Quadríceps, glúteos, posteriores e panturrilhas (pliometria), com core"],
+    "max-out-sweat": ["corpo", "Corpo inteiro: pernas, glúteos, core, ombros e peitoral"],
+    "max-out-strength": ["forca", "Peitoral, ombros, tríceps, quadríceps, glúteos e abdômen"],
+    "friday-fight-2": ["luta", "Ombros, oblíquos, abdômen, glúteos, quadríceps e panturrilhas"],
+    "ab-attack-10": ["core", "Reto abdominal, oblíquos e flexores do quadril"],
+    "max-out-abs": ["core", "Abdômen, oblíquos e flexores do quadril, sentado e em pé"],
+    "360-abs": ["core", "Abdômen, oblíquos, lombar e ombros (pranchas)"],
+    "max-out-15": ["pernas", "Pernas, glúteos e abdômen"],
+  };
+  VIDEOS.forEach((v) => { if (MUSC[v.id]) [v.mapa, v.musculos] = MUSC[v.id]; });
   const DESCANSO = { titulo: "Descanso", ids: [] };
   const dia = (titulo, ...ids) => ({ titulo, ids });
   const s = (ids) => dia(ids.map((i) => VIDEOS.find((v) => v.id === i).nome.replace(" · ", " ")).join(" + "), ...ids);

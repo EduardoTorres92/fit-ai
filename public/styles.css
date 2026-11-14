@@ -594,3 +594,11 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .prog-opt .po-txt { display: flex; flex-direction: column; flex: 1; font-size: 14px; }
 .prog-opt .po-txt small { font-size: 12px; color: var(--muted); }
 .prog-opt b { color: var(--blue); }
+
+/* Músculos trabalhados (vídeos) */
+.musc { border-radius: 12px; background: var(--secondary); }
+.musc summary { list-style: none; cursor: pointer; padding: 8px 12px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.musc summary::-webkit-details-marker { display: none; }
+.musc summary::after { content: "Ver mapa"; flex: none; font-size: 12px; font-weight: 600; color: var(--blue); }
+.musc[open] summary::after { content: "Ocultar"; }
+.musc img { display: block; width: 100%; height: auto; border-radius: 0 0 12px 12px; background: #fff; }

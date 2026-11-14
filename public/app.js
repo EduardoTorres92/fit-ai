@@ -471,6 +471,8 @@
         ${fitAnt ? `<span class="pill gray">Fit Test anterior: ${soma(fitAnt.fit.map((n) => n || 0))} reps</span>` : ""}
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
+      ${v.musculos ? `<details class="musc"><summary><span>💪 ${esc(v.musculos)}</span></summary>
+        ${v.mapa ? `<img src="${A(`musculos/${v.mapa}.webp`)}" alt="Mapa muscular de ${esc(v.nome)}: ${esc(v.musculos)}" loading="lazy" width="900" height="675">` : ""}</details>` : ""}
       ${link ? `<button class="btn btn-blue ins-play" data-ins-play="${id}">▶ Assistir</button>`
         : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Carregar vídeos</button>` : `<p class="ex-obs">Entre com sua conta para assistir aos vídeos.</p>`}
       ${fit ? `<form class="fit-test" data-fit="${id}" data-p="${p}" data-k="${kk}">
@@ -1873,7 +1875,7 @@
     const ins = VPROGS.map((P) => [`# Programa paralelo: ${P.nome} (vídeos, ${P.semanas.length} semanas${P.selo ? `, ${P.selo}` : ""})`,
       P.coach || "",
       ...P.semanas.map((s, w) => `## Semana ${w + 1} (${s.nome}): ${s.dias.map((t, d) => `${DIAS[d]}: ${t.titulo}`).join(" | ")}`),
-      `Vídeos: ${P.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}`).join("; ")}`].filter(Boolean).join("\n")).join("\n\n");
+      `Vídeos: ${P.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}${v.musculos ? ` Músculos: ${v.musculos}.` : ""}`).join("; ")}`].filter(Boolean).join("\n")).join("\n\n");
     const caminho = [`# Programas do app e caminho recomendado (do mais acessível ao mais avançado)`,
       ...CATALOGO.map((x, i) => `${i + 1}. ${x.nome} — nível ${x.nivel}. ${x.sobre}`),
       `Caminho natural: ${caminhoTxt()}. Quem está começando ou voltando começa pelo ${CATALOGO[0].nome}.`,
