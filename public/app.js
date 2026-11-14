@@ -853,8 +853,13 @@
     if (!token) return false;
     try {
       const r = await fetch("/api/videos", { headers: { authorization: `Bearer ${token}` } });
-      if (!r.ok) { if (interativo) toast(r.status === 401 ? "Entre de novo na sua conta para ver os vídeos." : "Não consegui carregar os vídeos agora."); return false; }
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        if (interativo) toast(r.status === 401 ? "Entre de novo na sua conta para ver os vídeos." : e.variaveis ? `Configuração dos vídeos com erro: ${e.variaveis.join(", ")}` : `Não consegui carregar os vídeos agora (erro ${r.status}).`);
+        return false;
+      }
       const dados = await r.json();
+      if (dados.variaveis_com_erro && interativo) toast(`Alguns vídeos não carregaram: ${dados.variaveis_com_erro.join(", ")} com erro.`);
       Object.assign(INS_VID, dados.videos || {});
       souDono = !!dados.dono;
       if (location.hash.startsWith("#/insanity")) render();

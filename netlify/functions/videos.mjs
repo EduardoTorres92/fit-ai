@@ -9,6 +9,26 @@ const json = (status, body) => new Response(JSON.stringify(body), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" },
 });
 
+// Lê o JSON da variável tolerando o que painéis de hospedagem costumam fazer com o valor:
+// espaços nas pontas, o texto inteiro entre aspas, aspas escapadas (\") ou aspas "curvas".
+function lerJson(bruto) {
+  let t = String(bruto || "").trim();
+  if (!t) return null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const v = JSON.parse(t);
+      if (v && typeof v === "object" && !Array.isArray(v)) return v;
+      if (typeof v === "string") { t = v.trim(); continue; } // estava entre aspas: tenta o conteúdo
+      return null;
+    } catch {
+      const t2 = t.replace(/^'(.*)'$/s, "$1").replace(/\\"/g, '"').replace(/[\u201C\u201D\u201E\u2033]/g, '"');
+      if (t2 === t) return null;
+      t = t2;
+    }
+  }
+  return null;
+}
+
 export default async (req) => {
   if (req.method !== "GET") return json(405, { erro: "metodo" });
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -18,7 +38,13 @@ export default async (req) => {
   // Valor: "<id no Drive>" ou "<id no Drive>|<resourcekey>" (arquivos antigos do Drive exigem a resourcekey).
   let videos = {};
   const vars = Object.keys(process.env).filter((n) => n === "FITAI_INSANITY_VIDEOS" || n.startsWith("FITAI_VIDEOS_"));
-  try { for (const n of vars) Object.assign(videos, JSON.parse(process.env[n] || "{}")); } catch { return json(500, { erro: "config" }); }
+  const ruins = [];
+  for (const n of vars) {
+    const v = lerJson(process.env[n]);
+    if (v) Object.assign(videos, v); else ruins.push(n); // uma variável com problema não derruba as outras
+  }
+  if (ruins.length) console.error("Variáveis de vídeo com JSON inválido:", ruins.join(", "));
+  if (!Object.keys(videos).length && ruins.length) return json(500, { erro: "config", variaveis: ruins });
   const limpo = Object.fromEntries(Object.entries(videos).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && /^[\w-]{10,100}(\|[\w-]{1,100})?$/.test(String(v))));
-  return json(200, { videos: limpo, dono: !!ehEmailDono(email) });
+  return json(200, { videos: limpo, dono: !!ehEmailDono(email), ...(ruins.length ? { variaveis_com_erro: ruins } : {}) });
 };
