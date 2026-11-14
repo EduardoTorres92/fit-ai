@@ -3,7 +3,6 @@
   "use strict";
 
   const A = (f) => `assets/${f}`;
-  const GOOGLE_CLIENT_ID = "900778689263-mgkn7nbs66bk3h7cqi19gmo1t7o7ivne.apps.googleusercontent.com";
   const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
   const INICIAIS = ["S", "T", "Q", "Q", "S", "S", "D"];
   const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -138,11 +137,12 @@
       if (!s.logs || typeof s.logs !== "object") s.logs = {};
       s.perfil = { ...padrao.perfil, ...(s.perfil || {}) };
       s.insanity = { inicio: null, logs: {}, ...(s.insanity || {}) };
+      if (s.user && !s.user.id) { s.logado = false; s.user = null; s.sessao = null; } // login antigo (antes do Supabase): entra de novo
       if (!s.insanity.logs || typeof s.insanity.logs !== "object") s.insanity.logs = {};
       return s;
     } catch { return { ...padrao, insanity: { inicio: null, logs: {} } }; }
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
   const semanasDesde = (d) => Math.floor(diffDays(parseKey(S.inicio), d) / 7);
   const semanaDe = (d) => { const n = semanasDesde(d); return n < 0 ? -1 : n % PROGRAMA.length; };
@@ -179,7 +179,7 @@
 
   /* ---------- Insanity MAX:30 (public/insanity.js; vídeos em public/insanity-videos.js, fora do GitHub) ---------- */
   const INS = window.FITAI_INSANITY || { nome: "Insanity MAX:30", videos: [], semanas: [], trocas: {}, nota: "" };
-  const INS_VID = window.FITAI_INSANITY_VIDEOS || {};
+  const INS_VID = { ...(window.FITAI_INSANITY_VIDEOS || {}) };
   const INSV = Object.fromEntries(INS.videos.map((v) => [v.id, v]));
   const insLink = (id) => (INS_VID[id] ? `https://drive.google.com/file/d/${encodeURIComponent(INS_VID[id])}/view` : "");
   const insSemanaDe = (d) => (S.insanity.inicio ? Math.floor(diffDays(parseKey(S.insanity.inicio), d) / 7) : -1);
@@ -257,6 +257,7 @@
       <span class="run-link">Ver no Strava</span></a>`;
   }
   function secaoCorridas() {
+    if (!veCorridas()) return "";
     const cs = corridas();
     const head = `<div class="sec-head"><h2>Corridas</h2><span class="strava-tag">Strava</span></div>`;
     if (!cs.length) return `<div class="section">${head}<p class="note">Nenhuma corrida sincronizada ainda. No Claude Code, peça: <b>“sincroniza minhas corridas do Strava”</b>.</p></div>`;
@@ -273,6 +274,7 @@
     </div>`;
   }
   function corridaHoje(t) {
+    if (!veCorridas()) return "";
     const cs = corridasDe(hojeKey);
     if (!cs.length) return "";
     const tem = t.ex.some((e) => e.un === "tiro");
@@ -300,7 +302,7 @@
   const check = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
   const primeiroNome = () => (S.user && S.user.primeiro) || "Atleta";
   const nomeCompleto = () => (S.user && S.user.nome) || "Visitante";
-  const fotoPerfil = () => (S.user && S.user.foto) || A("avatar.jpg");
+  const fotoPerfil = () => (S.user && S.user.foto) || S.fotoLocal || A("avatar.jpg");
 
   function toast(msg) {
     document.querySelectorAll(".toast").forEach((t) => t.remove());
@@ -416,7 +418,8 @@
         ${best ? `<span class="pill gray">${icon("zap.svg")}Melhor ${mmss(best)}</span>` : ""}
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
-      ${link ? `<a class="btn btn-blue ins-play" href="${link}" target="_blank" rel="noopener">▶ Assistir no Drive</a>` : `<p class="ex-obs">Vídeo ainda não configurado neste aparelho.</p>`}
+      ${link ? `<a class="btn btn-blue ins-play" href="${link}" target="_blank" rel="noopener">▶ Assistir no Drive</a>`
+        : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Liberar vídeos</button>` : `<p class="ex-obs">Os vídeos aparecem para o dono do app, logado.</p>`}
       ${editavel ? `<div class="ins-row">
         <form class="add-set ins-max" data-max="${id}">
           <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
@@ -488,6 +491,7 @@
           </div>
         </div>
         <div class="section">
+          ${grupoHome()}
           <div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t ? workoutCard(w, d) : ""}
@@ -589,7 +593,8 @@
       const seq = sequencia();
       return `<section class="screen has-toolbar">
         <header class="header"><span class="logo-txt dark">Fit.ai</span></header>
-        <div style="padding:0 20px">
+        ${evoSwitch("eu")}
+        <div style="padding:16px 20px 0">
           <div class="streak">
             <img class="cover" src="${A(seq > 0 ? "streak-fire.jpg" : "streak-gray.jpg")}" alt="">
             <span class="streak-icon">${icon(seq > 0 ? "streak-icon.svg" : "streak-icon-gray.svg", 32)}</span>
@@ -605,12 +610,17 @@
           </div>
           ${stat("hourglass.svg", fmtDur(tempoTotal()), "Tempo Total")}
         </div>
+        <div class="section"><div class="sec-head"><h2>Este mês</h2></div>${painelPessoal()}</div>
+        <div class="section"><div class="sec-head"><h2>Conquistas</h2></div>${medalhas()}</div>
+        <div class="section"><div class="sec-head"><h2>Max Out · ${esc(INS.nome)}</h2></div><div id="max-box">${graficoMaxOut()}</div></div>
         <div class="section">
           <div class="sec-head"><h2>Progresso por exercício</h2></div>
           ${progresso()}
         </div>
         ${secaoCorridas()}</section>`;
     },
+
+    grupo: (p1, p2) => telaGrupo(p1, p2),
 
     perfil() {
       setToolbar("perfil");
@@ -619,8 +629,11 @@
       return `<section class="screen has-toolbar">
         <header class="header"><span class="logo-txt dark">Fit.ai</span></header>
         <div style="padding:20px;display:flex;flex-direction:column;gap:20px">
-          <div class="profile"><img src="${esc(fotoPerfil())}" alt="Foto de ${esc(nomeCompleto())}" referrerpolicy="no-referrer">
-            <div><strong>${esc(nomeCompleto())}</strong><span>${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}</span></div></div>
+          <div class="profile">
+            <button class="foto-btn" id="trocar-foto" aria-label="Trocar foto de perfil"><img src="${esc(fotoPerfil())}" alt="Foto de ${esc(nomeCompleto())}" referrerpolicy="no-referrer"><span class="foto-cam" aria-hidden="true">📷</span></button>
+            <input type="file" id="foto-arquivo" accept="image/*" hidden>
+            <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
+          ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
             ${stat("weight.svg", P.peso || "—", "Kg", { up: true, edit: "peso" })}
             ${stat("ruler.svg", P.altura || "—", "Cm", { up: true, edit: "altura" })}
@@ -632,14 +645,14 @@
             <div class="seg">${PROGRAMA.map((s, i) => `<button class="${i === w ? "on" : ""}" data-semana="${i}">${i + 1}</button>`).join("")}</div>
           </div>
           <div class="field">
-            <span class="field-lbl">Seus dados ficam salvos neste aparelho. Faça backup de vez em quando.</span>
+            <span class="field-lbl">${uid ? "Seus treinos ficam salvos na sua conta e neste aparelho." : "Seus dados ficam salvos neste aparelho. Faça backup de vez em quando."}</span>
             <div class="row2">
               <button class="btn btn-outline" id="exportar">Exportar backup</button>
               <button class="btn btn-outline" id="importar">Importar backup</button>
             </div>
             <input type="file" id="arquivo" accept="application/json,.json" hidden>
           </div>
-          <button class="btn logout" id="sair">Sair da conta${icon("log-out.svg", 16)}</button>
+          <button class="btn logout" id="sair">${uid ? "Sair da conta" : "Sair do modo visitante"}${icon("log-out.svg", 16)}</button>
         </div></section>`;
     },
   };
@@ -784,6 +797,23 @@
     refazerCard(id);
   });
 
+  /* Vídeos do Insanity: vêm de /api/videos, só para o dono logado (interativo = pode abrir o login do Google) */
+  let souDono = false; // vira true quando o servidor libera os vídeos (só o ALLOWED_EMAIL)
+  const veCorridas = () => !uid || souDono; // as corridas do Strava são do dono; visitante vê como demonstração
+  async function carregarVideos(interativo = false) {
+    if (Object.keys(INS_VID).length || !uid || location.protocol === "file:") return false;
+    const token = await tokenSB();
+    if (!token) return false;
+    try {
+      const r = await fetch("/api/videos", { headers: { authorization: `Bearer ${token}` } });
+      if (!r.ok) { if (interativo) toast(r.status === 403 ? "Os vídeos são só para o dono do app." : "Não consegui carregar os vídeos agora."); return false; }
+      Object.assign(INS_VID, (await r.json()).videos || {});
+      souDono = true;
+      if (location.hash.startsWith("#/insanity")) render();
+      return true;
+    } catch { if (interativo) toast("Não consegui carregar os vídeos agora."); return false; }
+  }
+
   /* ---------- Registro do Insanity ---------- */
   function insLogDe(k) {
     if (!S.insanity.logs[k]) {
@@ -815,9 +845,436 @@
     if (insFeito(k) !== era) render();
   }
 
+  /* ==========================================================
+     Comunidade (Supabase): sincronização, métricas, medalhas, grupos, foto
+     ========================================================== */
+
+  /* Cada dia de treino vira uma linha: { data, programa, titulo, concluido, minutos, detalhes } */
+  // Minutos da calistenia: o cronômetro, quando usado; sem ele, 3 min por série registrada (estimativa).
+  const minCalistenia = (l) => (l.dur ? Math.round(l.dur / 60) : Math.min(120, 3 * soma(Object.values(l.sets || {}).map((s) => s.length))));
+  function linhasLocais() {
+    const out = [];
+    for (const [k, l] of Object.entries(S.logs)) {
+      const t = treino(l.w, l.d);
+      out.push({ data: k, programa: "calistenia", titulo: (t ? t.titulo : "Treino").slice(0, 120), concluido: !!l.done, minutos: Math.min(600, minCalistenia(l)),
+        detalhes: { w: l.w, d: l.d, sets: l.sets || {}, dur: l.dur || 0, done: !!l.done } });
+    }
+    for (const [k, l] of Object.entries(S.insanity.logs)) {
+      const t = insDia(l.w, l.d);
+      out.push({ data: k, programa: "insanity", titulo: (t ? t.titulo : INS.nome).slice(0, 120), concluido: insFeito(k), minutos: Math.min(600, soma(l.feitos.map((id) => INSV[id]?.min || 0))),
+        detalhes: { w: l.w, d: l.d, feitos: l.feitos, max: l.max || {} } });
+    }
+    return out;
+  }
+
+  /* ---------- Sincronização com o Supabase ---------- */
+  const SYNC_KEY = "fitai-sync-v1";
+  let enviados = (() => { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || "{}"); } catch { return {}; } })();
+  const guardarEnviados = () => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(enviados)); } catch {} };
+  let syncTimer = null, sincronizando = false, deNovo = false;
+  function agendarSync() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => { verificarConquistas(); if (uid) sincronizar(); }, 1200);
+  }
+  async function sincronizar() {
+    if (!uid || !sb) return;
+    if (sincronizando) { deNovo = true; return; }
+    sincronizando = true;
+    try {
+      const chave = (r) => `${uid}|${r.data}|${r.programa}`;
+      const linhas = linhasLocais().filter((r) => enviados[chave(r)] !== JSON.stringify(r));
+      if (linhas.length) {
+        const agora = new Date().toISOString();
+        const { error } = await sb.from("treinos").upsert(linhas.map((r) => ({ ...r, usuario_id: uid, atualizado_em: agora })));
+        if (!error) { linhas.forEach((r) => (enviados[chave(r)] = JSON.stringify(r))); guardarEnviados(); G.carregadoEm = 0; }
+      }
+      const cfg = { inicio: S.inicio, insanity: S.insanity.inicio };
+      if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
+        const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
+        if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
+      }
+    } catch {} finally {
+      sincronizando = false;
+      if (deNovo) { deNovo = false; sincronizar(); }
+    }
+  }
+  // Ao entrar: traz os treinos da conta que ainda não estão neste aparelho
+  async function puxarTreinos() {
+    if (!uid || !sb) return;
+    const { data, error } = await sb.from("treinos").select("data, programa, detalhes").eq("usuario_id", uid);
+    if (error || !data) return;
+    let mudou = false;
+    for (const r of data) {
+      const d = r.detalhes || {};
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.data)) continue;
+      if (r.programa === "calistenia" && !S.logs[r.data]) {
+        S.logs[r.data] = { w: d.w === "E" ? "E" : Number(d.w) || 0, d: Number(d.d) || 0, sets: d.sets && typeof d.sets === "object" ? d.sets : {}, dur: Number(d.dur) || 0, done: !!d.done }; mudou = true;
+      }
+      if (r.programa === "insanity" && !S.insanity.logs[r.data]) {
+        S.insanity.logs[r.data] = { w: Number(d.w) || 0, d: Number(d.d) || 0, feitos: Array.isArray(d.feitos) ? d.feitos.filter((x) => INSV[x]) : [], max: d.max && typeof d.max === "object" ? d.max : {} }; mudou = true;
+      }
+    }
+    if (mudou) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+    const naConta = new Set(data.map((r) => `${r.data}|${r.programa}`));
+    linhasLocais().filter((r) => naConta.has(`${r.data}|${r.programa}`)).forEach((r) => (enviados[`${uid}|${r.data}|${r.programa}`] = JSON.stringify(r)));
+    guardarEnviados();
+  }
+
+  /* ---------- Métricas (servem para mim e para cada pessoa do grupo) ---------- */
+  const feitas = (rows) => rows.filter((r) => r.concluido);
+  function sequencias(rows) {
+    const dias = new Set(feitas(rows).map((r) => r.data));
+    let d = dias.has(hojeKey) ? hoje : addDays(hoje, -1), atual = 0;
+    while (dias.has(keyOf(d))) { atual++; d = addDays(d, -1); }
+    let melhor = 0, run = 0, prev = null;
+    for (const k of [...dias].sort()) { run = prev && diffDays(parseKey(prev), parseKey(k)) === 1 ? run + 1 : 1; melhor = Math.max(melhor, run); prev = k; }
+    return { atual, melhor };
+  }
+  const maxOuts = (rows) => rows.filter((r) => r.programa === "insanity")
+    .flatMap((r) => Object.entries(r.detalhes?.max || {}).map(([v, s]) => ({ k: r.data, v, s: Number(s) || 0 }))).filter((m) => m.s > 0 && INSV[m.v]);
+  function kpis(rows) {
+    const f = feitas(rows), mx = maxOuts(rows);
+    return { treinos: f.length, minutos: soma(f.map((r) => r.minutos || 0)), dias: new Set(f.map((r) => r.data)).size, maxMedio: mx.length ? Math.round(soma(mx.map((m) => m.s)) / mx.length) : 0, maxouts: mx.length };
+  }
+  const PERIODOS = {
+    semana: ["Semana", () => keyOf(mondayOf(hoje))],
+    mes: ["Mês", () => keyOf(new Date(hoje.getFullYear(), hoje.getMonth(), 1))],
+    tudo: ["12 semanas", () => keyOf(addDays(mondayOf(hoje), -7 * 11))],
+  };
+  const noPeriodo = (rows, p) => { const ini = PERIODOS[p][1](); return rows.filter((r) => r.data >= ini && r.data <= hojeKey); };
+  function porSemana(rows, n = 8, campo = "treinos") {
+    const seg = mondayOf(hoje), f = feitas(rows);
+    return Array.from({ length: n }, (_, i) => {
+      const ini = addDays(seg, -(n - 1 - i) * 7), a = keyOf(ini), b = keyOf(addDays(ini, 6));
+      const s = f.filter((r) => r.data >= a && r.data <= b);
+      return { k: a, v: campo === "minutos" ? soma(s.map((r) => r.minutos || 0)) : s.length };
+    });
+  }
+  const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m}min`);
+
+  /* Gráfico de barras simples (SVG) */
+  function barras(serie, { fmt = (v) => v, rotulo = (x) => ddmm(x.k), meta = 0, aria = "Gráfico" } = {}) {
+    const W = 313, H = 150, top = 22, base = H - 22;
+    const max = Math.max(1, meta, ...serie.map((x) => x.v));
+    const step = W / serie.length, bw = Math.min(28, step * 0.55);
+    const bars = serie.map((x, i) => {
+      const bh = x.v ? Math.max(3, (x.v / max) * (base - top)) : 2, cx = step * i + step / 2;
+      return `<rect x="${cx - bw / 2}" y="${base - bh}" width="${bw}" height="${bh}" rx="6" fill="${i === serie.length - 1 ? "#2b54ff" : "#d5dffe"}"/>
+        ${x.v ? `<text x="${cx}" y="${base - bh - 6}" text-anchor="middle" class="cv">${fmt(x.v)}</text>` : ""}
+        <text x="${cx}" y="${H - 4}" text-anchor="middle" class="cd">${esc(rotulo(x))}</text>`;
+    }).join("");
+    const yMeta = base - (meta / max) * (base - top);
+    return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">
+      ${meta ? `<line x1="0" x2="${W}" y1="${yMeta}" y2="${yMeta}" stroke="#2b54ff" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/><text x="${W}" y="${yMeta - 5}" text-anchor="end" class="cm">meta ${meta}</text>` : ""}
+      ${bars}</svg></div>`;
+  }
+
+  /* ---------- Medalhas pessoais ---------- */
+  function metricasConquista(rows) {
+    const f = feitas(rows), mx = maxOuts(rows).sort((a, b) => a.k.localeCompare(b.k));
+    const semanas = {};
+    f.forEach((r) => { const s = keyOf(mondayOf(parseKey(r.data))); semanas[s] = (semanas[s] || 0) + 1; });
+    let recordes = 0; const best = {};
+    mx.forEach((m) => { if (best[m.v] && m.s > best[m.v]) recordes++; best[m.v] = Math.max(best[m.v] || 0, m.s); });
+    return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
+      melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
+      insanity: f.filter((r) => r.programa === "insanity").length, grupos: (G.grupos || []).length };
+  }
+  const CONQ = [
+    ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
+    ["t10", "💪", "10 treinos", (m) => [m.treinos, 10]],
+    ["t25", "🔥", "25 treinos", (m) => [m.treinos, 25]],
+    ["t50", "⚡", "50 treinos", (m) => [m.treinos, 50]],
+    ["t100", "🏆", "100 treinos", (m) => [m.treinos, 100]],
+    ["seq3", "📅", "3 dias seguidos", (m) => [m.melhor, 3]],
+    ["seq7", "🗓️", "7 dias seguidos", (m) => [m.melhor, 7]],
+    ["seq14", "🧱", "14 dias seguidos", (m) => [m.melhor, 14]],
+    ["seq30", "👑", "30 dias seguidos", (m) => [m.melhor, 30]],
+    ["semana5", "🚀", "5 treinos numa semana", (m) => [m.melhorSemana, 5]],
+    ["h10", "⏱️", "10 horas de treino", (m) => [m.horas, 10]],
+    ["h50", "⌛", "50 horas de treino", (m) => [m.horas, 50]],
+    ["maxout", "🥵", "Primeiro Max Out", (m) => [m.maxouts, 1]],
+    ["maxrec", "📈", "Recorde de Max Out", (m) => [m.recordes, 1]],
+    ["ins24", "🌀", "24 treinos de Insanity", (m) => [m.insanity, 24]],
+    ["ins48", "💀", "Insanity completo (48)", (m) => [m.insanity, 48]],
+    ["grupo", "🤝", "Entrou num grupo", (m) => [m.grupos, 1]],
+  ];
+  const CONQI = Object.fromEntries(CONQ.map((c) => [c[0], c]));
+  function verificarConquistas(silencioso = false) {
+    const m = metricasConquista(linhasLocais());
+    S.conquistas = S.conquistas || {};
+    const novas = CONQ.filter(([id, , , f]) => { const [v, alvo] = f(m); return v >= alvo && !S.conquistas[id]; });
+    novas.forEach(([id]) => (S.conquistas[id] = hojeKey));
+    if (novas.length) {
+      try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {}
+      if (!silencioso) novas.slice(0, 2).forEach(([, ic, nome], i) => setTimeout(() => toast(`${ic} Nova conquista: ${nome}!`), i * 2600));
+    }
+    if (uid && sb) {
+      const todas = Object.keys(S.conquistas).filter((c) => CONQI[c] && enviados[`${uid}|conq|${c}`] !== "1");
+      if (todas.length) sb.from("conquistas").upsert(todas.map((codigo) => ({ usuario_id: uid, codigo })), { onConflict: "usuario_id,codigo", ignoreDuplicates: true })
+        .then(({ error }) => { if (!error) { todas.forEach((c) => (enviados[`${uid}|conq|${c}`] = "1")); guardarEnviados(); } });
+    }
+  }
+  function medalhas() {
+    const m = metricasConquista(linhasLocais()), S2 = S.conquistas || {};
+    const ganhas = CONQ.filter(([id]) => S2[id]).length;
+    return `<p class="note small">${ganhas} de ${CONQ.length} conquistas</p><div class="badges">${CONQ.map(([id, ic, nome, f]) => {
+      const [v, alvo] = f(m), ok = !!S2[id];
+      return `<div class="badge${ok ? " on" : ""}" title="${esc(nome)}"><span class="b-ic">${ic}</span><strong>${esc(nome)}</strong><small>${ok ? `Desde ${ddmm(S2[id])}` : `${Math.min(v, alvo)}/${alvo}`}</small></div>`;
+    }).join("")}</div>`;
+  }
+
+  /* ---------- Avatar e foto de perfil ---------- */
+  const iniciais = (n) => String(n || "?").trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
+  const avatar = (p, s = 36) => p && p.foto_url
+    ? `<img class="av" src="${esc(p.foto_url)}" width="${s}" height="${s}" alt="" referrerpolicy="no-referrer" loading="lazy">`
+    : `<span class="av av-ini" style="width:${s}px;height:${s}px;font-size:${Math.round(s * 0.38)}px">${esc(iniciais(p && p.nome))}</span>`;
+  function reduzirFoto(arquivo, lado = 320) {
+    return new Promise((ok, falha) => {
+      const img = new Image(), url = URL.createObjectURL(arquivo);
+      img.onload = () => {
+        const c = document.createElement("canvas"); c.width = c.height = lado;
+        const m = Math.min(img.width, img.height);
+        c.getContext("2d").drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, lado, lado);
+        URL.revokeObjectURL(url);
+        c.toBlob((b) => (b ? ok(b) : falha(new Error("foto"))), "image/jpeg", 0.85);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); falha(new Error("foto")); };
+      img.src = url;
+    });
+  }
+  async function trocarFoto(arquivo) {
+    if (!arquivo || !/^image\//.test(arquivo.type)) { toast("Escolha uma imagem."); return; }
+    try {
+      const blob = await reduzirFoto(arquivo);
+      if (uid && sb) {
+        toast("Enviando foto…");
+        const caminho = `${uid}/perfil.jpg`;
+        const up = await sb.storage.from("fotos").upload(caminho, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "3600" });
+        if (up.error) throw up.error;
+        const url = `${sb.storage.from("fotos").getPublicUrl(caminho).data.publicUrl}?v=${Date.now()}`;
+        const { error } = await sb.from("perfis").update({ foto_url: url }).eq("id", uid);
+        if (error) throw error;
+        S.user.foto = url; G.carregadoEm = 0;
+      } else {
+        S.fotoLocal = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+      }
+      save(); render(); toast("Foto atualizada ✓");
+    } catch { toast("Não consegui trocar a foto. Tente outra imagem."); }
+  }
+  async function trocarNome() {
+    const n = prompt("Seu nome:", S.user ? S.user.nome : "");
+    if (n === null) return;
+    const nome = n.trim().slice(0, 60);
+    if (!nome) return;
+    if (uid && sb) { const { error } = await sb.from("perfis").update({ nome }).eq("id", uid); if (error) { toast("Não consegui salvar o nome."); return; } G.carregadoEm = 0; }
+    if (S.user) { S.user.nome = nome; S.user.primeiro = nome.split(" ")[0]; }
+    save(); render();
+  }
+
+  /* ---------- Grupos ---------- */
+  const G = { grupos: null, sel: null, membros: [], perfis: {}, linhas: [], conq: [], carregadoEm: 0, carregando: false, erro: false, periodo: "semana", rank: "treinos" };
+  async function carregarGrupos(forcar = false) {
+    if (!uid || !sb || G.carregando) return;
+    if (!forcar && G.grupos && Date.now() - G.carregadoEm < 60000) return;
+    G.carregando = true;
+    try {
+      const { data, error } = await sb.from("grupos").select("id, nome, codigo, meta_semanal, dono, criado_em").order("criado_em");
+      if (error) throw error;
+      G.grupos = data || [];
+      if (!G.grupos.some((g) => g.id === G.sel)) G.sel = G.grupos[0]?.id || null;
+      if (G.sel) await carregarGrupo(G.sel);
+      G.carregadoEm = Date.now(); G.erro = false;
+    } catch { G.erro = true; if (!G.grupos) G.grupos = []; }
+    G.carregando = false;
+    if (/^#\/(grupo|home)/.test(location.hash)) render();
+  }
+  async function carregarGrupo(id) {
+    const ms = await sb.from("membros").select("usuario_id").eq("grupo_id", id);
+    const ids = (ms.data || []).map((m) => m.usuario_id);
+    const desde = PERIODOS.tudo[1]();
+    const [pf, tr, cq] = await Promise.all([
+      sb.from("perfis").select("id, nome, foto_url").in("id", ids),
+      sb.from("treinos").select("usuario_id, data, programa, titulo, concluido, minutos, detalhes, atualizado_em").in("usuario_id", ids).gte("data", keyOf(addDays(parseKey(desde), -35))),
+      sb.from("conquistas").select("usuario_id, codigo, ganha_em").in("usuario_id", ids).order("ganha_em", { ascending: false }).limit(30),
+    ]);
+    G.membros = ids;
+    G.perfis = Object.fromEntries((pf.data || []).map((p) => [p.id, p]));
+    G.linhas = tr.data || [];
+    G.conq = cq.data || [];
+  }
+  const grupoSel = () => (G.grupos || []).find((g) => g.id === G.sel) || null;
+  const linhasDe = (id) => (id === uid ? linhasLocais().map((r) => ({ ...r, usuario_id: uid })) : G.linhas.filter((r) => r.usuario_id === id));
+  const linhasGrupo = () => G.membros.flatMap(linhasDe);
+  async function entrarComCodigo(codigo) {
+    codigo = String(codigo || "").trim().toUpperCase();
+    if (!codigo) return;
+    if (!uid) { S.convite = codigo; S.logado = false; save(); toast("Entre com sua conta para participar do grupo."); location.hash = "#/login"; return; }
+    const { data, error } = await sb.rpc("entrar_grupo", { p_codigo: codigo });
+    S.convite = null; save();
+    if (error) { toast(/codigo_invalido/.test(error.message) ? "Código não encontrado. Confira com quem te convidou." : /muitos_grupos/.test(error.message) ? "Você já está em grupos demais." : "Não consegui entrar no grupo agora."); return; }
+    G.sel = data.id; await carregarGrupos(true); verificarConquistas();
+    toast(`Você entrou no grupo ${data.nome}! 🤝`);
+    location.hash = "#/grupo";
+  }
+  async function criarGrupo() {
+    const nome = (prompt("Nome do grupo (ex.: Amigos do treino):") || "").trim().slice(0, 40);
+    if (!nome) return;
+    const meta = parseInt(prompt("Meta de treinos do grupo por semana (somando todo mundo):", "12"), 10);
+    const { data, error } = await sb.rpc("criar_grupo", { p_nome: nome, p_meta: meta > 0 && meta <= 500 ? meta : 12 });
+    if (error) { toast(/muitos_grupos/.test(error.message) ? "Você já criou grupos demais." : "Não consegui criar o grupo agora."); return; }
+    G.sel = data.id; await carregarGrupos(true); verificarConquistas();
+    toast("Grupo criado! Agora convide a galera. 🔥");
+  }
+  function convidar(g) {
+    const link = `${location.origin}/#/grupo/entrar/${g.codigo}`;
+    const txt = `Bora treinar comigo no FIT.AI? 💪 Entra no grupo "${g.nome}": ${link} (código ${g.codigo})`;
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) navigator.share({ title: "FIT.AI", text: txt }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Convite copiado. Cole no WhatsApp. 📲"), () => prompt("Copie o convite:", txt));
+    else prompt("Copie o convite:", txt);
+  }
+
+  // Medalhas do grupo (calculadas nas últimas 12 semanas)
+  function medalhasGrupo(g) {
+    const rows = feitas(linhasGrupo()).filter((r) => r.data >= PERIODOS.tudo[1]());
+    const semanas = {}, porDia = {};
+    rows.forEach((r) => { const s = keyOf(mondayOf(parseKey(r.data))); semanas[s] = (semanas[s] || 0) + 1; (porDia[r.data] = porDia[r.data] || new Set()).add(r.usuario_id); });
+    const metas = Object.entries(semanas).filter(([s, n]) => s < keyOf(mondayOf(hoje)) && n >= g.meta_semanal).length + ((semanas[keyOf(mondayOf(hoje))] || 0) >= g.meta_semanal ? 1 : 0);
+    const todos = G.membros.length > 1 ? Object.values(porDia).filter((s) => s.size >= G.membros.length).length : 0;
+    const seq = sequencias(rows.map((r) => ({ ...r, concluido: true }))).melhor;
+    const lista = [
+      ["🎯", "Meta da semana", metas, 1, `${metas} ${metas === 1 ? "semana" : "semanas"}`],
+      ["🙌", "Todo mundo treinou", todos, 1, `${todos} ${todos === 1 ? "dia" : "dias"}`],
+      ["🔥", "Grupo em chamas", seq, 7, seq >= 7 ? `${seq} dias seguidos` : `${seq}/7 dias seguidos`],
+      ["💯", "100 treinos juntos", rows.length, 100, `${Math.min(rows.length, 100)}/100`],
+    ];
+    return `<div class="badges">${lista.map(([ic, nome, v, alvo, txt]) => `<div class="badge${v >= alvo ? " on" : ""}"><span class="b-ic">${ic}</span><strong>${nome}</strong><small>${txt}</small></div>`).join("")}</div>`;
+  }
+  function atividade() {
+    const nomeDe = (id) => esc((G.perfis[id]?.nome || "Alguém").split(" ")[0]);
+    const tr = feitas(G.linhas).filter((r) => r.data >= keyOf(addDays(hoje, -10))).map((r) => {
+      const mx = Object.entries(r.detalhes?.max || {}).filter(([v]) => INSV[v]);
+      const txt = mx.length === 1 ? ` · cansou aos ${mmss(Number(mx[0][1]))}` : mx.length ? ` · Max Out: ${esc(mx.map(([v, s]) => `${INSV[v].nome} ${mmss(Number(s))}`).join(", "))}` : "";
+      return { t: r.atualizado_em || r.data, id: r.usuario_id, html: `<b>${nomeDe(r.usuario_id)}</b> concluiu <b>${esc(r.titulo)}</b>${txt}`, k: r.data };
+    });
+    const cq = G.conq.filter((c) => CONQI[c.codigo]).map((c) => ({ t: c.ganha_em, id: c.usuario_id, html: `<b>${nomeDe(c.usuario_id)}</b> ganhou ${CONQI[c.codigo][1]} <b>${esc(CONQI[c.codigo][2])}</b>`, k: c.ganha_em.slice(0, 10) }));
+    const itens = [...tr, ...cq].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 12);
+    if (!itens.length) return `<p class="note">Ainda sem atividade. Conclua um treino e puxe o grupo! 💪</p>`;
+    return `<ul class="feed">${itens.map((i) => `<li>${avatar(G.perfis[i.id], 32)}<p>${i.html}<small>${ddmm(i.k)}</small></p></li>`).join("")}</ul>`;
+  }
+  const RANKS = {
+    treinos: ["Treinos", (k) => k.treinos, (v) => `${v}`],
+    minutos: ["Tempo", (k) => k.minutos, (v) => fmtMin(v)],
+    sequencia: ["Sequência", (k) => k.seq, (v) => `${v} ${v === 1 ? "dia" : "dias"}`],
+    maxout: ["Max Out", (k) => k.maxMedio, (v) => (v ? mmss(v) : "—")],
+  };
+  function ranking() {
+    const [, val, fmt] = RANKS[G.rank];
+    const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual } }; })
+      .sort((a, b) => val(b.k) - val(a.k) || b.k.treinos - a.k.treinos);
+    const med = ["🥇", "🥈", "🥉"];
+    return `<ol class="rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}">
+      <span class="pos">${val(x.k) && i < 3 ? med[i] : i + 1}</span>${avatar(x.p, 36)}
+      <span class="nome">${esc(x.p?.nome || "Atleta")}${x.id === uid ? " <small>(você)</small>" : ""}</span>
+      <strong>${fmt(val(x.k))}</strong></li>`).join("")}</ol>
+      ${G.rank === "maxout" ? `<p class="note small">Média do Max Out nos vídeos do ${esc(INS.nome)} no período: quanto mais tarde a pessoa cansou, melhor.</p>` : ""}
+      ${G.rank === "minutos" ? `<p class="note small">Tempo dos vídeos concluídos e do cronômetro. Na calistenia sem cronômetro, conta 3 min por série.</p>` : ""}`;
+  }
+  const evoSwitch = (on) => `<nav class="seg prog" aria-label="Evolução">
+      <a href="#/evolucao" class="${on === "eu" ? "on" : ""}">Minha evolução</a>
+      <a href="#/grupo" class="${on === "grupo" ? "on" : ""}">Grupo</a></nav>`;
+  function telaGrupo(p1, p2) {
+    setToolbar("evolucao");
+    if (p1 === "entrar" && p2) { setTimeout(() => entrarComCodigo(p2), 0); return `<section class="screen has-toolbar"><p class="note" style="padding:40px 20px">Entrando no grupo…</p></section>`; }
+    const head = `<header class="header"><span class="logo-txt dark">Fit.ai</span></header>${evoSwitch("grupo")}`;
+    if (!uid) return `<section class="screen has-toolbar">${head}<div class="section">
+      <p class="note">Os grupos juntam amigos num ranking de treinos, tempo, sequência e Max Out. Para participar, entre com uma conta.</p>
+      <button class="btn btn-blue" id="ir-login" style="width:100%">Entrar ou criar conta</button></div></section>`;
+    if (!G.grupos || (Date.now() - G.carregadoEm > 60000 && !G.carregando)) carregarGrupos();
+    if (!G.grupos) return `<section class="screen has-toolbar">${head}<p class="note" style="padding:20px">Carregando seus grupos…</p></section>`;
+    if (!G.grupos.length) return `<section class="screen has-toolbar">${head}<div class="section">
+      ${G.erro ? `<p class="note">Não consegui carregar os grupos agora. Confira a internet e tente de novo.</p>` : ""}
+      <div class="note-box"><p><b>Treinar junto rende mais.</b> Crie um grupo e mande o convite no WhatsApp, ou entre com o código que um amigo te mandou.</p></div>
+      <div class="row2" style="margin-top:12px"><button class="btn btn-blue" id="g-criar">Criar grupo</button><button class="btn btn-outline" id="g-codigo">Tenho um código</button></div>
+      </div></section>`;
+    const g = grupoSel(), rows = linhasGrupo(), kp = kpis(noPeriodo(rows, G.periodo));
+    const semana = feitas(rows).filter((r) => r.data >= keyOf(mondayOf(hoje)) && r.data <= hojeKey).length;
+    const ativos = new Set(feitas(noPeriodo(rows, G.periodo)).map((r) => r.usuario_id)).size;
+    const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
+    return `<section class="screen has-toolbar">${head}
+      <div class="chips g-chips">${G.grupos.map((x) => `<button class="chip${x.id === G.sel ? " primary" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="chip" id="g-criar">+ Criar</button><button class="chip" id="g-codigo">Código</button></div>
+      <div class="section">
+        <div class="g-head"><div><h2>${esc(g.nome)}</h2><small>${G.membros.length} ${G.membros.length === 1 ? "pessoa" : "pessoas"} · código <b>${esc(g.codigo)}</b></small></div>
+          <button class="btn btn-blue" id="g-convidar">Convidar</button></div>
+        <div class="avs">${G.membros.slice(0, 12).map((id) => avatar(G.perfis[id], 34)).join("")}</div>
+        <div class="meta-g"><div class="sec-head"><h2>Meta da semana</h2><span>${semana}/${g.meta_semanal} treinos</span></div>
+          <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
+          ${g.dono === uid ? `<button class="lnk-btn" id="g-meta">Mudar meta</button>` : ""}</div>
+      </div>
+      <div class="section">
+        <div class="seg seg3">${Object.entries(PERIODOS).map(([k, [n]]) => `<button class="${G.periodo === k ? "on" : ""}" data-g-periodo="${k}">${n}</button>`).join("")}</div>
+        <div class="stats-row" style="margin-top:12px">
+          ${stat("circle-check.svg", kp.treinos, "Treinos do grupo")}
+          ${stat("hourglass.svg", fmtMin(kp.minutos), "Tempo total")}
+        </div>
+        <div class="stats-row">
+          ${stat("user-small.svg", `${ativos}/${G.membros.length}`, "Pessoas ativas")}
+          ${stat("flame.svg", kp.maxMedio ? mmss(kp.maxMedio) : "—", "Max Out médio")}
+        </div>
+      </div>
+      <div class="section">
+        <div class="sec-head"><h2>Ranking · ${PERIODOS[G.periodo][0]}</h2></div>
+        <div class="chips">${Object.entries(RANKS).map(([k, [n]]) => `<button class="chip${G.rank === k ? " primary" : ""}" data-g-rank="${k}">${n}</button>`).join("")}</div>
+        ${ranking()}
+      </div>
+      <div class="section"><div class="sec-head"><h2>Treinos do grupo por semana</h2></div>
+        ${barras(porSemana(rows, 8), { meta: g.meta_semanal, aria: "Treinos do grupo nas últimas 8 semanas" })}</div>
+      <div class="section"><div class="sec-head"><h2>Conquistas do grupo</h2></div>${medalhasGrupo(g)}</div>
+      <div class="section"><div class="sec-head"><h2>Atividade recente</h2><button class="lnk-btn" id="g-atualizar">Atualizar</button></div>${atividade()}</div>
+      <div class="section"><button class="btn btn-outline" id="g-sair">Sair do grupo</button></div>
+    </section>`;
+  }
+  function grupoHome() {
+    if (!uid) return "";
+    if (!G.grupos) { carregarGrupos(); return ""; }
+    const g = grupoSel();
+    if (!g) return `<a class="emerg" href="#/grupo"><span>${icon("user-small.svg", 20)}</span><div><strong>Treine com os amigos</strong><small>Crie um grupo ou entre com um código</small></div></a>`;
+    const semana = feitas(linhasGrupo()).filter((r) => r.data >= keyOf(mondayOf(hoje)) && r.data <= hojeKey).length;
+    const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
+    return `<a class="g-card" href="#/grupo"><div class="sec-head"><h2>${esc(g.nome)}</h2><span>${semana}/${g.meta_semanal} na semana</span></div>
+      <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
+      <div class="avs">${G.membros.slice(0, 8).map((id) => avatar(G.perfis[id], 28)).join("")}</div></a>`;
+  }
+
+  /* ---------- Minha evolução: KPIs e gráficos ---------- */
+  let evoMax = null;
+  function painelPessoal() {
+    const rows = linhasLocais(), mes = kpis(noPeriodo(rows, "mes")), sq = sequencias(rows);
+    const sem = porSemana(rows, 8), media = Math.round((soma(sem.map((x) => x.v)) / 8) * 10) / 10;
+    return `<div class="stats-row">${stat("circle-check.svg", mes.treinos, "Treinos no mês")}${stat("hourglass.svg", fmtMin(mes.minutos), "Tempo no mês")}</div>
+      <div class="stats-row">${stat("flame.svg", `${sq.melhor}`, "Melhor sequência")}${stat("calendar.svg", String(media).replace(".", ","), "Treinos/semana")}</div>
+      <div class="sec-head" style="margin-top:8px"><h2>Treinos por semana</h2></div>
+      ${barras(sem, { aria: "Treinos por semana nas últimas 8 semanas" })}
+      <div class="sec-head" style="margin-top:8px"><h2>Minutos por semana</h2></div>
+      ${barras(porSemana(rows, 8, "minutos"), { aria: "Minutos de treino por semana", fmt: (v) => v })}`;
+  }
+  function graficoMaxOut() {
+    const mx = maxOuts(linhasLocais());
+    if (!mx.length) return `<p class="note">Registre o Max Out nos vídeos do ${esc(INS.nome)} para ver aqui em que minuto você cansou em cada treino. 🥵</p>`;
+    const vids = [...new Set(mx.map((m) => m.v))];
+    if (!vids.includes(evoMax)) evoMax = vids[0];
+    const h = mx.filter((m) => m.v === evoMax).sort((a, b) => a.k.localeCompare(b.k)).slice(-8);
+    const best = Math.max(...h.map((m) => m.s)), dur = (INSV[evoMax].min || 0) * 60;
+    const evo = h.length > 1 ? h[h.length - 1].s - h[0].s : 0;
+    return `<div class="chips evo-chips">${vids.map((v) => `<button class="chip${v === evoMax ? " primary" : ""}" data-evo-max="${v}">${esc(INSV[v].nome)}</button>`).join("")}</div>
+      ${barras(h.map((m) => ({ k: m.k, v: m.s })), { fmt: mmss, meta: dur, aria: `Max Out em ${INSV[evoMax].nome}` }).replace(/meta (\d+)/, () => `fim ${mmss(dur)}`)}
+      <div class="stats-row">${stat("zap.svg", mmss(best), "Melhor Max Out")}${stat("arrow-up.svg", (evo >= 0 ? "+" : "−") + mmss(Math.abs(evo)), "Desde o 1º registro")}</div>`;
+  }
+
   /* ---------- Router ---------- */
   function render() {
     let [, rota = "", p1, p2] = location.hash.split("/");
+    if (rota === "grupo" && p1 === "entrar" && /^[A-Za-z0-9]{4,12}$/.test(p2 || "") && !uid) { S.convite = p2.toUpperCase(); save(); }
     if (!S.logado) rota = "login";
     else if (!S.onboarded && rota !== "login") rota = "onboarding";
     else if (!telas[rota] || rota === "login" || rota === "onboarding") rota = "home";
@@ -825,6 +1282,7 @@
     let alvo = `#/${rota}`;
     if (rota === "treino") alvo += `/${p1}/${p2}`;
     else if (rota === "insanity" && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
+    else if (rota === "grupo" && p1 === "entrar" && p2) alvo += `/entrar/${p2}`;
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
@@ -835,7 +1293,13 @@
   }
   window.addEventListener("hashchange", render);
 
-  /* ---------- Login com e-mail e senha (contas no servidor, /api/auth) ---------- */
+  /* ---------- Contas (Supabase Auth): e-mail e senha ou Google ---------- */
+  const SB_URL = "https://thckpqzvvjujuseqeusz.supabase.co";
+  const SB_KEY = "sb_publishable_t8SLyWZNLgSHj_4B158EyA_tpHm_DmV";
+  const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
+  let uid = null; // id do usuário logado no Supabase (null = visitante)
+  const tokenSB = async () => (sb ? (await sb.auth.getSession()).data.session?.access_token || null : null);
+
   let loginModo = null; // null | "entrar" | "cadastro"
   function telaLoginEmail() {
     const cad = loginModo === "cadastro";
@@ -854,74 +1318,88 @@
           <p class="form-erro" id="login-erro" role="alert"></p>
           <button class="btn btn-google" type="submit">${cad ? "Criar conta" : "Entrar"}</button>
         </form>
+        ${cad ? "" : `<button class="visitante" id="esqueci">Esqueci a senha</button>`}
         <button class="visitante" id="voltar-login">Voltar</button>
       </div></section>`;
   }
-  const ERROS_LOGIN = {
-    email_invalido: "Confira o e-mail.", nome_invalido: "Digite seu nome.", senha_curta: "A senha precisa ter pelo menos 8 caracteres.",
-    ja_cadastrado: "Esse e-mail já tem conta. Toque em Entrar.", senha_errada: "E-mail ou senha incorretos.",
-    muitas_tentativas: "Muitas tentativas. Espere 15 minutos e tente de novo.",
-  };
+  function erroLogin(e) {
+    const m = String(e?.message || e || "").toLowerCase();
+    if (m.includes("invalid login")) return "E-mail ou senha incorretos.";
+    if (m.includes("already registered") || m.includes("already been registered")) return "Esse e-mail já tem conta. Toque em Entrar.";
+    if (m.includes("email not confirmed")) return "Confirme seu e-mail pelo link que enviamos e tente de novo.";
+    if (m.includes("password")) return "A senha precisa ter pelo menos 8 caracteres.";
+    if (m.includes("rate") || m.includes("too many")) return "Muitas tentativas. Espere alguns minutos e tente de novo.";
+    if (m.includes("email")) return "Confira o e-mail.";
+    return "Não foi possível entrar agora. Tente de novo.";
+  }
   document.addEventListener("submit", async (ev) => {
     if (ev.target.id !== "form-login") return;
     ev.preventDefault();
     const f = ev.target, btn = f.querySelector("button[type=submit]"), erro = $("#login-erro");
-    const dados = Object.fromEntries(new FormData(f));
+    const d = Object.fromEntries(new FormData(f));
+    if (!sb) { erro.textContent = "Sem conexão com o servidor de contas. Tente de novo."; return; }
+    if (loginModo === "cadastro" && !String(d.nome || "").trim()) { erro.textContent = "Digite seu nome."; return; }
     erro.textContent = ""; btn.disabled = true; btn.style.opacity = ".7";
     try {
-      const r = await fetch("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: loginModo, ...dados }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(ERROS_LOGIN[d.erro] || "Não foi possível entrar agora. Tente de novo.");
-      S.sessao = d.token; loginModo = null;
-      entrar({ nome: d.nome, primeiro: d.nome.split(" ")[0], foto: null, email: d.email });
+      if (loginModo === "cadastro") {
+        const { data, error } = await sb.auth.signUp({ email: d.email.trim(), password: d.senha, options: { data: { nome: d.nome.trim().slice(0, 60) }, emailRedirectTo: location.origin + "/" } });
+        if (error) throw error;
+        if (!data.session) { loginModo = "entrar"; render(); toast("Conta criada! Confirme pelo link que mandamos no seu e-mail. 📩"); return; }
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email: d.email.trim(), password: d.senha });
+        if (error) throw error;
+      }
+      loginModo = null; // onAuthStateChange cuida do resto
     } catch (e) {
-      erro.textContent = e.message || "Sem conexão. Tente de novo.";
+      erro.textContent = erroLogin(e);
       btn.disabled = false; btn.style.opacity = "";
     }
   });
-
-  /* ---------- Login com Google ---------- */
+  async function loginGoogle(btn) {
+    if (!sb) { toast("Sem conexão com o servidor de contas."); return; }
+    btn.disabled = true; btn.style.opacity = ".7";
+    const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + "/" } });
+    if (error) { btn.disabled = false; btn.style.opacity = ""; toast("Não foi possível entrar com o Google."); }
+  }
+  async function esqueciSenha() {
+    const email = prompt("Seu e-mail para receber o link de nova senha:");
+    if (!email || !sb) return;
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.origin + "/#/nova-senha" });
+    toast(error ? erroLogin(error) : "Se o e-mail tiver conta, o link chega em instantes. 📩");
+  }
   function entrar(user) {
     S.logado = true; S.user = user; save();
     location.hash = S.onboarded ? "#/home" : "#/onboarding";
   }
-  function loginGoogle(btn) {
-    if (!(window.google && google.accounts && google.accounts.oauth2)) { toast("Carregando o login do Google… tente de novo."); return; }
-    const reset = () => { btn.disabled = false; btn.style.opacity = ""; };
-    btn.disabled = true; btn.style.opacity = ".7";
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: "openid profile email",
-      callback: async (resp) => {
-        if (resp.error) { reset(); toast("Login cancelado."); return; }
-        guardarToken(resp);
-        try {
-          const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${resp.access_token}` } });
-          if (!r.ok) throw new Error(r.status);
-          const u = await r.json();
-          const nome = u.name || u.given_name || "Atleta";
-          entrar({ nome, primeiro: u.given_name || nome.split(" ")[0], foto: u.picture || null });
-        } catch { reset(); toast("Não foi possível entrar com o Google."); }
-      },
-      error_callback: () => { reset(); toast("Login cancelado."); },
-    });
-    client.requestAccessToken();
+  // Sessão do Supabase -> estado do app
+  async function aoLogar(session) {
+    const u = session.user, novo = uid !== u.id;
+    // Outra conta neste aparelho: não mistura os treinos de uma pessoa com os da outra
+    if (S.contaId && S.contaId !== u.id) { S.logs = {}; S.insanity = { inicio: null, logs: {} }; S.conquistas = {}; S.onboarded = false; G.grupos = null; }
+    S.contaId = u.id;
+    uid = u.id;
+    let perfil = null;
+    try { perfil = (await sb.from("perfis").select("nome, foto_url, config").eq("id", uid).maybeSingle()).data; } catch {}
+    const meta = u.user_metadata || {};
+    const nome = (perfil?.nome || meta.nome || meta.full_name || meta.name || u.email.split("@")[0]).trim();
+    const user = { id: uid, nome, primeiro: nome.split(" ")[0], foto: perfil?.foto_url || meta.avatar_url || null, email: u.email };
+    if (perfil?.config) {
+      if (perfil.config.inicio && !Object.keys(S.logs).length) S.inicio = perfil.config.inicio;
+      if (perfil.config.insanity !== undefined && !Object.keys(S.insanity.logs).length) S.insanity.inicio = perfil.config.insanity;
+    }
+    if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
+    else { S.user = user; save(); }
+    if (novo) { await puxarTreinos(); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
+    render();
   }
-
-  /* Token do Google: guardado só nesta aba (sessionStorage), usado para o Coach AI provar que é você. */
-  const TK = "fitai-gtoken";
-  function guardarToken(resp) {
-    try { sessionStorage.setItem(TK, JSON.stringify({ t: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60000 })); } catch {}
-  }
-  function pegarToken() {
-    try { const g = JSON.parse(sessionStorage.getItem(TK) || "null"); if (g && g.exp > Date.now()) return Promise.resolve(g.t); } catch {}
-    if (!(window.google && google.accounts && google.accounts.oauth2)) return Promise.resolve(null);
-    return new Promise((ok) => {
-      google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID, scope: "openid profile email",
-        callback: (resp) => { if (resp.error) return ok(null); guardarToken(resp); ok(resp.access_token); },
-        error_callback: () => ok(null),
-      }).requestAccessToken({ prompt: "" });
+  if (sb) {
+    sb.auth.onAuthStateChange((evento, session) => {
+      if (session && (evento === "SIGNED_IN" || evento === "INITIAL_SESSION")) setTimeout(() => aoLogar(session), 0);
+      if (evento === "PASSWORD_RECOVERY") setTimeout(async () => {
+        const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
+        if (nova) { const { error } = await sb.auth.updateUser({ password: nova }); toast(error ? erroLogin(error) : "Senha trocada ✓"); }
+      }, 300);
+      if (evento === "SIGNED_OUT") uid = null;
     });
   }
 
@@ -934,8 +1412,28 @@
     else if (t.id === "email-login") { loginModo = "entrar"; render(); }
     else if (t.id === "voltar-login") { loginModo = null; render(); }
     else if (t.dataset.modo) { loginModo = t.dataset.modo; render(); }
-    else if (t.id === "sair") { S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
+    else if (t.id === "esqueci") esqueciSenha();
+    else if (t.id === "ir-login") { S.logado = false; save(); location.hash = "#/login"; }
+    else if (t.id === "trocar-foto") $("#foto-arquivo").click();
+    else if (t.id === "trocar-nome") trocarNome();
+    else if (t.id === "g-criar") criarGrupo();
+    else if (t.id === "g-codigo") entrarComCodigo(prompt("Código do grupo:") || "");
+    else if (t.dataset.gSel) { G.sel = t.dataset.gSel; G.carregadoEm = 0; carregarGrupos(true); }
+    else if (t.id === "g-convidar") convidar(grupoSel());
+    else if (t.dataset.gPeriodo) { G.periodo = t.dataset.gPeriodo; render(); }
+    else if (t.dataset.gRank) { G.rank = t.dataset.gRank; render(); }
+    else if (t.id === "g-atualizar") { carregarGrupos(true); toast("Atualizando…"); }
+    else if (t.id === "g-meta") {
+      const g = grupoSel(), n = parseInt(prompt("Meta de treinos do grupo por semana:", g.meta_semanal), 10);
+      if (n > 0 && n <= 500) sb.from("grupos").update({ meta_semanal: n }).eq("id", g.id).then(({ error }) => { if (error) toast("Não consegui mudar a meta."); else { g.meta_semanal = n; render(); } });
+    } else if (t.id === "g-sair") {
+      const g = grupoSel();
+      if (!confirm(`Sair do grupo ${g.nome}?${g.dono === uid ? " Você criou este grupo; ele continua para os outros." : ""}`)) return;
+      sb.from("membros").delete().eq("grupo_id", g.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui sair do grupo."); else { G.sel = null; carregarGrupos(true); toast("Você saiu do grupo."); } });
+    } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = graficoMaxOut(); }
+    else if (t.id === "sair") { if (sb && uid) sb.auth.signOut(); uid = null; S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
     else if (t.id === "iniciar") t.textContent = toggleTimer();
+    else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true).then((ok) => { if (ok) toast("Vídeos liberados ✓ Toque em Assistir."); else t.disabled = false; }); }
     else if (t.dataset.insFeito) {
       const id = t.dataset.insFeito, k = t.dataset.k, l = insLogDe(k), era = insFeito(k);
       const i = l.feitos.indexOf(id);
@@ -999,7 +1497,7 @@
       planoSemana = null; save(); render();
       toast(`Você está na Semana ${Number(t.dataset.semana) + 1}.`);
     } else if (t.id === "exportar") {
-      const blob = new Blob([JSON.stringify({ app: "fitai", versao: 1, inicio: S.inicio, perfil: S.perfil, logs: S.logs, insanity: S.insanity }, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify({ app: "fitai", versao: 1, inicio: S.inicio, perfil: S.perfil, logs: S.logs, insanity: S.insanity, conquistas: S.conquistas || {} }, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob); a.download = `fitai-backup-${hojeKey}.json`; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -1012,6 +1510,7 @@
     else if (t.hasAttribute("data-close-chat")) closeChat();
   });
   document.addEventListener("change", async (e) => {
+    if (e.target.id === "foto-arquivo" && e.target.files[0]) { trocarFoto(e.target.files[0]); e.target.value = ""; return; }
     if (e.target.id !== "arquivo" || !e.target.files[0]) return;
     try {
       const d = JSON.parse(await e.target.files[0].text());
@@ -1137,13 +1636,13 @@
   }
   async function coachIA() {
     // Logado com Google: manda o token (se for o dono, o servidor usa o modelo completo). Visitante: vai sem token.
-    const token = S.sessao || (S.user ? await pegarToken() : null);
+    const token = await tokenSB();
     const mensagens = chatLog.filter((m) => m.txt).map((m) => ({ role: m.me ? "user" : "assistant", content: m.txt }));
     const stop = typing(msgsEl);
     let r;
     try {
       r = await fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ mensagens, programa: programaTexto(), contexto: contextoTexto(!!token) }) });
+        body: JSON.stringify({ mensagens, programa: programaTexto(), contexto: contextoTexto(!!token && souDono) }) });
     } catch { stop(); return false; }
     if (!r.ok || !r.body) {
       stop();
@@ -1247,4 +1746,5 @@
   }
 
   render();
+  carregarVideos();
 })();
