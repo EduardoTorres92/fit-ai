@@ -393,6 +393,73 @@
     }).join("");
   }
 
+  /* Músculos trabalhados por exercício de calistenia (Treino da Fera e programa de exemplo)
+     e o mapa da imagem (assets/musculos/<mapa>.webp) */
+  const MUSC_EX = {
+    flexao: ["empurrar", "Peitoral, tríceps e ombros (frente), com o core firme"],
+    "flexao-comum": ["empurrar", "Peitoral, tríceps e ombros (frente), com o core firme"],
+    "flexao-leve": ["empurrar", "Peitoral, tríceps e ombros (frente)"],
+    "flexao-diamante": ["empurrar", "Tríceps (ênfase), peitoral e ombros"],
+    "flexao-aberta": ["empurrar", "Peitoral (ênfase), ombros e tríceps"],
+    "flexao-mike-tyson": ["empurrar", "Tríceps, peitoral e ombros"],
+    "flexao-explosiva": ["empurrar", "Peitoral, tríceps e ombros, com potência"],
+    "flexao-arqueiro": ["empurrar", "Peitoral e tríceps com mais carga num braço, ombros e core"],
+    "flexao-unilateral": ["empurrar", "Peitoral, tríceps, ombros e core (anti-rotação)"],
+    "flexao-inclinada": ["empurrar", "Peitoral, tríceps e ombros (versão mais leve)"],
+    "flexao-pes-elevados": ["empurrar", "Peitoral superior, ombros e tríceps"],
+    "mergulho-banco": ["empurrar", "Tríceps (ênfase), peitoral e ombros"],
+    "pseudo-planche": ["ombros", "Ombros (frente), peitoral, tríceps, bíceps e core"],
+    "flexao-militar": ["ombros", "Ombros e tríceps, com peitoral superior"],
+    "flexao-pike": ["ombros", "Ombros, tríceps e trapézio"],
+    hspu: ["ombros", "Ombros, tríceps e trapézio, com core para estabilizar"],
+    "barra-aberta": ["puxar", "Dorsais (largura das costas), bíceps e parte de trás dos ombros"],
+    "barra-fechada": ["puxar", "Dorsais, bíceps e antebraços"],
+    "barra-pronada": ["puxar", "Dorsais, bíceps, trapézio e antebraços"],
+    "barra-negativa": ["puxar", "Dorsais e bíceps (fase de descida), antebraços"],
+    "barra-isometrica": ["puxar", "Bíceps, dorsais e antebraços (isometria)"],
+    "barra-uma-mao": ["puxar", "Dorsais e bíceps de um lado, antebraço e core"],
+    "chin-up": ["puxar", "Bíceps (ênfase) e dorsais, com antebraços"],
+    "drop-aberta": ["puxar", "Dorsais, meio das costas, bíceps e antebraços (até a falha)"],
+    "drop-supinada": ["puxar", "Bíceps, dorsais e meio das costas (até a falha)"],
+    "barra-australiana": ["puxar", "Meio das costas (romboides e trapézio), dorsais, bíceps e parte de trás dos ombros"],
+    "remada-aberta": ["puxar", "Meio das costas, parte de trás dos ombros e bíceps"],
+    "remada-fechada": ["puxar", "Dorsais (ênfase), bíceps e meio das costas"],
+    "remada-uma-mao": ["puxar", "Dorsal e meio das costas de um lado, bíceps e core (anti-rotação)"],
+    "remada-australiana-fin": ["puxar", "Meio das costas, dorsais e bíceps"],
+    abdominal: ["core", "Reto abdominal"],
+    "abdominal-bicicleta": ["core", "Oblíquos e reto abdominal"],
+    "abdominal-canivete": ["core", "Reto abdominal inteiro e flexores do quadril"],
+    "abdominal-pendurado": ["core", "Abdômen inferior, flexores do quadril e pegada (antebraços)"],
+    "elevacao-pernas": ["core", "Abdômen inferior e flexores do quadril"],
+    "core-barra": ["core", "Abdômen, oblíquos, flexores do quadril e pegada"],
+    "l-sit": ["core", "Abdômen, flexores do quadril, tríceps e ombros"],
+    "dragon-flag": ["core", "Abdômen inteiro, lombar e dorsais"],
+    hollow: ["core", "Abdômen (reto e transverso) e flexores do quadril"],
+    prancha: ["core", "Abdômen (transverso e reto), ombros e glúteos"],
+    "prancha-lateral": ["core", "Oblíquos, quadrado lombar e ombro de apoio"],
+    "rkc-plank": ["core", "Abdômen, glúteos, quadríceps e dorsais em tensão total"],
+    agachamento: ["inferiores", "Quadríceps, glúteos e posteriores"],
+    "agachamento-sumo": ["inferiores", "Glúteos, adutores (parte interna da coxa) e quadríceps"],
+    "agachamento-bulgaro": ["inferiores", "Quadríceps e glúteos (uma perna por vez), com equilíbrio"],
+    "agachamento-isometrico": ["inferiores", "Quadríceps e glúteos (isometria)"],
+    "pistol-squat": ["inferiores", "Quadríceps, glúteos e equilíbrio (uma perna)"],
+    afundo: ["inferiores", "Quadríceps, glúteos e posteriores"],
+    "afundo-reverso": ["inferiores", "Glúteos (ênfase), quadríceps e posteriores"],
+    "flexao-nordica-reversa": ["inferiores", "Quadríceps (ênfase) e flexores do quadril"],
+    "ponte-gluteos": ["gluteos", "Glúteos e posteriores da coxa"],
+    superman: ["gluteos", "Lombar, glúteos e posteriores"],
+    "panturrilha-em-pe": ["panturrilha", "Panturrilhas (gastrocnêmio e sóleo)"],
+    "panturrilha-unilateral": ["panturrilha", "Panturrilhas (uma perna por vez)"],
+    "agachamento-salto": ["pernas", "Quadríceps, glúteos e panturrilhas (pliometria), com core"],
+    pulos: ["pernas", "Quadríceps, glúteos e panturrilhas (pliometria), com core"],
+    trote: ["pernas", "Pernas, glúteos e panturrilhas (aquecimento)"],
+    caminhada: ["pernas", "Pernas e glúteos, em ritmo leve"],
+    "tiro-200": ["pernas", "Quadríceps, posteriores, glúteos e panturrilhas (velocidade)"],
+    alongamento: ["corpo", "Corpo inteiro (mobilidade e flexibilidade)"],
+  };
+  // Bloco "músculos + mapa" usado nos cards de exercício e de vídeo
+  const muscHtml = (texto, mapa, nome) => texto ? `<details class="musc"><summary><span>💪 ${esc(texto)}</span></summary>
+    ${mapa ? `<img src="${A(`musculos/${mapa}.webp`)}" alt="Mapa muscular de ${esc(nome)}: ${esc(texto)}" loading="lazy" width="900" height="675">` : ""}</details>` : "";
   function exCard(e, editavel) {
     const sets = editavel ? (logHoje()?.sets?.[e.id] || []) : [];
     const prev = anterior(e.id), rec = recorde(e.id);
@@ -414,6 +481,7 @@
         ${rec ? `<span class="pill gray">${icon("zap.svg")}${tiro ? "Melhor" : "Máx"} ${rec}${u}</span>` : ""}
       </div>
       ${e.obs ? `<p class="ex-obs">${esc(e.obs)}</p>` : ""}
+      ${MUSC_EX[e.id] ? muscHtml(MUSC_EX[e.id][1], MUSC_EX[e.id][0], e.nome) : ""}
       ${editavel ? `
       <div class="sets">
         ${sets.map((s, i) => `<button class="set" data-del="${i}" title="Toque para remover" aria-label="Série ${i + 1}: ${s}${u}. Toque para remover">${s}${u}</button>`).join("")}
@@ -471,8 +539,7 @@
         ${fitAnt ? `<span class="pill gray">Fit Test anterior: ${soma(fitAnt.fit.map((n) => n || 0))} reps</span>` : ""}
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
-      ${v.musculos ? `<details class="musc"><summary><span>💪 ${esc(v.musculos)}</span></summary>
-        ${v.mapa ? `<img src="${A(`musculos/${v.mapa}.webp`)}" alt="Mapa muscular de ${esc(v.nome)}: ${esc(v.musculos)}" loading="lazy" width="900" height="675">` : ""}</details>` : ""}
+      ${muscHtml(v.musculos, v.mapa, v.nome)}
       ${link ? `<button class="btn btn-blue ins-play" data-ins-play="${id}">▶ Assistir</button>`
         : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Carregar vídeos</button>` : `<p class="ex-obs">Entre com sua conta para assistir aos vídeos.</p>`}
       ${fit ? `<form class="fit-test" data-fit="${id}" data-p="${p}" data-k="${kk}">
@@ -1867,7 +1934,8 @@
   }
   function linhaEx(e) {
     const alvo = typeof e.r === "string" ? e.r : e.r;
-    return `${e.nome} [${e.id}]: ${e.un === "tiro" ? `${e.s} tiros de 200 m (tempo em s, menor é melhor)` : `${e.s}×${alvo}${e.un === "reps" ? " reps" : " " + e.un}${e.lado ? " por lado" : ""}`}${e.obs ? ` — ${e.obs}` : ""}`;
+    const mu = MUSC_EX[e.id] ? ` (músculos: ${MUSC_EX[e.id][1]})` : "";
+    return `${e.nome} [${e.id}]${mu}: ${e.un === "tiro" ? `${e.s} tiros de 200 m (tempo em s, menor é melhor)` : `${e.s}×${alvo}${e.un === "reps" ? " reps" : " " + e.un}${e.lado ? " por lado" : ""}`}${e.obs ? ` — ${e.obs}` : ""}`;
   }
   function programaTexto() {
     const sem = PROGRAMA.map((s, w) => [`## Semana ${w + 1} · ${s.nome}`, s.nota.replace(/<[^>]+>/g, ""),
