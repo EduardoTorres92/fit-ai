@@ -1,6 +1,5 @@
 /* FIT.AI — Insanity MAX:30 com Ab Maximizer (calendário de 8 semanas).
-   Os links dos vídeos NÃO ficam aqui: ficam em public/insanity-videos.js (fora do GitHub),
-   no formato window.FITAI_INSANITY_VIDEOS = { "cardio-challenge": "<id do arquivo no Drive>", ... } */
+   Os links dos vídeos NÃO ficam aqui: vêm de /api/videos (variável FITAI_INSANITY_VIDEOS no servidor). */
 window.FITAI_INSANITY = (() => {
   const V = (id, nome, min, tipo, desc) => ({ id, nome, min, tipo, desc });
   const VIDEOS = [
@@ -41,7 +40,16 @@ window.FITAI_INSANITY = (() => {
   SEMANAS[7].dias[5] = dia("Cardio Challenge final", "cardio-challenge");
   SEMANAS[7].dias[6] = { titulo: "Challenge Complete 🏆", ids: [], fim: true };
   return {
+    k: "insanity", // chave antiga: os registros do MAX:30 já salvos usam "insanity"
     nome: "Insanity MAX:30",
+    curto: "MAX:30",
+    selo: "Ab Maximizer · 8 semanas",
+    resumo: "Ab Maximizer · 8 semanas de vídeos · toque para começar",
+    banner: "banner-home.jpg",
+    maxOut: true,
+    trocaAte: 4,
+    extraTitulo: "Sem tempo?",
+    coach: "O usuário registra o Max Out de cada vídeo (minuto em que precisou parar pela primeira vez; quanto mais tarde, melhor).",
     videos: VIDEOS,
     semanas: SEMANAS,
     trocas: { "sweat-intervals": "sweat-fest" },

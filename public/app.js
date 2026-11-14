@@ -127,20 +127,31 @@
   const hojeKey = keyOf(hoje);
   const hojeDia = (hoje.getDay() + 6) % 7;
 
+  /* ---------- Programas em vídeo (public/insanity.js = MAX:30, public/insanity60.js = Insanity) ----------
+     Cada um tem uma chave (k) que também é a chave do estado (S[k]), da rota (#/k/semana/dia) e do campo
+     "programa" no Supabase. O MAX:30 usa "insanity" para continuar lendo os registros antigos. */
+  const VPROGS = [window.FITAI_INSANITY, window.FITAI_INSANITY60].filter((p) => p && p.semanas && p.semanas.length);
+  VPROGS.forEach((p) => { p.k = p.k || "insanity"; p.trocas = p.trocas || {}; p.trocaAte = p.trocaAte ?? 0; p.curto = p.curto || p.nome; });
+  const VP = Object.fromEntries(VPROGS.map((p) => [p.k, p]));
+  const VKEYS = VPROGS.map((p) => p.k);
+  const vazioVP = () => ({ inicio: null, logs: {} });
+
   /* ---------- Estado ---------- */
   const KEY = "fitai-state-v1";
-  const padrao = { user: null, logado: false, onboarded: false, inicio: keyOf(mondayOf(hoje)), logs: {}, perfil: { peso: "", altura: "", idade: "" }, insanity: { inicio: null, logs: {} } };
+  const padrao = { user: null, logado: false, onboarded: false, inicio: keyOf(mondayOf(hoje)), logs: {}, perfil: { peso: "", altura: "", idade: "" } };
   let S = load();
   function load() {
     try {
       const s = { ...padrao, ...JSON.parse(localStorage.getItem(KEY) || "{}") };
       if (!s.logs || typeof s.logs !== "object") s.logs = {};
       s.perfil = { ...padrao.perfil, ...(s.perfil || {}) };
-      s.insanity = { inicio: null, logs: {}, ...(s.insanity || {}) };
+      for (const k of VKEYS) {
+        s[k] = { ...vazioVP(), ...(s[k] || {}) };
+        if (!s[k].logs || typeof s[k].logs !== "object") s[k].logs = {};
+      }
       if (s.user && !s.user.id) { s.logado = false; s.user = null; s.sessao = null; } // login antigo (antes do Supabase): entra de novo
-      if (!s.insanity.logs || typeof s.insanity.logs !== "object") s.insanity.logs = {};
       return s;
-    } catch { return { ...padrao, insanity: { inicio: null, logs: {} } }; }
+    } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])) }; }
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
@@ -152,16 +163,17 @@
   const logHoje = () => S.logs[hojeKey];
   const ativoHoje = () => { const l = logHoje(); if (l) return { w: l.w, d: l.d }; const w = semanaDe(hoje); return { w: Math.max(w, 0), d: hojeDia }; };
   const soma = (a) => a.reduce((x, y) => x + y, 0);
-  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || insFeito(k);
-  const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || insParcial(k);
+  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k));
+  const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || VKEYS.some((p) => insParcial(p, k));
+  const diasVideo = () => VKEYS.flatMap((p) => Object.keys(S[p].logs));
 
   function sequencia() {
     let d = feito(hojeKey) ? hoje : addDays(hoje, -1), c = 0;
     while (feito(keyOf(d))) { c++; d = addDays(d, -1); }
     return c;
   }
-  const treinosFeitos = () => [...new Set([...Object.keys(S.logs), ...Object.keys(S.insanity.logs)])].filter(feito).length;
-  const tempoTotal = () => soma(Object.values(S.logs).map((l) => l.dur || 0)) + soma(Object.values(S.insanity.logs).flatMap((l) => (l.feitos || []).map((id) => (INSV[id]?.min || 0) * 60)));
+  const treinosFeitos = () => [...new Set([...Object.keys(S.logs), ...diasVideo()])].filter(feito).length;
+  const tempoTotal = () => soma(Object.values(S.logs).map((l) => l.dur || 0)) + soma(VKEYS.flatMap((p) => Object.values(S[p].logs)).map((l) => minVideo(l) * 60));
   function taxaConclusao() {
     const dias = diffDays(parseKey(S.inicio), hoje) + (feito(hojeKey) ? 1 : 0);
     if (dias <= 0) return treinosFeitos() ? 100 : 0;
@@ -174,30 +186,41 @@
   const menorMelhor = (id) => EXI[id] && EXI[id].un === "tiro";
   const anterior = (id) => historico(id).filter((h) => h.k < hojeKey).pop();
   const recorde = (id) => { const b = historico(id).map((h) => h.best); return b.length ? (menorMelhor(id) ? Math.min(...b) : Math.max(...b)) : 0; };
-  function ultimoTreino() { const ks = [...new Set([...Object.keys(S.logs), ...Object.keys(S.insanity.logs)])].filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
+  function ultimoTreino() { const ks = [...new Set([...Object.keys(S.logs), ...diasVideo()])].filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
   const fmtDur = (seg) => { const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60); return h ? `${h}h${pad(m)}m` : `${m}min`; };
 
-  /* ---------- Insanity MAX:30 (public/insanity.js; IDs dos vídeos vêm de /api/videos) ---------- */
-  const INS = window.FITAI_INSANITY || { nome: "Insanity MAX:30", videos: [], semanas: [], trocas: {}, nota: "" };
-  const INS_VID = { ...(window.FITAI_INSANITY_VIDEOS || {}) };
-  const INSV = Object.fromEntries(INS.videos.map((v) => [v.id, v]));
-  const insLink = (id) => (INS_VID[id] ? `https://drive.google.com/file/d/${encodeURIComponent(INS_VID[id])}/view` : "");
-  const insSemanaDe = (d) => (S.insanity.inicio ? Math.floor(diffDays(parseKey(S.insanity.inicio), d) / 7) : -1);
-  const insDia = (w, d) => (INS.semanas[w] ? INS.semanas[w].dias[d] : null);
-  const insData = (w, d) => keyOf(addDays(parseKey(S.insanity.inicio), w * 7 + d));
-  const insHoje = () => { const w = insSemanaDe(hoje); return w >= 0 && w < INS.semanas.length ? { w, d: hojeDia } : null; };
-  const insAlt = (w, id) => (w < 4 && INS.trocas[id]) || null; // Sweat Fest pode substituir o Sweat Intervals no mês 1
-  function insFeito(k) {
-    const l = S.insanity.logs[k];
+  /* ---------- Programas em vídeo: funções (p = chave do programa; IDs dos vídeos vêm de /api/videos) ---------- */
+  const INS_VID = { ...(window.FITAI_INSANITY_VIDEOS || {}) }; // { idDoVideo: "idNoDrive" ou "idNoDrive|resourcekey" }
+  const INSV = Object.fromEntries(VPROGS.flatMap((p) => p.videos.map((v) => [v.id, v])));
+  // Arquivos antigos do Drive (antes de 2021) só abrem com a resourcekey junto
+  const driveUrl = (id, modo) => {
+    const [f, rk] = String(INS_VID[id] || "").split("|");
+    return f ? `https://drive.google.com/file/d/${encodeURIComponent(f)}/${modo}${rk ? `?resourcekey=${encodeURIComponent(rk)}` : ""}` : "";
+  };
+  const insLink = (id) => driveUrl(id, "view");
+  const insSemanaDe = (p, d) => (S[p].inicio ? Math.floor(diffDays(parseKey(S[p].inicio), d) / 7) : -1);
+  const insDia = (p, w, d) => (VP[p].semanas[w] ? VP[p].semanas[w].dias[d] : null);
+  const insData = (p, w, d) => keyOf(addDays(parseKey(S[p].inicio), w * 7 + d));
+  const insHoje = (p) => { const w = insSemanaDe(p, hoje); return w >= 0 && w < VP[p].semanas.length ? { w, d: hojeDia } : null; };
+  const insAlt = (p, w, id) => (w < VP[p].trocaAte && VP[p].trocas[id]) || null; // MAX:30: Sweat Fest pode substituir o Sweat Intervals no mês 1
+  function insFeito(p, k) {
+    const l = S[p].logs[k];
     if (!l) return false;
-    const t = insDia(l.w, l.d);
-    return !!(t && t.ids.length && t.ids.every((id) => l.feitos.includes(id) || (insAlt(l.w, id) && l.feitos.includes(insAlt(l.w, id)))));
+    if ((l.avulso || []).length) return true; // vídeo feito fora do calendário (extra, bônus ou de outro dia) conta como treino
+    const t = insDia(p, l.w, l.d);
+    return !!(t && t.ids.length && t.ids.every((id) => l.feitos.includes(id) || (insAlt(p, l.w, id) && l.feitos.includes(insAlt(p, l.w, id)))));
   }
-  const insParcial = (k) => !!(S.insanity.logs[k] && S.insanity.logs[k].feitos.length);
+  const insParcial = (p, k) => !!(S[p].logs[k] && (S[p].logs[k].feitos.length || (S[p].logs[k].avulso || []).length));
+  const vidsDe = (l) => [...(l.feitos || []), ...(l.avulso || [])];
+  // Minutos de um dia de vídeo: o cronômetro, quando usado; sem ele, a duração dos vídeos feitos
+  const minVideo = (l) => (l.dur ? Math.round(l.dur / 60) : soma(vidsDe(l).map((id) => INSV[id]?.min || 0)));
   const segDe = (txt) => { const m = String(txt).trim().match(/^(\d{1,2})(?:[:.,h](\d{1,2}))?$/); return m && +(m[2] || 0) < 60 ? +m[1] * 60 + +(m[2] || 0) : null; };
   const mmss = (seg) => `${Math.floor(seg / 60)}:${pad(seg % 60)}`;
-  function insMaxHist(id) {
-    return Object.keys(S.insanity.logs).sort().filter((k) => S.insanity.logs[k].max?.[id]).map((k) => ({ k, seg: S.insanity.logs[k].max[id] }));
+  // Fit Test (Insanity): repetições por movimento, em ordem de data
+  const fitHist = (p) => Object.keys(S[p].logs).sort().filter((k) => Array.isArray(S[p].logs[k].fit) && S[p].logs[k].fit.some((n) => n > 0)).map((k) => ({ k, fit: S[p].logs[k].fit }));
+  const NOMES_MAXOUT = VPROGS.filter((p) => p.maxOut).map((p) => p.nome).join(" e ") || "Insanity";
+  function insMaxHist(p, id) {
+    return Object.keys(S[p].logs).sort().filter((k) => S[p].logs[k].max?.[id]).map((k) => ({ k, seg: S[p].logs[k].max[id] }));
   }
 
 
@@ -387,51 +410,63 @@
   }
 
   /* Insanity: componentes */
-  const INS_IMG = { Cardio: "banner-home.jpg", Tabata: "login.jpg", Potência: "login.jpg", Força: "treino-superiores-2.jpg", Luta: "treino-inferiores-1.jpg", Recuperação: "treino-inferiores-2.jpg", Abdômen: "treino-inferiores-2.jpg" };
-  const progSwitch = (on) => `<nav class="seg prog" aria-label="Programa">
-      <a href="#/plano" class="${on === "plano" ? "on" : ""}"${on === "plano" ? ' aria-current="page"' : ""}>${esc(NOME_PROG)}</a>
-      <a href="#/insanity" class="${on === "insanity" ? "on" : ""}"${on === "insanity" ? ' aria-current="page"' : ""}>${esc(INS.nome)}</a></nav>`;
-  function insCard(w, d, { link = true } = {}) {
-    const t = insDia(w, d), tag = link ? "a" : "div";
+  const INS_IMG = { Cardio: "banner-home.jpg", Tabata: "login.jpg", Potência: "login.jpg", Pliometria: "login.jpg", Teste: "banner-plano.jpg", Intervalos: "banner-home.jpg", Core: "treino-inferiores-2.jpg", Força: "treino-superiores-2.jpg", Luta: "treino-inferiores-1.jpg", Recuperação: "treino-inferiores-2.jpg", Abdômen: "treino-inferiores-2.jpg" };
+  const progSwitch = (on) => {
+    const abas = [["plano", NOME_PROG], ...VPROGS.map((p) => [p.k, VPROGS.length > 1 ? p.curto : p.nome])];
+    return `<nav class="seg prog" aria-label="Programa" style="grid-template-columns:repeat(${abas.length},1fr)">
+      ${abas.map(([r, nome]) => `<a href="#/${r}" class="${on === r ? "on" : ""}"${on === r ? ' aria-current="page"' : ""}>${esc(nome)}</a>`).join("")}</nav>`;
+  };
+  function insCard(p, w, d, { link = true } = {}) {
+    const P = VP[p], t = insDia(p, w, d), tag = link ? "a" : "div";
     const min = soma(t.ids.map((id) => INSV[id].min || 0));
-    const k = S.insanity.inicio ? insData(w, d) : null;
-    const ok = k && insFeito(k);
+    const k = S[p].inicio ? insData(p, w, d) : null;
+    const ok = k && insFeito(p, k);
     const meta = t.ids.length ? `<span>${icon("timer.svg")}${min ? `${min} min` : "vídeo"}</span><span>${icon("zap.svg")}${t.ids.length} ${t.ids.length > 1 ? "vídeos" : "vídeo"}</span>` : `<span>${t.fim ? "Programa concluído" : "Recupere o corpo"}</span>`;
-    return `<${tag} class="wcard${t.ids.length ? "" : " pending"}" ${link && t.ids.length ? `href="#/insanity/${w}/${d}"` : ""} aria-label="${esc(INS.nome)}, semana ${w + 1}, ${DIAS[d]}: ${esc(t.titulo)}">
+    return `<${tag} class="wcard${t.ids.length ? "" : " pending"}" ${link && t.ids.length ? `href="#/${p}/${w}/${d}"` : ""} aria-label="${esc(P.nome)}, semana ${w + 1}, ${DIAS[d]}: ${esc(t.titulo)}">
       <img class="cover" src="${A(INS_IMG[t.ids.length ? INSV[t.ids[0]].tipo : ""] || "banner-plano.jpg")}" alt="" loading="lazy">
       <span class="pill glass">${icon("calendar-14.svg")}${DIAS[d]} · ${t.ids.length ? esc(INSV[t.ids[0]].tipo) : "Descanso"}${ok ? " · ✓" : ""}</span>
       <div class="bottom"><div class="info"><h3>${esc(t.titulo)}</h3><div class="meta">${meta}</div></div></div></${tag}>`;
   }
-  function insVideoCard(id, k, editavel, rotulo = "") {
-    const v = INSV[id], l = (k && S.insanity.logs[k]) || { feitos: [], max: {} };
-    const ok = l.feitos.includes(id);
-    const hist = insMaxHist(id), ant = hist.filter((h) => h.k < k).pop(), best = hist.length ? Math.max(...hist.map((h) => h.seg)) : 0;
+  // editavel = dia do calendário que já chegou. Fora disso (extra, bônus, dia futuro, programa não iniciado),
+  // o vídeo é "avulso": se fizer, conta como treino de hoje.
+  function insVideoCard(p, id, k, editavel, rotulo = "") {
+    const P = VP[p], v = INSV[id], av = !editavel, kk = editavel ? k : hojeKey;
+    const l = S[p].logs[kk] || { feitos: [], max: {} };
+    const ok = (av ? l.avulso || [] : l.feitos).includes(id);
+    const hist = P.maxOut ? insMaxHist(p, id) : [], ant = hist.filter((h) => h.k < k).pop(), best = hist.length ? Math.max(...hist.map((h) => h.seg)) : 0;
     const link = insLink(id);
-    return `<div class="ex ins${ok ? " done" : ""}" data-ins="${id}">
+    const fit = v.fitTest && P.fitTest, fitAnt = fit ? fitHist(p).filter((h) => h.k < kk).pop() : null;
+    return `<div class="ex ins${ok ? " done" : ""}" data-ins="${id}" data-kc="${k || ""}" data-ed="${editavel ? 1 : 0}">
       <div class="ex-top">
         <span class="ex-name"><span class="ex-check">${check}</span><span>${rotulo ? `<small class="ins-rot">${esc(rotulo)}</small>` : ""}${esc(v.nome)}</span></span>
-        <button class="ask" data-ask-ins="${id}" aria-label="Perguntar ao Coach AI sobre ${esc(v.nome)}">${icon("circle-question.svg", 20)}</button>
+        <button class="ask" data-ask-ins="${id}" data-p="${p}" aria-label="Perguntar ao Coach AI sobre ${esc(v.nome)}">${icon("circle-question.svg", 20)}</button>
       </div>
       <div class="ex-tags">
         ${v.min ? `<span class="pill gray">${v.min} min</span>` : ""}<span class="pill gray">${esc(v.tipo)}</span>
         ${ant ? `<span class="pill gray">Último Max Out ${mmss(ant.seg)}</span>` : ""}
         ${best ? `<span class="pill gray">${icon("zap.svg")}Melhor ${mmss(best)}</span>` : ""}
+        ${fitAnt ? `<span class="pill gray">Fit Test anterior: ${soma(fitAnt.fit.map((n) => n || 0))} reps</span>` : ""}
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
       ${link ? `<button class="btn btn-blue ins-play" data-ins-play="${id}">▶ Assistir</button>`
         : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Carregar vídeos</button>` : `<p class="ex-obs">Entre com sua conta para assistir aos vídeos.</p>`}
-      ${editavel ? `<div class="ins-row">
-        <form class="add-set ins-max" data-max="${id}">
+      ${fit ? `<form class="fit-test" data-fit="${id}" data-p="${p}" data-k="${kk}">
+        <div class="fit-grid">${P.fitTest.map((m, i) => `<label><span>${esc(m)}</span><input type="number" inputmode="numeric" min="0" max="999" name="m${i}" value="${l.fit?.[i] ?? ""}" placeholder="${fitAnt?.fit[i] ?? "reps"}" aria-label="Repetições de ${esc(m)}"></label>`).join("")}</div>
+        <button type="submit" class="btn btn-blue">Salvar Fit Test</button>
+      </form>` : ""}
+      ${av ? `<p class="ex-obs avulso">Fora do calendário de hoje: se fizer, conta como treino de hoje.</p>` : ""}
+      <div class="ins-row">
+        ${P.maxOut ? `<form class="add-set ins-max" data-max="${id}" data-p="${p}" data-k="${kk}">
           <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
           <button type="submit" class="btn btn-blue">Max Out</button>
-        </form>
-        <button class="btn btn-outline${ok ? " done" : ""} ins-feito" data-ins-feito="${id}" data-k="${k}">${ok ? "Feito ✓" : "Marcar feito"}</button>
-      </div>` : ""}
+        </form>` : ""}
+        <button class="btn btn-outline${ok ? " done" : ""} ins-feito" data-ins-feito="${id}" data-p="${p}" data-k="${kk}" data-av="${av ? 1 : 0}">${ok ? "Feito ✓" : "Marcar feito"}</button>
+      </div>
     </div>`;
   }
 
   /* ---------- Telas ---------- */
-  let planoSemana = null, insSemana = null;
+  let planoSemana = null; const insSemana = {};
   const telas = {
     login() {
       setToolbar(null);
@@ -495,7 +530,7 @@
           <div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t ? workoutCard(w, d) : ""}
-          ${insHome()}
+          ${videoHome()}
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -551,42 +586,6 @@
         </div></section>`;
     },
 
-    insanity(p1, p2) {
-      setToolbar("plano");
-      const total = INS.semanas.length;
-      if (p2 !== undefined) return telaInsanityDia(Number(p1), Number(p2));
-      const atual = insSemanaDe(hoje);
-      const w = p1 !== undefined && INS.semanas[p1] ? Number(p1) : insSemana ?? Math.min(Math.max(atual, 0), total - 1);
-      insSemana = w;
-      const status = !S.insanity.inicio ? `<p class="note week-note">Escolha em qual semana você está para o app montar o calendário e mostrar o treino do dia na tela inicial.</p>`
-        : atual >= total ? `<p class="note week-note"><b>Programa concluído! 🏆</b> Quer recomeçar? Escolha a semana abaixo.</p>`
-        : atual < 0 ? `<p class="note week-note">Seu Insanity começa na segunda, ${ddmm(S.insanity.inicio)}.</p>` : "";
-      return `<section class="screen has-toolbar">
-        <div class="banner" style="--grad: linear-gradient(238.09deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.8) 100%)">
-          <div class="banner-bg"><img class="plano-img" src="${A("banner-home.jpg")}" alt=""></div>
-          <span class="logo-txt">Fit.ai</span>
-          <div class="plano-title"><span class="pill blue">${icon("goal.svg", 16)}Ab Maximizer · 8 semanas</span><h1>${esc(INS.nome)}</h1></div>
-        </div>
-        ${progSwitch("insanity")}
-        <div class="week-tabs" role="tablist">
-          ${INS.semanas.map((s, i) => `<a role="tab" aria-selected="${i === w}" class="wtab${i === w ? " on" : ""}" href="#/insanity/${i}">
-            <strong>Semana ${i + 1}${i === atual ? " •" : ""}</strong><span>${s.nome.split(" · ")[0]}</span></a>`).join("")}
-        </div>
-        ${status}
-        <p class="note week-note">${INS.nota}</p>
-        <div class="list" style="padding-top:8px">${INS.semanas[w].dias.map((_, d) => insCard(w, d)).join("")}</div>
-        <div class="section">
-          <div class="sec-head"><h2>Sem tempo?</h2></div>
-          ${INS.extra ? insVideoCard(INS.extra, null, false) : ""}
-        </div>
-        <div class="section">
-          <div class="field">
-            <span class="field-lbl">Em qual semana do ${esc(INS.nome)} você está?</span>
-            <div class="seg seg8">${INS.semanas.map((_, i) => `<button class="${S.insanity.inicio && i === atual ? "on" : ""}" data-ins-semana="${i}">${i + 1}</button>`).join("")}</div>
-          </div>
-          ${S.insanity.inicio ? `<button class="btn btn-outline" id="ins-parar" style="margin-top:12px">Pausar ${esc(INS.nome)}</button>` : ""}
-        </div></section>`;
-    },
 
     evolucao() {
       setToolbar("evolucao");
@@ -612,7 +611,8 @@
         </div>
         <div class="section"><div class="sec-head"><h2>Este mês</h2></div>${painelPessoal()}</div>
         <div class="section"><div class="sec-head"><h2>Conquistas</h2></div>${medalhas()}</div>
-        <div class="section"><div class="sec-head"><h2>Max Out · ${esc(INS.nome)}</h2></div><div id="max-box">${graficoMaxOut()}</div></div>
+        ${VPROGS.some((P) => P.maxOut) ? `<div class="section"><div class="sec-head"><h2>Max Out · ${esc(NOMES_MAXOUT)}</h2></div><div id="max-box">${graficoMaxOut()}</div></div>` : ""}
+        ${VPROGS.filter((P) => P.fitTest && fitHist(P.k).length).map((P) => `<div class="section"><div class="sec-head"><h2>Fit Test · ${esc(P.nome)}</h2></div>${tabelaFitTest(P.k)}</div>`).join("")}
         <div class="section">
           <div class="sec-head"><h2>Progresso por exercício</h2></div>
           ${progresso()}
@@ -656,30 +656,75 @@
         </div></section>`;
     },
   };
+  VKEYS.forEach((p) => { telas[p] = (p1, p2) => telaVideo(p, p1, p2); });
 
-  function insHome() {
-    const h = insHoje();
-    if (!h) return S.insanity.inicio ? "" : `<a class="emerg" href="#/insanity"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(INS.nome)}</strong><small>Ab Maximizer · 8 semanas de vídeos · toque para começar</small></div></a>`;
-    return `<div class="sec-head" style="margin-top:8px"><h2>${esc(INS.nome)}</h2><a href="#/insanity/${h.w}">Semana ${h.w + 1} · ${INS.semanas[h.w].nome.split(" · ")[0]}</a></div>${insCard(h.w, h.d)}`;
+
+  /* Tela de um programa em vídeo (#/chave, #/chave/semana, #/chave/semana/dia) */
+  function telaVideo(p, p1, p2) {
+    setToolbar("plano");
+    const P = VP[p], total = P.semanas.length;
+    if (p2 !== undefined) return telaVideoDia(p, Number(p1), Number(p2));
+    const atual = insSemanaDe(p, hoje);
+    const w = p1 !== undefined && P.semanas[p1] ? Number(p1) : insSemana[p] ?? Math.min(Math.max(atual, 0), total - 1);
+    insSemana[p] = w;
+    const status = !S[p].inicio ? `<p class="note week-note">Escolha em qual semana você está para o app montar o calendário e mostrar o treino do dia na tela inicial.</p>`
+      : atual >= total ? `<p class="note week-note"><b>Programa concluído! 🏆</b> Quer recomeçar? Escolha a semana abaixo.</p>`
+      : atual < 0 ? `<p class="note week-note">Seu ${esc(P.nome)} começa na segunda, ${ddmm(S[p].inicio)}.</p>` : "";
+    return `<section class="screen has-toolbar">
+      <div class="banner" style="--grad: linear-gradient(238.09deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.8) 100%)">
+        <div class="banner-bg"><img class="plano-img" src="${A(P.banner || "banner-home.jpg")}" alt=""></div>
+        <span class="logo-txt">Fit.ai</span>
+        <div class="plano-title"><span class="pill blue">${icon("goal.svg", 16)}${esc(P.selo || "")}</span><h1>${esc(P.nome)}</h1></div>
+      </div>
+      ${progSwitch(p)}
+      <div class="week-tabs" role="tablist">
+        ${P.semanas.map((s, i) => `<a role="tab" aria-selected="${i === w}" class="wtab${i === w ? " on" : ""}" href="#/${p}/${i}">
+          <strong>Semana ${i + 1}${i === atual ? " •" : ""}</strong><span>${s.nome.split(" · ")[0]}</span></a>`).join("")}
+      </div>
+      ${status}
+      <p class="note week-note">${P.nota}</p>
+      <div class="list" style="padding-top:8px">${P.semanas[w].dias.map((_, d) => insCard(p, w, d)).join("")}</div>
+      ${P.extra ? `<div class="section">
+        <div class="sec-head"><h2>${esc(P.extraTitulo || "Extra")}</h2></div>
+        ${insVideoCard(p, P.extra, null, false)}
+        ${timerBox(p, hojeKey)}
+      </div>` : ""}
+      <div class="section">
+        <div class="field">
+          <span class="field-lbl">Em qual semana do ${esc(P.nome)} você está?</span>
+          <div class="seg seg8" style="grid-template-columns:repeat(${total},1fr)">${P.semanas.map((_, i) => `<button class="${S[p].inicio && i === atual ? "on" : ""}" data-ins-semana="${i}" data-p="${p}">${i + 1}</button>`).join("")}</div>
+        </div>
+        ${S[p].inicio ? `<button class="btn btn-outline" id="ins-parar" data-p="${p}" style="margin-top:12px">Pausar ${esc(P.nome)}</button>` : ""}
+      </div></section>`;
   }
-  function telaInsanityDia(w, d) {
-    const t = insDia(w, d);
-    if (!t || !t.ids.length) return telas.insanity(String(w));
-    const k = S.insanity.inicio ? insData(w, d) : null;
+  // Tela inicial: o treino de hoje de cada programa em vídeo em andamento (ou atalhos, se nenhum começou)
+  function videoHome() {
+    const ativos = VPROGS.filter((P) => S[P.k].inicio);
+    if (!ativos.length) return VPROGS.map((P) => `<a class="emerg" href="#/${P.k}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)}</strong><small>${esc(P.resumo || "Programa em vídeo · toque para começar")}</small></div></a>`).join("");
+    return ativos.map((P) => {
+      const h = insHoje(P.k);
+      return h ? `<div class="sec-head" style="margin-top:8px"><h2>${esc(P.nome)}</h2><a href="#/${P.k}/${h.w}">Semana ${h.w + 1} · ${P.semanas[h.w].nome.split(" · ")[0]}</a></div>${insCard(P.k, h.w, h.d)}` : "";
+    }).join("");
+  }
+  function telaVideoDia(p, w, d) {
+    const P = VP[p], t = insDia(p, w, d);
+    if (!t || !t.ids.length) return telaVideo(p, String(w));
+    const k = S[p].inicio ? insData(p, w, d) : null;
     const editavel = !!k && k <= hojeKey;
-    const alt = t.ids.map((id) => insAlt(w, id)).filter(Boolean);
+    const alt = t.ids.map((id) => insAlt(p, w, id)).filter(Boolean);
     const quando = k ? (k === hojeKey ? "Hoje" : ddmm(k)) : "";
     return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
       <div class="page-head">
-        <a class="icon-btn" href="#/insanity/${w}" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a>
-        <h1>${k === hojeKey ? "Insanity de Hoje" : `Semana ${w + 1} · ${DIAS[d]}`}</h1><span class="spacer"></span></div>
-      ${insCard(w, d, { link: false })}
-      <div class="note-box"><p>${INS.nota}</p>${quando && !editavel ? `<p>Este treino está marcado para <b>${quando}</b>. Você poderá registrar o Max Out nesse dia.</p>` : ""}${!k ? "<p>Escolha sua semana na tela do Insanity para registrar os treinos.</p>" : ""}</div>
+        <a class="icon-btn" href="#/${p}/${w}" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a>
+        <h1>${k === hojeKey ? `${esc(P.curto)} de hoje` : `Semana ${w + 1} · ${DIAS[d]}`}</h1><span class="spacer"></span></div>
+      ${insCard(p, w, d, { link: false })}
+      ${timerBox(p, editavel ? k : hojeKey)}
+      <div class="note-box"><p>${P.nota}</p>${quando && !editavel ? `<p>Este treino está marcado para <b>${quando}</b>. Se fizer agora, conta como treino de hoje.</p>` : ""}${!k ? `<p>Escolha sua semana na tela do ${esc(P.nome)} para seguir o calendário. Dá para fazer os vídeos mesmo assim: contam como treino de hoje.</p>` : ""}</div>
       <div class="ex-list">
-        ${t.ids.map((id, i) => insVideoCard(id, k, editavel, t.ids.length > 1 ? (i ? "Depois" : "Principal") : "")).join("")}
-        ${alt.map((id) => insVideoCard(id, k, editavel, "Alternativa")).join("")}
+        ${t.ids.map((id, i) => insVideoCard(p, id, k, editavel, t.ids.length > 1 ? (i ? "Depois" : "Principal") : "")).join("")}
+        ${alt.map((id) => insVideoCard(p, id, k, editavel, "Alternativa")).join("")}
       </div>
-      ${editavel && insFeito(k) ? `<p class="note" style="text-align:center">Treino concluído! 🔥</p>` : ""}
+      ${insFeito(p, editavel ? k : hojeKey) ? `<p class="note" style="text-align:center">Treino concluído! 🔥</p>` : ""}
       </div></section>`;
   }
 
@@ -779,6 +824,8 @@
   document.addEventListener("submit", (ev) => {
     const mx = ev.target.closest(".ins-max");
     if (mx) { ev.preventDefault(); salvarMaxOut(mx); return; }
+    const ft = ev.target.closest(".fit-test");
+    if (ft) { ev.preventDefault(); salvarFitTest(ft); return; }
     const f = ev.target.closest(".add-set[data-add]");
     if (!f) return;
     ev.preventDefault();
@@ -828,45 +875,118 @@
       dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-video-fechar]")) dlg.close(); });
       $(".device").appendChild(dlg);
     }
-    const f = encodeURIComponent(drive);
     dlg.setAttribute("aria-label", v.nome);
     dlg.innerHTML = `<div class="video-box">
         <div class="video-head"><strong>${esc(v.nome)}</strong><button class="video-x" data-video-fechar aria-label="Fechar vídeo">✕</button></div>
-        <div class="video-frame"><iframe src="https://drive.google.com/file/d/${f}/preview" title="${esc(v.nome)}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
-        <a class="video-alt" href="https://drive.google.com/file/d/${f}/view" target="_blank" rel="noopener">Não carregou? Abrir no Google Drive</a>
+        <div class="video-frame"><iframe src="${driveUrl(id, "preview")}" title="${esc(v.nome)}" allow="autoplay; fullscreen"></iframe></div>
+        <a class="video-alt" href="${driveUrl(id, "view")}" target="_blank" rel="noopener">Não carregou? Abrir no Google Drive</a>
       </div>`;
     dlg.showModal();
   }
 
-  /* ---------- Registro do Insanity ---------- */
-  function insLogDe(k) {
-    if (!S.insanity.logs[k]) {
-      const n = diffDays(parseKey(S.insanity.inicio), parseKey(k));
-      S.insanity.logs[k] = { w: Math.floor(n / 7), d: n % 7, feitos: [], max: {} };
-    }
-    return S.insanity.logs[k];
+  /* ---------- Cronômetro dos treinos em vídeo ----------
+     Fica salvo (S.vtimer = { p, k, ini }) para sobreviver a recarregar a página ou bloquear o celular.
+     Ao pausar, o tempo soma em log.dur. Esse tempo vai para o Supabase e entra no ranking "Tempo" do grupo. */
+  const vtDecorrido = () => (S.vtimer ? Math.max(0, Math.round((Date.now() - S.vtimer.ini) / 1000)) : 0);
+  const vtAtivo = (p, k) => !!(S.vtimer && S.vtimer.p === p && S.vtimer.k === k);
+  const vtTotal = (p, k) => (S[p].logs[k]?.dur || 0) + (vtAtivo(p, k) ? vtDecorrido() : 0);
+  const fmtCrono = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}:` : "") + `${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+  function timerBox(p, k) {
+    const on = vtAtivo(p, k), tot = vtTotal(p, k);
+    return `<div class="vtimer${on ? " on" : ""}" data-vt-p="${p}" data-vt-k="${k}">
+      <div class="vt-info"><span class="vt-lbl">Cronômetro${k !== hojeKey ? ` · ${ddmm(k)}` : ""}</span><strong class="vt-val">${fmtCrono(tot)}</strong></div>
+      <div class="vt-btns">
+        ${tot && !on ? `<button class="btn btn-outline vt-edit" data-vt-edit>Ajustar</button>` : ""}
+        <button class="btn btn-blue" data-vt-toggle>${on ? "Pausar" : tot ? "Continuar" : "Iniciar"}</button>
+      </div></div>`;
   }
-  function insRefazer(id) {
-    const [, , w, d] = location.hash.split("/");
-    const k = insData(Number(w), Number(d)), el = document.querySelector(`.ex.ins[data-ins="${id}"]`);
+  function vtParar() {
+    if (!S.vtimer) return;
+    const { p, k } = S.vtimer, seg = vtDecorrido();
+    S.vtimer = null;
+    if (VP[p] && seg > 0) { const l = insLogDe(p, k); l.dur = Math.min(6 * 3600, (l.dur || 0) + seg); }
+  }
+  let vtInterval = null;
+  function vtTick() {
+    clearInterval(vtInterval);
+    if (!S.vtimer) return;
+    vtInterval = setInterval(() => {
+      if (!S.vtimer) return clearInterval(vtInterval);
+      document.querySelectorAll(`.vtimer[data-vt-p="${S.vtimer.p}"][data-vt-k="${S.vtimer.k}"] .vt-val`).forEach((el) => (el.textContent = fmtCrono(vtTotal(S.vtimer.p, S.vtimer.k))));
+    }, 1000);
+  }
+  function vtAlternar(box) {
+    const p = box.dataset.vtP, k = box.dataset.vtK;
+    if (vtAtivo(p, k)) { vtParar(); save(); toast(insFeito(p, k) ? "Cronômetro pausado ✓" : "Cronômetro pausado. Marque os vídeos como feitos para o tempo contar no ranking."); }
+    else { vtParar(); S.vtimer = { p, k, ini: Date.now() }; save(); toast("Cronômetro valendo! 💪"); }
+    box.outerHTML = timerBox(p, k);
+    vtTick();
+  }
+  function vtAjustar(box) {
+    const p = box.dataset.vtP, k = box.dataset.vtK, l = insLogDe(p, k);
+    const r = prompt("Tempo de treino em minutos:", String(Math.round((l.dur || 0) / 60)));
+    if (r === null) return;
+    const min = Math.round(Number(String(r).replace(",", ".")));
+    if (!Number.isFinite(min) || min < 0 || min > 360) { toast("Digite os minutos (0 a 360)."); return; }
+    l.dur = min * 60; save(); box.outerHTML = timerBox(p, k);
+  }
+
+  /* ---------- Registro dos programas em vídeo ---------- */
+  function insLogDe(p, k) {
+    if (!S[p].logs[k]) {
+      const n = S[p].inicio ? diffDays(parseKey(S[p].inicio), parseKey(k)) : -1;
+      S[p].logs[k] = n >= 0 ? { w: Math.floor(n / 7), d: n % 7, feitos: [], max: {} } : { w: -1, d: -1, feitos: [], max: {} };
+    }
+    return S[p].logs[k];
+  }
+  function insRefazer(p, id) {
+    const el = document.querySelector(`.ex.ins[data-ins="${id}"]`);
     if (!el) return render();
     const rot = el.querySelector(".ins-rot")?.textContent || "";
-    el.outerHTML = insVideoCard(id, k, k <= hojeKey, rot);
+    el.outerHTML = insVideoCard(p, id, el.dataset.kc || null, el.dataset.ed === "1", rot);
   }
   function salvarMaxOut(f) {
-    const id = f.dataset.max, [, , w, d] = location.hash.split("/");
-    const k = insData(Number(w), Number(d));
+    const p = f.dataset.p, id = f.dataset.max, k = f.dataset.k;
     const txt = f.querySelector("input").value, seg = segDe(txt);
-    const l = insLogDe(k), era = insFeito(k);
-    if (!txt.trim()) { delete l.max[id]; save(); insRefazer(id); return; }
+    const l = insLogDe(p, k), era = insFeito(p, k);
+    if (!txt.trim()) { delete l.max[id]; save(); insRefazer(p, id); return; }
     if (seg === null || seg > 60 * 60) { toast("Digite o tempo como mm:ss (ex.: 12:30)."); return; }
-    const antes = insMaxHist(id).filter((h) => h.k !== k).map((h) => h.seg);
+    const antes = insMaxHist(p, id).filter((h) => h.k !== k).map((h) => h.seg);
     l.max[id] = seg;
-    if (!l.feitos.includes(id)) l.feitos.push(id);
-    save(); insRefazer(id);
+    marcarVideo(p, l, id);
+    save(); insRefazer(p, id);
     if (antes.length && seg > Math.max(...antes)) toast(`Novo recorde de Max Out em ${INSV[id].nome}: ${mmss(seg)}! 🏆`);
     else toast("Max Out salvo ✓");
-    if (insFeito(k) !== era) render();
+    if (insFeito(p, k) !== era) render();
+  }
+  // Marca o vídeo como feito: no calendário, se ele é do dia; senão, como avulso
+  function marcarVideo(p, l, id) {
+    const t = insDia(p, l.w, l.d), doDia = t && (t.ids.includes(id) || t.ids.some((x) => insAlt(p, l.w, x) === id));
+    const arr = doDia ? l.feitos : (l.avulso = l.avulso || []);
+    if (!arr.includes(id)) arr.push(id);
+  }
+  function salvarFitTest(f) {
+    const p = f.dataset.p, id = f.dataset.fit, k = f.dataset.k;
+    const l = insLogDe(p, k), era = insFeito(p, k);
+    const fit = VP[p].fitTest.map((_, i) => { const v = f.elements[`m${i}`].value.trim(); const n = Math.round(Number(v)); return v !== "" && Number.isFinite(n) && n >= 0 && n < 1000 ? n : null; });
+    if (!fit.some((n) => n !== null)) { delete l.fit; save(); insRefazer(p, id); toast("Fit Test apagado."); return; }
+    const ant = fitHist(p).filter((h) => h.k < k).pop();
+    l.fit = fit;
+    marcarVideo(p, l, id);
+    save(); insRefazer(p, id);
+    const tot = soma(fit.map((n) => n || 0)), dif = ant ? tot - soma(ant.fit.map((n) => n || 0)) : 0;
+    toast(ant ? `Fit Test salvo ✓ ${tot} reps (${dif >= 0 ? "+" : ""}${dif} desde o último)` : `Fit Test salvo ✓ ${tot} reps no total`);
+    if (insFeito(p, k) !== era) render();
+  }
+  // Evolução: tabela com os Fit Tests (linhas = movimentos, colunas = testes)
+  function tabelaFitTest(p) {
+    const h = fitHist(p).slice(-5), mov = VP[p].fitTest;
+    const tot = (f) => soma(f.map((n) => n || 0));
+    return `<div class="fit-tab-wrap"><table class="fit-tab">
+      <thead><tr><th>Movimento</th>${h.map((x, i) => `<th>${i + 1}º<small>${ddmm(x.k)}</small></th>`).join("")}</tr></thead>
+      <tbody>${mov.map((m, i) => `<tr><td>${esc(m)}</td>${h.map((x) => `<td>${x.fit[i] ?? "—"}</td>`).join("")}</tr>`).join("")}
+      <tr class="tot"><td>Total</td>${h.map((x) => `<td>${tot(x.fit)}</td>`).join("")}</tr></tbody></table></div>
+      ${h.length > 1 ? `<p class="note small">Do 1º ao último teste: ${tot(h[h.length - 1].fit) - tot(h[0].fit) >= 0 ? "+" : ""}${tot(h[h.length - 1].fit) - tot(h[0].fit)} repetições no total.</p>` : ""}`;
   }
 
   /* ==========================================================
@@ -883,10 +1003,11 @@
       out.push({ data: k, programa: "calistenia", titulo: (t ? t.titulo : "Treino").slice(0, 120), concluido: !!l.done, minutos: Math.min(600, minCalistenia(l)),
         detalhes: { w: l.w, d: l.d, sets: l.sets || {}, dur: l.dur || 0, done: !!l.done } });
     }
-    for (const [k, l] of Object.entries(S.insanity.logs)) {
-      const t = insDia(l.w, l.d);
-      out.push({ data: k, programa: "insanity", titulo: (t ? t.titulo : INS.nome).slice(0, 120), concluido: insFeito(k), minutos: Math.min(600, soma(l.feitos.map((id) => INSV[id]?.min || 0))),
-        detalhes: { w: l.w, d: l.d, feitos: l.feitos, max: l.max || {} } });
+    for (const p of VKEYS) for (const [k, l] of Object.entries(S[p].logs)) {
+      const t = insDia(p, l.w, l.d), av = (l.avulso || []).map((id) => INSV[id]?.nome || id);
+      const titulo = t && t.ids.length && l.feitos.length ? t.titulo + (av.length ? ` + ${av.join(" + ")}` : "") : av.length ? av.join(" + ") : t ? t.titulo : VP[p].nome;
+      out.push({ data: k, programa: p, titulo: titulo.slice(0, 120), concluido: insFeito(p, k), minutos: Math.min(600, minVideo(l)),
+        detalhes: { w: l.w, d: l.d, feitos: l.feitos, max: l.max || {}, ...(l.avulso?.length ? { avulso: l.avulso } : {}), ...(l.dur ? { dur: l.dur } : {}), ...(l.fit ? { fit: l.fit } : {}) } });
     }
     return out;
   }
@@ -912,7 +1033,7 @@
         const { error } = await sb.from("treinos").upsert(linhas.map((r) => ({ ...r, usuario_id: uid, atualizado_em: agora })));
         if (!error) { linhas.forEach((r) => (enviados[chave(r)] = JSON.stringify(r))); guardarEnviados(); G.carregadoEm = 0; }
       }
-      const cfg = { inicio: S.inicio, insanity: S.insanity.inicio };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])) };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -934,8 +1055,10 @@
       if (r.programa === "calistenia" && !S.logs[r.data]) {
         S.logs[r.data] = { w: d.w === "E" ? "E" : Number(d.w) || 0, d: Number(d.d) || 0, sets: d.sets && typeof d.sets === "object" ? d.sets : {}, dur: Number(d.dur) || 0, done: !!d.done }; mudou = true;
       }
-      if (r.programa === "insanity" && !S.insanity.logs[r.data]) {
-        S.insanity.logs[r.data] = { w: Number(d.w) || 0, d: Number(d.d) || 0, feitos: Array.isArray(d.feitos) ? d.feitos.filter((x) => INSV[x]) : [], max: d.max && typeof d.max === "object" ? d.max : {} }; mudou = true;
+      if (VP[r.programa] && !S[r.programa].logs[r.data]) {
+        S[r.programa].logs[r.data] = { w: Number(d.w) || 0, d: Number(d.d) || 0, feitos: Array.isArray(d.feitos) ? d.feitos.filter((x) => INSV[x]) : [], max: d.max && typeof d.max === "object" ? d.max : {},
+          ...(Array.isArray(d.fit) ? { fit: d.fit.map((n) => (Number.isFinite(n) ? n : null)) } : {}),
+          ...(Array.isArray(d.avulso) ? { avulso: d.avulso.filter((x) => INSV[x]) } : {}), ...(Number(d.dur) > 0 ? { dur: Number(d.dur) } : {}) }; mudou = true;
       }
     }
     if (mudou) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
@@ -954,7 +1077,7 @@
     for (const k of [...dias].sort()) { run = prev && diffDays(parseKey(prev), parseKey(k)) === 1 ? run + 1 : 1; melhor = Math.max(melhor, run); prev = k; }
     return { atual, melhor };
   }
-  const maxOuts = (rows) => rows.filter((r) => r.programa === "insanity")
+  const maxOuts = (rows) => rows.filter((r) => VP[r.programa]?.maxOut)
     .flatMap((r) => Object.entries(r.detalhes?.max || {}).map(([v, s]) => ({ k: r.data, v, s: Number(s) || 0 }))).filter((m) => m.s > 0 && INSV[m.v]);
   function kpis(rows) {
     const f = feitas(rows), mx = maxOuts(rows);
@@ -1002,7 +1125,7 @@
     mx.forEach((m) => { if (best[m.v] && m.s > best[m.v]) recordes++; best[m.v] = Math.max(best[m.v] || 0, m.s); });
     return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
       melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
-      insanity: f.filter((r) => r.programa === "insanity").length, grupos: (G.grupos || []).length };
+      insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length };
   }
   const CONQ = [
     ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
@@ -1178,7 +1301,8 @@
     const nomeDe = (id) => esc((G.perfis[id]?.nome || "Alguém").split(" ")[0]);
     const tr = feitas(G.linhas).filter((r) => r.data >= keyOf(addDays(hoje, -10))).map((r) => {
       const mx = Object.entries(r.detalhes?.max || {}).filter(([v]) => INSV[v]);
-      const txt = mx.length === 1 ? ` · cansou aos ${mmss(Number(mx[0][1]))}` : mx.length ? ` · Max Out: ${esc(mx.map(([v, s]) => `${INSV[v].nome} ${mmss(Number(s))}`).join(", "))}` : "";
+      const crono = Number(r.detalhes?.dur) > 0 ? ` · ⏱ ${fmtMin(Math.round(r.detalhes.dur / 60))}` : "";
+      const txt = crono + (mx.length === 1 ? ` · cansou aos ${mmss(Number(mx[0][1]))}` : mx.length ? ` · Max Out: ${esc(mx.map(([v, s]) => `${INSV[v].nome} ${mmss(Number(s))}`).join(", "))}` : "");
       return { t: r.atualizado_em || r.data, id: r.usuario_id, html: `<b>${nomeDe(r.usuario_id)}</b> concluiu <b>${esc(r.titulo)}</b>${txt}`, k: r.data };
     });
     const cq = G.conq.filter((c) => CONQI[c.codigo]).map((c) => ({ t: c.ganha_em, id: c.usuario_id, html: `<b>${nomeDe(c.usuario_id)}</b> ganhou ${CONQI[c.codigo][1]} <b>${esc(CONQI[c.codigo][2])}</b>`, k: c.ganha_em.slice(0, 10) }));
@@ -1201,7 +1325,7 @@
       <span class="pos">${val(x.k) && i < 3 ? med[i] : i + 1}</span>${avatar(x.p, 36)}
       <span class="nome">${esc(x.p?.nome || "Atleta")}${x.id === uid ? " <small>(você)</small>" : ""}</span>
       <strong>${fmt(val(x.k))}</strong></li>`).join("")}</ol>
-      ${G.rank === "maxout" ? `<p class="note small">Média do Max Out nos vídeos do ${esc(INS.nome)} no período: quanto mais tarde a pessoa cansou, melhor.</p>` : ""}
+      ${G.rank === "maxout" ? `<p class="note small">Média do Max Out nos vídeos do ${esc(NOMES_MAXOUT)} no período: quanto mais tarde a pessoa cansou, melhor.</p>` : ""}
       ${G.rank === "minutos" ? `<p class="note small">Tempo dos vídeos concluídos e do cronômetro. Na calistenia sem cronômetro, conta 3 min por série.</p>` : ""}`;
   }
   const evoSwitch = (on) => `<nav class="seg prog" aria-label="Evolução">
@@ -1284,7 +1408,7 @@
   }
   function graficoMaxOut() {
     const mx = maxOuts(linhasLocais());
-    if (!mx.length) return `<p class="note">Registre o Max Out nos vídeos do ${esc(INS.nome)} para ver aqui em que minuto você cansou em cada treino. 🥵</p>`;
+    if (!mx.length) return `<p class="note">Registre o Max Out nos vídeos do ${esc(NOMES_MAXOUT)} para ver aqui em que minuto você cansou em cada treino. 🥵</p>`;
     const vids = [...new Set(mx.map((m) => m.v))];
     if (!vids.includes(evoMax)) evoMax = vids[0];
     const h = mx.filter((m) => m.v === evoMax).sort((a, b) => a.k.localeCompare(b.k)).slice(-8);
@@ -1305,7 +1429,7 @@
     if (rota === "treino" && (p2 === undefined || !treino(p1 === "E" ? "E" : Number(p1), Number(p2)))) rota = "home";
     let alvo = `#/${rota}`;
     if (rota === "treino") alvo += `/${p1}/${p2}`;
-    else if (rota === "insanity" && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
+    else if (VP[rota] && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
     else if (rota === "grupo" && p1 === "entrar" && p2) alvo += `/entrar/${p2}`;
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
@@ -1399,7 +1523,7 @@
   async function aoLogar(session) {
     const u = session.user, novo = uid !== u.id;
     // Outra conta neste aparelho: não mistura os treinos de uma pessoa com os da outra
-    if (S.contaId && S.contaId !== u.id) { S.logs = {}; S.insanity = { inicio: null, logs: {} }; S.conquistas = {}; S.onboarded = false; G.grupos = null; }
+    if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; G.grupos = null; }
     S.contaId = u.id;
     uid = u.id;
     let perfil = null;
@@ -1409,7 +1533,7 @@
     const user = { id: uid, nome, primeiro: nome.split(" ")[0], foto: perfil?.foto_url || meta.avatar_url || null, email: u.email };
     if (perfil?.config) {
       if (perfil.config.inicio && !Object.keys(S.logs).length) S.inicio = perfil.config.inicio;
-      if (perfil.config.insanity !== undefined && !Object.keys(S.insanity.logs).length) S.insanity.inicio = perfil.config.insanity;
+      for (const p of VKEYS) if (perfil.config[p] !== undefined && !Object.keys(S[p].logs).length) S[p].inicio = perfil.config[p];
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
     else { S.user = user; save(); }
@@ -1459,23 +1583,27 @@
     else if (t.id === "iniciar") t.textContent = toggleTimer();
     else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true).then((ok) => { if (ok) toast("Vídeos carregados ✓ Toque em Assistir."); else t.disabled = false; }); }
     else if (t.hasAttribute("data-ins-play")) abrirVideo(t.dataset.insPlay);
+    else if (t.hasAttribute("data-vt-toggle")) vtAlternar(t.closest(".vtimer"));
+    else if (t.hasAttribute("data-vt-edit")) vtAjustar(t.closest(".vtimer"));
     else if (t.dataset.insFeito) {
-      const id = t.dataset.insFeito, k = t.dataset.k, l = insLogDe(k), era = insFeito(k);
-      const i = l.feitos.indexOf(id);
-      i >= 0 ? l.feitos.splice(i, 1) : l.feitos.push(id);
+      const p = t.dataset.p, id = t.dataset.insFeito, k = t.dataset.k, l = insLogDe(p, k), era = insFeito(p, k);
+      const arr = t.dataset.av === "1" ? (l.avulso = l.avulso || []) : l.feitos, i = arr.indexOf(id);
+      i >= 0 ? arr.splice(i, 1) : arr.push(id);
       save();
-      if (insFeito(k) !== era) { render(); if (insFeito(k)) toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); }
-      else insRefazer(id);
+      if (insFeito(p, k) !== era) { render(); if (insFeito(p, k)) toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); }
+      else insRefazer(p, id);
     } else if (t.dataset.insSemana !== undefined) {
-      const n = Number(t.dataset.insSemana);
-      S.insanity.inicio = keyOf(addDays(mondayOf(hoje), -n * 7));
-      insSemana = null; save(); render();
-      toast(`${INS.nome}: você está na Semana ${n + 1}.`);
+      const p = t.dataset.p, n = Number(t.dataset.insSemana);
+      S[p].inicio = keyOf(addDays(mondayOf(hoje), -n * 7));
+      insSemana[p] = null; save(); render();
+      toast(`${VP[p].nome}: você está na Semana ${n + 1}.`);
     } else if (t.id === "ins-parar") {
-      if (!confirm(`Pausar o ${INS.nome}? Seus registros continuam salvos.`)) return;
-      S.insanity.inicio = null; insSemana = null; save(); render();
+      const p = t.dataset.p;
+      if (!confirm(`Pausar o ${VP[p].nome}? Seus registros continuam salvos.`)) return;
+      S[p].inicio = null; insSemana[p] = null; save(); render();
     } else if (t.dataset.askIns) {
-      openChat(`Como fazer o treino ${INSV[t.dataset.askIns].nome} do ${INS.nome}? Dicas para aguentar mais tempo antes do Max Out?`);
+      const P = VP[t.dataset.p];
+      openChat(`Como fazer o treino ${INSV[t.dataset.askIns].nome} do ${P.nome}? ${P.maxOut ? "Dicas para aguentar mais tempo antes do Max Out?" : "Dicas para dar o máximo e evoluir no Fit Test?"}`);
     }
     else if (t.id === "trocar") {
       const l = logHoje();
@@ -1522,7 +1650,7 @@
       planoSemana = null; save(); render();
       toast(`Você está na Semana ${Number(t.dataset.semana) + 1}.`);
     } else if (t.id === "exportar") {
-      const blob = new Blob([JSON.stringify({ app: "fitai", versao: 1, inicio: S.inicio, perfil: S.perfil, logs: S.logs, insanity: S.insanity, conquistas: S.conquistas || {} }, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify({ app: "fitai", versao: 1, inicio: S.inicio, perfil: S.perfil, logs: S.logs, ...Object.fromEntries(VKEYS.map((p) => [p, S[p]])), conquistas: S.conquistas || {} }, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob); a.download = `fitai-backup-${hojeKey}.json`; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -1541,7 +1669,7 @@
       const d = JSON.parse(await e.target.files[0].text());
       if (d.app !== "fitai" || typeof d.logs !== "object") throw 0;
       S.logs = { ...S.logs, ...d.logs }; if (d.inicio) S.inicio = d.inicio; if (d.perfil) S.perfil = { ...S.perfil, ...d.perfil };
-      if (d.insanity && typeof d.insanity.logs === "object") S.insanity = { inicio: d.insanity.inicio ?? S.insanity.inicio, logs: { ...S.insanity.logs, ...d.insanity.logs } };
+      for (const p of VKEYS) if (d[p] && typeof d[p].logs === "object") S[p] = { inicio: d[p].inicio ?? S[p].inicio, logs: { ...S[p].logs, ...d[p].logs } };
       save(); render(); toast("Backup importado ✓");
     } catch { toast("Arquivo de backup inválido."); }
   });
@@ -1627,10 +1755,10 @@
   function programaTexto() {
     const sem = PROGRAMA.map((s, w) => [`## Semana ${w + 1} · ${s.nome}`, s.nota.replace(/<[^>]+>/g, ""),
       ...s.dias.map((t, d) => `### ${DIAS[d]} · ${t.foco} · ${t.titulo}${t.obs ? ` (${t.obs})` : ""}\n${(t.ex || []).map((e) => "- " + linhaEx(e)).join("\n")}`)].join("\n"));
-    const ins = INS.semanas.length ? [`# Programa paralelo: ${INS.nome} (vídeos, 8 semanas, calendário com Ab Maximizer)`,
-      "O usuário registra o Max Out de cada vídeo (minuto em que precisou parar pela primeira vez; quanto mais tarde, melhor).",
-      ...INS.semanas.map((s, w) => `## Semana ${w + 1} (${s.nome}): ${s.dias.map((t, d) => `${DIAS[d]}: ${t.titulo}`).join(" | ")}`),
-      `Vídeos: ${INS.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}`).join("; ")}`].join("\n") : "";
+    const ins = VPROGS.map((P) => [`# Programa paralelo: ${P.nome} (vídeos, ${P.semanas.length} semanas${P.selo ? `, ${P.selo}` : ""})`,
+      P.coach || "",
+      ...P.semanas.map((s, w) => `## Semana ${w + 1} (${s.nome}): ${s.dias.map((t, d) => `${DIAS[d]}: ${t.titulo}`).join(" | ")}`),
+      `Vídeos: ${P.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}`).join("; ")}`].filter(Boolean).join("\n")).join("\n\n");
     return [`# Programa: ${NOME_PROG}`, ...sem, `## Treino de emergência (15 min)\n${EMERGENCIA.ex.map((e) => "- " + linhaEx(e)).join("\n")}`,
       CICLO, ins].filter(Boolean).join("\n\n");
   }
@@ -1648,12 +1776,14 @@
     const recs = TODOS_EX.filter((e) => historico(e.id).length).map((e) => { const h = historico(e.id), u = UN[e.un] || "";
       return `- ${e.nome}: recorde ${recorde(e.id)}${u} (${menorMelhor(e.id) ? "melhor tiro" : "melhor série"}), último total ${h[h.length - 1].total}${u} em ${h[h.length - 1].k}, ${h.length} treinos`; });
     if (recs.length) out.push("Recordes por exercício:\n" + recs.join("\n"));
-    const ih = insHoje();
-    if (S.insanity.inicio) {
-      out.push(ih ? `${INS.nome}: semana ${ih.w + 1} de ${INS.semanas.length}. Hoje: ${insDia(ih.w, ih.d).titulo}${insFeito(hojeKey) ? " (feito)" : insParcial(hojeKey) ? " (em andamento)" : ""}.` : `${INS.nome}: fora do calendário (início ${S.insanity.inicio}).`);
-      const ik = Object.keys(S.insanity.logs).sort().slice(-21);
-      if (ik.length) out.push(`Registros do ${INS.nome}:\n` + ik.map((k) => { const l = S.insanity.logs[k];
-        return `- ${k}: ${l.feitos.map((id) => `${INSV[id]?.nome || id}${l.max[id] ? ` (Max Out ${mmss(l.max[id])})` : ""}`).join("; ") || "nada"}`; }).join("\n"));
+    for (const P of VPROGS) {
+      const p = P.k, ih = insHoje(p);
+      if (!S[p].inicio) continue;
+      out.push(ih ? `${P.nome}: semana ${ih.w + 1} de ${P.semanas.length}. Hoje: ${insDia(p, ih.w, ih.d).titulo}${insFeito(p, hojeKey) ? " (feito)" : insParcial(p, hojeKey) ? " (em andamento)" : ""}.` : `${P.nome}: fora do calendário (início ${S[p].inicio}).`);
+      const ik = Object.keys(S[p].logs).sort().slice(-21);
+      if (ik.length) out.push(`Registros do ${P.nome}:\n` + ik.map((k) => { const l = S[p].logs[k];
+        const fit = l.fit && P.fitTest ? ` | Fit Test: ${P.fitTest.map((m, i) => `${m} ${l.fit[i] ?? "—"}`).join(", ")}` : "";
+        return `- ${k}: ${l.feitos.map((id) => `${INSV[id]?.nome || id}${l.max?.[id] ? ` (Max Out ${mmss(l.max[id])})` : ""}`).join("; ") || "nada"}${fit}`; }).join("\n"));
     }
     const cs = comCorridas ? corridas().slice(0, 10) : [];
     if (comCorridas) out.push("Corridas do Strava:\n" + (cs.length ? cs.map((c) => `- ${c.data} ${c.nome}: ${km(c.dist)} km, ${fmtDur(c.tempo)}, ritmo ${ritmo(c.tempo, c.dist)}/km${c.fc ? `, FC ${Math.round(c.fc)}` : ""}`).join("\n") : "- nenhuma sincronizada"));
@@ -1772,4 +1902,5 @@
 
   render();
   carregarVideos();
+  vtTick(); // cronômetro de vídeo que ficou rodando antes de recarregar a página
 })();
