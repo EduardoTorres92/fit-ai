@@ -26,6 +26,15 @@ App web mobile para seguir um programa de calistenia, registrar as repetições 
   - `/api/auth` cuida das contas, guardadas no Netlify Blobs.
 - **Custos sob controle**: visitantes usam um modelo menor, só sobre treino, com limite de perguntas por dia (por visitante e geral).
 
+## Comunidade (Supabase)
+
+Contas, treinos, grupos e conquistas ficam no Supabase (projeto `fitai`). O app continua funcionando offline: grava no aparelho e sincroniza quando há conexão.
+
+- **Login**: e-mail e senha ou Google (Supabase Auth). Visitante continua possível, só no aparelho.
+- **Grupos com código de convite**: ranking por treinos, tempo, sequência e Max Out; meta semanal do grupo; conquistas do grupo; feed de atividade.
+- **Minha evolução**: KPIs do mês, treinos e minutos por semana, Max Out por vídeo e medalhas pessoais.
+- **Segurança**: RLS em todas as tabelas; cada pessoa só vê os treinos de quem divide grupo com ela. Foto de perfil no bucket `fotos` (só a própria pasta).
+
 ## Hospedar fora da Netlify (Hostinger ou qualquer Node.js)
 
 `server.mjs` entrega a pasta `public/` e as rotas `/api/auth` e `/api/coach` com as mesmas funções da Netlify. Contas e limites do Coach ficam em arquivos JSON em `DADOS_DIR` (padrão `~/fitai-dados`, fora da pasta do app).
