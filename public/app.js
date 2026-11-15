@@ -933,6 +933,20 @@
     if (foco) document.querySelector(`.ex[data-ex="${id}"] input`)?.focus({ preventScroll: true });
   }
 
+  document.addEventListener("submit", async (ev) => {
+    if (ev.target.id !== "form-desafio") return;
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(ev.target));
+    const titulo = String(d.titulo || "").trim().slice(0, 80), link = String(d.link || "").trim();
+    if (!titulo) { toast("Dê um título ao desafio."); return; }
+    if (link && !/^https:\/\//i.test(link)) { toast("O link precisa começar com https://"); return; }
+    const btn = ev.target.querySelector("button[type=submit]"); btn.disabled = true;
+    const { error } = await sb.from("desafios").insert({ grupo_id: G.sel, semana: semanaAtual(), titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito", criado_por: uid });
+    btn.disabled = false;
+    if (error) { toast(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana." : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
+    formDesafio = null; await carregarGrupos(true);
+    toast("Desafio lançado! Avise a galera. ⚔️");
+  });
   document.addEventListener("submit", (ev) => {
     const mx = ev.target.closest(".ins-max");
     if (mx) { ev.preventDefault(); salvarMaxOut(mx); return; }
@@ -1273,7 +1287,7 @@
     return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
       melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
       insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length, fits: fitTests(rows).length,
-      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })() };
+      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0 };
   }
   const CONQ = [
     ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
@@ -1296,6 +1310,9 @@
     ["fit50", "📈", "+50 reps no Fit Test", (m) => [m.fitEvo, 50]],
     ["fit5", "🏁", "5 Fit Tests (Insanity completo)", (m) => [m.fits, 5]],
     ["grupo", "🤝", "Entrou num grupo", (m) => [m.grupos, 1]],
+    ["desafio1", "⚔️", "Primeiro desafio", (m) => [m.desafios, 1]],
+    ["desafio5", "🥋", "5 desafios", (m) => [m.desafios, 5]],
+    ["desafio10", "🦾", "10 desafios", (m) => [m.desafios, 10]],
   ];
   const CONQI = Object.fromEntries(CONQ.map((c) => [c[0], c]));
   function verificarConquistas(silencioso = false) {
@@ -1371,7 +1388,7 @@
   }
 
   /* ---------- Grupos ---------- */
-  const G = { grupos: null, sel: null, membros: [], perfis: {}, linhas: [], conq: [], carregadoEm: 0, carregando: false, erro: false, periodo: "semana", rank: "treinos" };
+  const G = { grupos: null, sel: null, membros: [], perfis: {}, linhas: [], conq: [], desafios: [], feitos: [], meusDesafios: null, carregadoEm: 0, carregando: false, erro: false, periodo: "semana", rank: "treinos" };
   async function carregarGrupos(forcar = false) {
     if (!uid || !sb || G.carregando) return;
     if (!forcar && G.grupos && Date.now() - G.carregadoEm < 60000) return;
@@ -1381,9 +1398,12 @@
       if (error) throw error;
       G.grupos = data || [];
       if (!G.grupos.some((g) => g.id === G.sel)) G.sel = G.grupos[0]?.id || null;
+      const meus = await sb.from("desafio_feitos").select("desafio_id").eq("usuario_id", uid);
+      if (!meus.error) G.meusDesafios = (meus.data || []).length;
       if (G.sel) await carregarGrupo(G.sel);
+      else { G.desafios = []; G.feitos = []; }
       G.carregadoEm = Date.now(); G.erro = false;
-    } catch { G.erro = true; if (!G.grupos) G.grupos = []; }
+    } catch (e) { console.error("grupos", e); G.erro = true; G.carregadoEm = Date.now(); if (!G.grupos) G.grupos = []; }
     G.carregando = false;
     if (/^#\/(grupo|home)/.test(location.hash)) render();
   }
@@ -1396,6 +1416,10 @@
       sb.from("treinos").select("usuario_id, data, programa, titulo, concluido, minutos, detalhes, atualizado_em").in("usuario_id", ids).gte("data", keyOf(addDays(parseKey(desde), -35))),
       sb.from("conquistas").select("usuario_id, codigo, ganha_em").in("usuario_id", ids).order("ganha_em", { ascending: false }).limit(30),
     ]);
+    const ds = await sb.from("desafios").select("id, semana, titulo, descricao, link, medida, criado_por, criado_em").eq("grupo_id", id).gte("semana", keyOf(addDays(mondayOf(hoje), -7 * 11))).order("semana", { ascending: false });
+    const dids = (ds.data || []).map((d) => d.id);
+    const fs = dids.length ? await sb.from("desafio_feitos").select("desafio_id, usuario_id, resultado, prova, feito_em").in("desafio_id", dids) : { data: [] };
+    G.desafios = ds.data || []; G.feitos = fs.data || [];
     G.membros = ids;
     G.perfis = Object.fromEntries((pf.data || []).map((p) => [p.id, p]));
     G.linhas = tr.data || [];
@@ -1445,6 +1469,7 @@
       ["🙌", "Todo mundo treinou", todos, 1, `${todos} ${todos === 1 ? "dia" : "dias"}`],
       ["🔥", "Grupo em chamas", seq, 7, seq >= 7 ? `${seq} dias seguidos` : `${seq}/7 dias seguidos`],
       ["💯", "100 treinos juntos", rows.length, 100, `${Math.min(rows.length, 100)}/100`],
+      ["⚔️", "4 desafios da semana", ...(() => { const n = G.desafios.filter((d) => G.feitos.some((f) => f.desafio_id === d.id)).length; return [n, 4, `${Math.min(n, 4)}/4 semanas`]; })()],
     ];
     return `<div class="badges">${lista.map(([ic, nome, v, alvo, txt]) => `<div class="badge${v >= alvo ? " on" : ""}"><span class="b-ic">${ic}</span><strong>${nome}</strong><small>${txt}</small></div>`).join("")}</div>`;
   }
@@ -1457,7 +1482,8 @@
       return { t: r.atualizado_em || r.data, id: r.usuario_id, html: `<b>${nomeDe(r.usuario_id)}</b> concluiu <b>${esc(r.titulo)}</b>${txt}`, k: r.data };
     });
     const cq = G.conq.filter((c) => CONQI[c.codigo]).map((c) => ({ t: c.ganha_em, id: c.usuario_id, html: `<b>${nomeDe(c.usuario_id)}</b> ganhou ${CONQI[c.codigo][1]} <b>${esc(CONQI[c.codigo][2])}</b>`, k: c.ganha_em.slice(0, 10) }));
-    const itens = [...tr, ...cq].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 12);
+    const df = G.feitos.map((f) => { const d = G.desafios.find((x) => x.id === f.desafio_id); return d && { t: f.feito_em, id: f.usuario_id, html: `<b>${nomeDe(f.usuario_id)}</b> cumpriu o desafio <b>${esc(d.titulo)}</b>${f.resultado ? ` · ${esc(fmtRes(d, f.resultado))}` : ""} ⚔️`, k: String(f.feito_em || hojeKey).slice(0, 10) }; }).filter(Boolean);
+    const itens = [...tr, ...cq, ...df].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 12);
     if (!itens.length) return `<p class="note">Ainda sem atividade. Conclua um treino e puxe o grupo! 💪</p>`;
     return `<ul class="feed">${itens.map((i) => `<li>${avatar(G.perfis[i.id], 32)}<p>${i.html}<small>${ddmm(i.k)}</small></p></li>`).join("")}</ul>`;
   }
@@ -1514,6 +1540,9 @@
         <div class="meta-g"><div class="sec-head"><h2>Meta da semana</h2><span>${semana}/${g.meta_semanal} treinos</span></div>
           <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
           ${g.dono === uid ? `<button class="lnk-btn" id="g-meta">Mudar meta</button>` : ""}</div>
+        ${cardDesafio(g)}
+        <div class="sec-head"><h2>Conquistas da semana</h2><span>${G.desafios.filter((d) => G.feitos.some((f) => f.desafio_id === d.id)).length} de 12 semanas</span></div>
+        ${historicoDesafios()}
       </div>
       <div class="section">
         <div class="seg seg3">${Object.entries(PERIODOS).map(([k, [n]]) => `<button class="${G.periodo === k ? "on" : ""}" data-g-periodo="${k}">${n}</button>`).join("")}</div>
@@ -1560,7 +1589,89 @@
     const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
     return `<a class="g-card" href="#/grupo"><div class="sec-head"><h2>${esc(g.nome)}</h2><span>${semana}/${g.meta_semanal} na semana</span></div>
       <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
+      ${(() => { const d = desafioDaSemana(), n = d ? feitosDe(d).length : 0;
+        return `<p class="d-mini">⚔️ ${d ? `${esc(d.titulo)} · ${n ? `🏅 ${n} cumpriu${n > 1 ? "ram" : ""}` : "ninguém cumpriu ainda"}` : "Sem desafio esta semana. Lance um!"}</p>`; })()}
       <div class="avs">${G.membros.slice(0, 8).map((id) => avatar(G.perfis[id], 28)).join("")}</div></a>`;
+  }
+
+  /* ---------- Desafio da semana (por grupo) ---------- */
+  // medida: feito (só cumprir) | reps (mais é melhor) | tempo (completar no menor tempo) | duracao (aguentar mais tempo)
+  const MEDIDAS = { feito: "Só cumprir", reps: "Repetições (mais é melhor)", tempo: "Tempo para completar (menor é melhor)", duracao: "Tempo aguentando (mais é melhor)" };
+  const MODELOS = [
+    { titulo: "100 burpees", descricao: "100 burpees completos (peito no chão e salto no fim). Pode descansar quando quiser; vale o tempo total.", medida: "tempo" },
+    { titulo: "Prancha máxima", descricao: "Prancha com antebraços no chão e corpo reto. Para quando o quadril cair.", medida: "duracao" },
+    { titulo: "Flexões em 2 minutos", descricao: "Máximo de flexões com técnica limpa em 2 minutos. Pode pausar no alto.", medida: "reps" },
+    { titulo: "Max Out Cardio sem parar", descricao: "Faça o Max Out Cardio e anote o minuto em que precisou parar pela primeira vez.", medida: "duracao" },
+    { titulo: "300 agachamentos no dia", descricao: "300 agachamentos ao longo do dia, divididos como quiser.", medida: "feito" },
+  ];
+  const semanaAtual = () => keyOf(mondayOf(hoje));
+  const fmtRes = (d, v) => (v == null ? "" : d.medida === "reps" ? `${v} reps` : mmss(v));
+  const melhorPrimeiro = (d) => (a, b) => d.medida === "tempo" ? (a.resultado ?? 1e9) - (b.resultado ?? 1e9) : d.medida === "feito" ? String(a.feito_em).localeCompare(String(b.feito_em)) : (b.resultado ?? 0) - (a.resultado ?? 0);
+  const feitosDe = (d) => G.feitos.filter((f) => f.desafio_id === d.id).sort(melhorPrimeiro(d));
+  const desafioDaSemana = () => G.desafios.find((d) => d.semana === semanaAtual()) || null;
+  let formDesafio = null; // null | índice do modelo ("" = em branco)
+  function cardDesafio(g) {
+    const d = desafioDaSemana();
+    const fim = 6 - hojeDia, prazo = fim === 0 ? "termina hoje" : `${fim} ${fim === 1 ? "dia" : "dias"} para acabar`;
+    if (formDesafio !== null) {
+      const m = MODELOS[formDesafio] || { titulo: "", descricao: "", medida: "feito" };
+      return `<form class="desafio form-desafio" id="form-desafio">
+        <div class="sec-head"><h2>Lançar desafio da semana</h2></div>
+        <div class="chips">${MODELOS.map((x, i) => `<button type="button" class="chip${String(i) === String(formDesafio) ? " primary" : ""}" data-modelo="${i}">${esc(x.titulo)}</button>`).join("")}<button type="button" class="chip${formDesafio === "" ? " primary" : ""}" data-modelo="">Em branco</button></div>
+        <label>Título<input name="titulo" required maxlength="80" value="${esc(m.titulo)}" placeholder="Ex.: Desafio do reel"></label>
+        <label>Como fazer<textarea name="descricao" maxlength="500" rows="3" placeholder="Explique a regra do desafio">${esc(m.descricao)}</textarea></label>
+        <label>Link do vídeo (opcional)<input name="link" type="url" inputmode="url" maxlength="300" placeholder="https://www.instagram.com/reel/..."></label>
+        <label>Como medir<select name="medida">${Object.entries(MEDIDAS).map(([k, n]) => `<option value="${k}"${k === m.medida ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+        <div class="row2"><button type="button" class="btn btn-outline" id="desafio-cancelar">Cancelar</button><button type="submit" class="btn btn-blue">Lançar</button></div>
+      </form>`;
+    }
+    if (!d) return `<div class="desafio vazio"><div class="sec-head"><h2>⚔️ Desafio da semana</h2><span>${prazo}</span></div>
+      <p class="note">Ninguém lançou o desafio desta semana. Basta <b>uma pessoa</b> cumprir para o grupo ganhar a conquista da semana.</p>
+      <button class="btn btn-blue" id="desafio-novo">Lançar desafio</button></div>`;
+    const fs = feitosDe(d), eu = fs.find((f) => f.usuario_id === uid), med = ["🥇", "🥈", "🥉"];
+    const podeApagar = d.criado_por === uid || g.dono === uid;
+    return `<div class="desafio${fs.length ? " ok" : ""}">
+      <div class="sec-head"><h2>⚔️ ${esc(d.titulo)}</h2><span>${prazo}</span></div>
+      ${d.descricao ? `<p class="d-desc">${esc(d.descricao)}</p>` : ""}
+      <div class="ex-tags"><span class="pill gray">${esc(MEDIDAS[d.medida].split(" (")[0])}</span><span class="pill gray">por ${esc((G.perfis[d.criado_por]?.nome || "alguém").split(" ")[0])}</span></div>
+      ${d.link ? `<a class="btn btn-outline" href="${esc(d.link)}" target="_blank" rel="noopener">▶ Ver o desafio</a>` : ""}
+      <p class="d-status">${fs.length ? `🏅 <b>Conquista da semana garantida!</b> ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}.` : "Ninguém cumpriu ainda. Bora ser o primeiro? 💪"}</p>
+      ${fs.length ? `<ol class="rank">${fs.map((f, i) => `<li class="${f.usuario_id === uid ? "eu" : ""}"><span class="pos">${d.medida !== "feito" && i < 3 ? med[i] : "✓"}</span>${avatar(G.perfis[f.usuario_id], 32)}
+        <span class="nome">${esc(G.perfis[f.usuario_id]?.nome || "Atleta")}</span>${f.prova ? `<a class="lnk-btn" href="${esc(f.prova)}" target="_blank" rel="noopener">prova</a>` : ""}<strong>${esc(fmtRes(d, f.resultado))}</strong></li>`).join("")}</ol>` : ""}
+      ${eu ? `<button class="btn btn-outline done" id="desafio-desfazer" data-id="${d.id}">Você cumpriu ✓ (toque para desfazer)</button>` : `<button class="btn btn-blue" id="desafio-cumpri" data-id="${d.id}">✅ Cumpri o desafio</button>`}
+      ${podeApagar ? `<button class="lnk-btn" id="desafio-apagar" data-id="${d.id}">Apagar desafio</button>` : ""}
+    </div>`;
+  }
+  function historicoDesafios() {
+    const semanas = Array.from({ length: 8 }, (_, i) => keyOf(addDays(mondayOf(hoje), -(7 - i) * 7)));
+    const ok = (s) => G.desafios.some((d) => d.semana === s && G.feitos.some((f) => f.desafio_id === d.id));
+    return `<div class="semanas">${semanas.map((s) => {
+      const d = G.desafios.find((x) => x.semana === s), c = ok(s), atual = s === semanaAtual();
+      return `<div class="sem${c ? " on" : ""}${atual ? " atual" : ""}" title="${d ? esc(d.titulo) : "Sem desafio"}"><span>${c ? "🏅" : atual ? "⏳" : "—"}</span><small>${ddmm(s)}</small></div>`;
+    }).join("")}</div>`;
+  }
+  async function cumprirDesafio(id) {
+    const d = G.desafios.find((x) => x.id === id);
+    if (!d) return;
+    let resultado = null;
+    if (d.medida === "reps") {
+      const n = parseInt(prompt("Quantas repetições?") || "", 10);
+      if (!(n > 0 && n <= 100000)) { toast("Digite o número de repetições."); return; }
+      resultado = n;
+    } else if (d.medida !== "feito") {
+      const t = prompt(d.medida === "tempo" ? "Em quanto tempo você completou? (mm:ss)" : "Quanto tempo você aguentou? (mm:ss)");
+      if (t === null) return;
+      resultado = segDe(t);
+      if (!resultado) { toast("Digite o tempo como mm:ss (ex.: 6:30)."); return; }
+    }
+    let prova = (prompt("Link da prova (opcional): vídeo no Instagram, Drive, YouTube…") || "").trim();
+    if (prova && !/^https:\/\//i.test(prova)) prova = "";
+    const { error } = await sb.from("desafio_feitos").upsert({ desafio_id: id, usuario_id: uid, resultado, prova: prova || null });
+    if (error) { toast("Não consegui salvar. Tente de novo."); return; }
+    const primeiro = !G.feitos.some((f) => f.desafio_id === id);
+    G.meusDesafios = (G.meusDesafios || 0) + 1;
+    await carregarGrupos(true); verificarConquistas();
+    toast(primeiro ? "🏅 Conquista da semana garantida para o grupo!" : "Desafio cumprido! 🔥");
   }
 
   /* ---------- Minha evolução: KPIs e gráficos ---------- */
@@ -1737,6 +1848,17 @@
     else if (t.id === "trocar-foto") $("#foto-arquivo").click();
     else if (t.id === "trocar-nome") trocarNome();
     else if (t.id === "g-criar") criarGrupo();
+    else if (t.id === "desafio-novo") { formDesafio = 0; render(); }
+    else if (t.dataset.modelo !== undefined) { formDesafio = t.dataset.modelo === "" ? "" : Number(t.dataset.modelo); render(); }
+    else if (t.id === "desafio-cancelar") { formDesafio = null; render(); }
+    else if (t.id === "desafio-cumpri") cumprirDesafio(t.dataset.id);
+    else if (t.id === "desafio-desfazer") {
+      if (!confirm("Desfazer seu cumprimento do desafio?")) return;
+      sb.from("desafio_feitos").delete().eq("desafio_id", t.dataset.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui desfazer."); else { G.meusDesafios = Math.max(0, (G.meusDesafios || 1) - 1); carregarGrupos(true); } });
+    } else if (t.id === "desafio-apagar") {
+      if (!confirm("Apagar o desafio desta semana? Os cumprimentos dele também somem.")) return;
+      sb.from("desafios").delete().eq("id", t.dataset.id).then(({ error }) => { if (error) toast("Não consegui apagar."); else carregarGrupos(true); });
+    }
     else if (t.id === "g-codigo") entrarComCodigo(prompt("Código do grupo:") || "");
     else if (t.dataset.gSel) { G.sel = t.dataset.gSel; G.carregadoEm = 0; carregarGrupos(true); }
     else if (t.id === "g-convidar") convidar(grupoSel());
