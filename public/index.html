@@ -16,24 +16,13 @@
   <div class="device">
     <main id="app" class="app" aria-live="polite"></main>
     <nav id="toolbar" class="toolbar" aria-label="Navegação principal" hidden>
-      <a href="#/home" class="tb-item" data-tab="home" aria-label="Início">
-        <img src="assets/house-inactive.svg" data-on="assets/house.svg" data-off="assets/house-inactive.svg" width="24" height="24" alt="">
-      </a>
-      <a href="#/plano" class="tb-item" data-tab="plano" aria-label="Plano de treino">
-        <img src="assets/calendar.svg" data-on="assets/calendar-active.svg" data-off="assets/calendar.svg" width="24" height="24" alt="">
-      </a>
-      <a href="#/nutricao" class="tb-item" data-tab="nutricao" aria-label="Nutrição e água">
-        <img src="assets/nutri.svg" data-on="assets/nutri-active.svg" data-off="assets/nutri.svg" width="24" height="24" alt="">
-      </a>
+      <button type="button" class="tb-menu" id="tb-menu" aria-haspopup="dialog" aria-expanded="false" aria-label="Abrir navegação">
+        <svg class="tb-menu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg>
+        <span id="tb-atual">Início</span>
+      </button>
       <button type="button" class="tb-ai" data-open-chat aria-label="Abrir Coach AI">
         <img src="assets/sparkles-white.svg" width="24" height="24" alt="">
       </button>
-      <a href="#/evolucao" class="tb-item" data-tab="evolucao" aria-label="Evolução">
-        <img src="assets/chart.svg" data-on="assets/chart-active.svg" data-off="assets/chart.svg" width="24" height="24" alt="">
-      </a>
-      <a href="#/perfil" class="tb-item" data-tab="perfil" aria-label="Perfil">
-        <img src="assets/user.svg" data-on="assets/user-active.svg" data-off="assets/user.svg" width="24" height="24" alt="">
-      </a>
     </nav>
     <div id="chat-layer" class="chat-layer" hidden>
       <div class="chat-backdrop" data-close-chat></div>
@@ -65,6 +54,7 @@
   <script src="academia.js"></script>
   <script src="calistenia21.js"></script>
   <script src="guia-alimentacao.js"></script>
+  <script src="circular-nav.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

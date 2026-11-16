@@ -367,17 +367,40 @@
     $(".device").appendChild(t);
     setTimeout(() => t.remove(), ms);
   }
+  // Menu: um botão só (abre a Circular Navigation) + o Coach AI ao lado
+  const MENU_ITENS = () => [
+    { name: "Início", icon: "house", href: "#/home", tab: "home" },
+    { name: "Treinos", icon: "calendar-days", href: `#/${principal()}`, tab: "plano" },
+    { name: "Nutrição", icon: "apple", href: "#/nutricao", tab: "nutricao" },
+    { name: "Coach AI", icon: "sparkles", href: "#/coach", tab: "coach" },
+    { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
+    { name: "Grupo", icon: "users", href: "#/grupo", tab: "grupo" },
+    { name: "Perfil", icon: "user", href: "#/perfil", tab: "perfil" },
+  ];
+  let tabAtual = "home", menuNav = null;
   function setToolbar(tab) {
     const tb = $("#toolbar");
     tb.hidden = !tab;
-    const plano = tb.querySelector('[data-tab="plano"]'); // o botão de calendário abre o programa principal
-    if (plano) plano.setAttribute("href", `#/${principal()}`);
-    tb.querySelectorAll(".tb-item").forEach((a) => {
-      const on = a.dataset.tab === tab, img = a.querySelector("img");
-      img.src = on ? img.dataset.on : img.dataset.off;
-      on ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current");
-    });
+    if (!tab) return;
+    tabAtual = tab === "evolucao" && location.hash.startsWith("#/grupo") ? "grupo" : tab;
+    const it = MENU_ITENS().find((x) => x.tab === tabAtual);
+    $("#tb-atual").textContent = it ? it.name : "Menu";
   }
+  function abrirMenu() {
+    if (!window.CircularNav) return;
+    const itens = MENU_ITENS();
+    menuNav = window.CircularNav.criar({
+      itens, label: "Navegação do Fit.ai", closeLabel: "Fechar navegação",
+      onNavigate: (item, e) => {
+        if (item.tab === "coach") { e.preventDefault(); setTimeout(() => openChat(), 420); }
+      },
+    });
+    const btn = $("#tb-menu");
+    btn.setAttribute("aria-expanded", "true");
+    menuNav.abrir(itens.find((x) => x.tab === tabAtual)?.href);
+    const obs = setInterval(() => { if (!menuNav.aberto) { btn.setAttribute("aria-expanded", "false"); clearInterval(obs); } }, 300);
+  }
+  document.addEventListener("click", (e) => { if (e.target.closest("#tb-menu")) abrirMenu(); });
 
   /* ---------- Componentes ---------- */
   function workoutCard(w, d, { link = true, botao = "" } = {}) {
