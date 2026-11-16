@@ -2865,6 +2865,34 @@
 
   /* ---------- Avatar e foto de perfil ---------- */
   const iniciais = (n) => String(n || "?").trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
+  /* Avatar Group (ProfitizeBuild), portado do componente React para JS puro: fotos redondas sobrepostas; a do mouse,
+     do foco ou do toque sobe 10 px, passa para a frente e mostra o nome num balão que salta (mola em CSS); o resto vira "+N".
+     ids: ids de G.perfis. opts: { max, size, overlap, label, link (abre o perfil do membro), estatico (dentro de um link) } */
+  function avatarGroup(ids, { max = 5, size = 40, overlap = 14, label = "Participantes", link = false, estatico = false } = {}) {
+    const vis = ids.slice(0, max), extra = ids.length - vis.length;
+    return `<ul class="ag-group" aria-label="${esc(label)}"${estatico ? " data-ag-estatico" : ""}>${vis.map((id, i) => {
+      const p = G.perfis[id] || (id === uid ? { nome: nomeCompleto(), foto_url: S.user?.foto } : null), nome = (p?.nome || "Atleta").split(" ")[0] + (id === uid ? " (você)" : "");
+      const foto = p?.foto_url ? `<img class="ag-photo" src="${esc(p.foto_url)}" alt="${esc(p.nome || "Atleta")}" width="${size}" height="${size}" draggable="false" referrerpolicy="no-referrer" loading="lazy">`
+        : `<span class="ag-photo ag-ini" style="font-size:${Math.round(size * 0.34)}px" role="img" aria-label="${esc(p?.nome || "Atleta")}">${esc(iniciais(p?.nome))}</span>`;
+      const tag = link && !estatico ? "a" : "span", attrs = link && !estatico ? `href="#/grupo/membro/${esc(id)}"` : estatico ? "" : 'tabindex="0"';
+      return `<li class="ag-item" style="width:${size}px;height:${size}px;z-index:${vis.length - i};margin-left:${i ? -overlap : 0}px">
+        <${tag} class="ag-avatar" ${attrs}>${foto}</${tag}><span class="ag-tip" style="top:${Math.round(-size * 0.7)}px" aria-hidden="true">${esc(nome)}</span></li>`;
+    }).join("")}${extra > 0 ? `<li class="ag-item ag-extra" role="img" aria-label="Mais ${extra}" style="width:${size}px;height:${size}px;margin-left:-${overlap}px;z-index:0;font-size:${Math.round(size * 0.32)}px">+${extra}</li>` : ""}</ul>`;
+  }
+  {
+    const ativar = (li) => { document.querySelectorAll(".ag-item[data-active]").forEach((x) => x !== li && x.removeAttribute("data-active")); li?.setAttribute("data-active", ""); };
+    const item = (e) => { const li = e.target.closest?.(".ag-item:not(.ag-extra)"); return li && li.closest(".ag-group") ? li : null; };
+    document.addEventListener("pointerover", (e) => { if (e.pointerType !== "touch") { const li = item(e); if (li) ativar(li); } });
+    document.addEventListener("pointerout", (e) => { if (e.pointerType === "touch") return; const li = item(e); if (li && !li.contains(e.relatedTarget)) li.removeAttribute("data-active"); });
+    document.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch") return;
+      const li = item(e);
+      if (li && !li.closest("[data-ag-estatico]")) ativar(li); else ativar(null); // toque fora esconde
+    });
+    document.addEventListener("focusin", (e) => { const li = item(e); if (li && e.target.matches(":focus-visible")) ativar(li); });
+    document.addEventListener("focusout", (e) => { const li = item(e); if (li) li.removeAttribute("data-active"); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const li = item(e); if (li?.hasAttribute("data-active")) { e.preventDefault(); li.removeAttribute("data-active"); } } });
+  }
   const avatar = (p, s = 36) => p && p.foto_url
     ? `<img class="av" src="${esc(p.foto_url)}" width="${s}" height="${s}" alt="" referrerpolicy="no-referrer" loading="lazy">`
     : `<span class="av av-ini" style="width:${s}px;height:${s}px;font-size:${Math.round(s * 0.38)}px">${esc(iniciais(p && p.nome))}</span>`;
@@ -3088,7 +3116,7 @@
       <div class="section">
         <div class="g-head"><div><h2>${esc(g.nome)}</h2><small>${G.membros.length} ${G.membros.length === 1 ? "pessoa" : "pessoas"} · código <b>${esc(g.codigo)}</b></small></div>
           <button class="btn btn-blue" id="g-convidar">Convidar</button></div>
-        <div class="avs">${G.membros.slice(0, 12).map((id) => avatar(G.perfis[id], 34)).join("")}</div>
+        ${avatarGroup(G.membros, { max: 6, size: 40, label: `Membros do grupo ${g.nome}`, link: true })}
         <div class="meta-g"><div class="sec-head"><h2>Meta da semana</h2><span>${semana}/${g.meta_semanal} treinos</span></div>
           <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
           ${g.dono === uid ? `<button class="lnk-btn" id="g-meta">Mudar meta</button>` : ""}</div>
@@ -3148,7 +3176,7 @@
         return `<p class="d-mini">⚔️ ${d ? `${esc(d.titulo)} · ${n ? `🏅 ${n} cumpriu${n > 1 ? "ram" : ""}` : "ninguém cumpriu ainda"}` : "Sem desafio esta semana. Lance um!"}</p>`; })()}
       ${(() => { const top = G.membros.map((id) => ({ id, ml: aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0 })).sort((a, b) => b.ml - a.ml)[0];
         return `<p class="d-mini">💧 ${top?.ml ? `${top.id === uid ? "Você lidera" : `${esc((G.perfis[top.id]?.nome || "Alguém").split(" ")[0])} lidera`} a água de hoje com ${fmtL(top.ml)}` : "Ninguém anotou água hoje ainda"}</p>`; })()}
-      <div class="avs">${G.membros.slice(0, 8).map((id) => avatar(G.perfis[id], 28)).join("")}</div></a>`;
+      ${avatarGroup(G.membros, { max: 6, size: 34, overlap: 12, label: "Membros do grupo", estatico: true })}</a>`;
   }
 
   /* ==========================================================
@@ -3191,6 +3219,8 @@
       ${p.foto ? (M.urls[p.foto] ? `<img class="post-foto" src="${esc(M.urls[p.foto])}" alt="Foto de ${nomeCurto(p.usuario_id)}" loading="lazy">` : `<div class="post-foto vazia">📷</div>`) : ""}
       <div class="post-reacoes">${REACOES.map((e) => { const n = rs.filter((r) => r.emoji === e).length, eu = rs.some((r) => r.emoji === e && r.usuario_id === uid);
         return `<button class="reacao${eu ? " on" : ""}" data-reagir="${e}" data-post-id="${p.id}" aria-pressed="${eu}" title="${rs.filter((r) => r.emoji === e).map((r) => (G.perfis[r.usuario_id]?.nome || "").split(" ")[0]).join(", ")}">${e}${n ? ` <b>${n}</b>` : ""}</button>`; }).join("")}</div>
+      ${rs.length ? (() => { const quem = [...new Set(rs.map((r) => r.usuario_id))];
+        return `<div class="post-quem">${avatarGroup(quem, { max: 5, size: 28, overlap: 9, label: "Quem reagiu" })}<small>${quem.length === 1 ? `${esc((G.perfis[quem[0]]?.nome || "Alguém").split(" ")[0])} reagiu` : `${quem.length} pessoas reagiram`}</small></div>`; })() : ""}
       ${cs.length > 2 && !aberto ? `<button class="lnk-btn" data-post-coments="${p.id}">Ver os ${cs.length} comentários</button>` : ""}
       ${mostra.length ? `<ul class="coments">${mostra.map((c) => `<li><b>${nomeCurto(c.usuario_id)}</b> ${esc(c.texto)} <small>${quando(c.criado_em)}</small>${c.usuario_id === uid || meu ? ` <button class="lnk-btn" data-coment-apagar="${c.id}" aria-label="Apagar comentário">✕</button>` : ""}</li>`).join("")}</ul>` : ""}
       <form class="coment-form" data-comentar="${p.id}" autocomplete="off"><input name="t" maxlength="300" placeholder="Comente…" aria-label="Escreva um comentário"><button type="submit" class="btn btn-blue">Enviar</button></form>

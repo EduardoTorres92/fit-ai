@@ -863,3 +863,30 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .cf-sug-op { flex: none; padding: 7px 12px; border-radius: 99px; background: var(--blue-08); color: var(--blue); font-size: 13px; font-weight: 600; white-space: nowrap; border: 1px solid var(--blue-soft); }
 .cf-sug-op:first-child { background: var(--blue); color: #fff; border-color: var(--blue); }
 .cf-sug-op:active { scale: .96; }
+
+/* ---------- Avatar Group (ProfitizeBuild, portado para CSS puro) ---------- */
+.ag-group { --ag-ring: #ffffff; --ag-primary: #171717; --ag-primary-text: #fafafa; --ag-focus: #737373;
+  position: relative; box-sizing: border-box; display: flex; align-items: center; width: max-content; margin: 0; padding: 0; list-style: none;
+  font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: 400; line-height: 1; -webkit-font-smoothing: antialiased; }
+.ag-group *, .ag-group *::before, .ag-group *::after { box-sizing: border-box; }
+.ag-item { position: relative; flex-shrink: 0; margin: 0; padding: 0; border: 4px solid var(--ag-ring); border-radius: 999px; background: var(--ag-ring);
+  transform: translateY(0); transition: margin-left .3s cubic-bezier(.4, 0, .2, 1), transform .3s cubic-bezier(.4, 0, .2, 1); }
+.ag-item[data-active] { transform: translateY(-10px); z-index: 100 !important; }
+.ag-avatar { display: block; width: 100%; height: 100%; margin: 0; padding: 0; border-radius: 999px; color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.ag-avatar:focus { outline: none; }
+.ag-avatar:focus-visible { outline: 2px solid var(--ag-focus); outline-offset: 4px; }
+.ag-photo { display: block; width: 100%; height: 100%; max-width: none; margin: 0; border-radius: 999px; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.ag-ini { display: grid; place-items: center; background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+/* o balão: sai de baixo crescendo de 70% a 100%, numa curva com sobra que imita a mola (rigidez 400, amortecimento 24) */
+.ag-tip { position: absolute; left: 50%; z-index: 50; margin: 0; padding: 4px 8px; border-radius: 4px; background: var(--ag-primary); color: var(--ag-primary-text);
+  font-size: 12px; font-weight: 600; line-height: 16px; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+  opacity: 0; transform: translate(-50%, 10px) scale(.7); transition: opacity .18s ease, transform .2s ease-in; }
+.ag-item[data-active] .ag-tip { opacity: 1; transform: translate(-50%, 0) scale(1); transition: opacity .15s ease, transform .42s cubic-bezier(.34, 1.56, .64, 1); }
+.ag-extra { display: flex; align-items: center; justify-content: center; background: var(--ag-primary); color: var(--ag-primary-text); font-weight: 600; font-variant-numeric: tabular-nums; transform: none; }
+@media (prefers-reduced-motion: reduce) { .ag-item, .ag-tip, .ag-item[data-active] .ag-tip { transition: none; } }
+.g-head + .ag-group, .g-card .ag-group { margin-top: 4px; }
+.section > .ag-group { margin-top: 18px; }
+.post-quem { display: flex; align-items: center; gap: 8px; }
+.post-quem small { font-size: 12px; color: var(--muted); }
+.post-quem .ag-group { --ag-ring: #fff; }
