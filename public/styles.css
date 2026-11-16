@@ -645,3 +645,24 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .hx-graf { font-size: 12px; margin: 14px 0 4px; }
 .hx-passo { display: inline-block; font-size: 11px; font-weight: 600; color: var(--blue); background: var(--blue-08); border-radius: 99px; padding: 1px 7px; margin-right: 4px; vertical-align: 1px; }
 .chips.wrap { flex-wrap: wrap; overflow: visible; row-gap: 8px; }
+
+/* ---------- Programas do Coach: abas, músculos, contador e cronômetro ---------- */
+.seg.prog.rolar { display: flex; overflow-x: auto; scrollbar-width: none; }
+.seg.prog.rolar::-webkit-scrollbar { display: none; }
+.seg.prog.rolar a { flex: none; padding: 0 14px; white-space: nowrap; }
+.ia-musc { font-size: 13px; line-height: 1.4; color: #1a1a1a; margin-top: -4px; }
+.ia-grupos { font-size: 13px; line-height: 1.45; color: #1a1a1a; background: var(--secondary); border-radius: 12px; padding: 10px 14px; }
+.ia-grupos b { font-weight: 600; }
+.ia-contador { font-size: 14px; color: var(--muted); }
+.ia-contador b { color: var(--blue); font-size: 18px; font-weight: 700; }
+.ia-contador.ok { color: var(--blue); font-weight: 600; }
+.ia-iniciar { height: 40px; font-size: 14px; }
+.ia-tm { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--blue-08); border-radius: 12px; padding: 10px 12px; }
+.ia-tm > span { flex: 1; font-size: 14px; color: #1a1a1a; }
+.ia-tm b { font-size: 22px; font-weight: 700; color: var(--blue); font-variant-numeric: tabular-nums; }
+.ia-tm small { color: var(--muted); font-size: 12px; }
+.ia-tm .btn { height: 34px; padding: 0 14px; font-size: 13px; }
+.ia-tm.alvo { background: #e3f7e8; }
+.ia-tm.alvo b { color: #1a8a3a; }
+.ia-tm.desc { background: #fff4e0; }
+.ia-tm.desc b { color: #b26a00; }
