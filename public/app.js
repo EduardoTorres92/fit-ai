@@ -146,7 +146,9 @@
     sobre: "Musculação na academia: o Coach AI faz uma entrevista (objetivo, dias, experiência, peso) e monta o treino semanal, com registro de carga e repetições, vídeo de execução em cada exercício e revisão semanal do plano." };
   const C21 = { k: "c21", nome: "Calistenia 21 dias", curto: "21 dias", nivel: "Montado pelo Coach", ordem: 98, extra: true,
     sobre: "Calistenia de resistência em 3 semanas, montada pelo Coach AI no seu nível a partir dos treinos do treinador: circuitos com peso do corpo ou barra fixa, contador de voltas e cronômetro." };
-  const CATALOGO = [...VPROGS, CALI, ...(window.FITAI_CAL21 ? [C21] : []), ...(window.FITAI_ACADEMIA ? [HIPER] : [])].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
+  const CF = { k: "cf", nome: "CrossFit", curto: "CrossFit", nivel: "Box ou garagem", ordem: 97, extra: true,
+    sobre: "O WOD do dia do seu box: tire uma foto do quadro e a IA lança o treino (blocos, formato, movimentos e cargas); cronômetro de For Time, AMRAP, EMOM e Tabata, resultado RX/Scaled e recordes nos WODs repetidos. Sem box, o Coach monta um WOD." };
+  const CATALOGO = [...VPROGS, CALI, ...(window.FITAI_CAL21 ? [C21] : []), ...(window.FITAI_ACADEMIA ? [HIPER] : []), CF].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
   const TRILHA = CATALOGO.filter((x) => !x.extra); // caminho natural de níveis
   const progDe = (k) => CATALOGO.find((x) => x.k === k) || null;
   const NIVEIS = [
@@ -181,9 +183,11 @@
         s[k] = { ...vazioIA(), ...(s[k] || {}) };
         if (!s[k].logs || typeof s[k].logs !== "object") s[k].logs = {};
       }
+      s.cf = { logs: {}, perfil: {}, ...(s.cf || {}) };
+      if (!s.cf.logs || typeof s.cf.logs !== "object") s.cf.logs = {};
       if (s.user && !s.user.id) { s.logado = false; s.user = null; s.sessao = null; } // login antigo (antes do Supabase): entra de novo
       return s;
-    } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])) }; }
+    } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])), cf: { logs: {}, perfil: {} } }; }
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
@@ -195,9 +199,9 @@
   const logHoje = () => S.logs[hojeKey];
   const ativoHoje = () => { const l = logHoje(); if (l) return { w: l.w, d: l.d }; const w = semanaDe(hoje); return { w: Math.max(w, 0), d: hojeDia }; };
   const soma = (a) => a.reduce((x, y) => x + y, 0);
-  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k)) || iaFeito(k);
-  const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || VKEYS.some((p) => insParcial(p, k)) || iaParcial(k);
-  const diasVideo = () => [...VKEYS.flatMap((p) => Object.keys(S[p].logs)), ...iaDiasComLog()]; // dias dos programas fora da calistenia
+  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k)) || iaFeito(k) || !!S.cf?.logs[k]?.done;
+  const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || VKEYS.some((p) => insParcial(p, k)) || iaParcial(k) || !!S.cf?.logs[k]?.wod;
+  const diasVideo = () => [...VKEYS.flatMap((p) => Object.keys(S[p].logs)), ...iaDiasComLog(), ...Object.keys(S.cf?.logs || {})]; // dias dos programas fora da calistenia
   const principal = () => (S.principal && progDe(S.principal) ? S.principal : "plano");
 
   function sequencia() {
@@ -538,7 +542,7 @@
   /* Insanity: componentes */
   const INS_IMG = { Cardio: "banner-home.jpg", Tabata: "login.jpg", Potência: "login.jpg", Pliometria: "login.jpg", Teste: "banner-plano.jpg", Intervalos: "banner-home.jpg", Core: "treino-inferiores-2.jpg", Força: "treino-superiores-2.jpg", Luta: "treino-inferiores-1.jpg", Recuperação: "treino-inferiores-2.jpg", Abdômen: "treino-inferiores-2.jpg" };
   const progSwitch = (on) => {
-    const abas = [["plano", NOME_PROG], ...VPROGS.map((p) => [p.k, VPROGS.length > 1 ? p.curto : p.nome]), ...IAK.map((k) => [k, progDe(k)?.curto || IA[k].nome])];
+    const abas = [["plano", NOME_PROG], ...VPROGS.map((p) => [p.k, VPROGS.length > 1 ? p.curto : p.nome]), ...IAK.map((k) => [k, progDe(k)?.curto || IA[k].nome]), ["cf", "CrossFit"]];
     const rolar = abas.length > 4; // muitas abas: vira uma faixa que rola para o lado
     return `<nav class="seg prog${rolar ? " rolar" : ""}" aria-label="Programa" ${rolar ? "" : `style="grid-template-columns:repeat(${abas.length},1fr)"`}>
       ${abas.map(([r, nome]) => `<a href="#/${r}" class="${on === r ? "on" : ""}"${on === r ? ' aria-current="page"' : ""}>${esc(nome)}</a>`).join("")}</nav>`;
@@ -643,7 +647,7 @@
           <span class="logo-txt">Fit.ai</span>
           <div class="banner-row">
             <div class="hello"><h1>Olá, ${esc(primeiroNome())}</h1><p>${sub}</p></div>
-            <a class="btn btn-blue" href="${principal() === "plano" ? `#/treino/${w}/${d}` : IA[principal()] ? iaLinkHoje(principal()) : linkHojeVideo(principal())}">Bora!</a>
+            <a class="btn btn-blue" href="${principal() === "plano" ? `#/treino/${w}/${d}` : principal() === "cf" ? "#/cf" : IA[principal()] ? iaLinkHoje(principal()) : linkHojeVideo(principal())}">Bora!</a>
           </div>
         </div>
         <div class="section">
@@ -658,7 +662,8 @@
           <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
           ${IA.hiper && principal() !== "hiper" ? iaHome("hiper", false) : ""}
           ${IA.c21 && principal() !== "c21" && (S.c21.plano || S.c21.etapa) ? iaHome("c21", false) : ""}
-          ${principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : IA[principal()] ? iaHome(principal(), true) : treinoHojeVideo(principal())}
+          ${principal() !== "cf" && Object.keys(S.cf.logs).length ? cfHome(false) : ""}
+          ${principal() === "cf" ? cfHome(true) : principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : IA[principal()] ? iaHome(principal(), true) : treinoHojeVideo(principal())}
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
           ${videoHome(principal())}
@@ -1307,6 +1312,344 @@
       if (p1 !== undefined && iaSessao(pk, d, w)) return telaIaDia(pk, d, w);
       return telaIaPlano(pk);
     };
+  });
+
+
+  /* ==========================================================
+     CrossFit: o WOD do dia (foto do quadro lida pela IA, digitado ou montado pelo Coach), cronômetro do formato
+     (For Time, AMRAP, EMOM, Tabata), resultado (tempo, voltas, cargas, RX/Scaled) e histórico com recordes por WOD.
+     S.cf.logs[data] = { wod: { titulo, partes: [{ nome, tipo, minutos?, rodadas?, esquema?, movimentos: [{ nome, reps?, carga? }], descricao? }], pontuado, obs? },
+                         res: { tempo?, cap?, voltas?, reps?, texto?, cargas?: { [i]: kg }, rx?, notas? }, done }
+     ========================================================== */
+  const CF_TIPOS = { for_time: "For Time", amrap: "AMRAP", emom: "EMOM", tabata: "Tabata", intervalos: "Intervalos", forca: "Força", livre: "Livre" };
+  const CF_TEMPO = ["for_time", "amrap", "emom", "tabata", "intervalos"];
+  let cfLendo = false, cfEdit = null, cfTm = null, cfTmId = null, cfWake = null;
+  const cfLog = (k = hojeKey) => S.cf.logs[k] || null;
+  const cfParteTxt = (p) => `${CF_TIPOS[p.tipo] || p.tipo}${p.minutos ? ` ${p.minutos}'` : ""}${p.rodadas && p.tipo !== "amrap" ? ` · ${p.rodadas} ${p.tipo === "forca" ? "séries" : "voltas"}` : ""}${p.esquema ? ` · ${p.esquema}` : ""}`;
+  const cfMovTxt = (m) => [m.reps, m.nome].filter(Boolean).join(" ") + (m.carga ? ` (${m.carga})` : "");
+  function cfMinutos(l) {
+    if (!l?.wod) return 0;
+    const ps = l.wod.partes, tempo = l.res?.tempo;
+    const m = soma(ps.map((p, i) => (i === l.wod.pontuado && tempo ? tempo / 60 : p.minutos || (p.tipo === "forca" ? 12 : 8))));
+    return Math.max(10, Math.min(180, Math.round(m)));
+  }
+  // O resultado do bloco pontuado, em texto ("5:32", "8 voltas + 12", "Cap: 4 voltas + 3")
+  function cfResTxt(l) {
+    const r = l?.res || {}, p = l?.wod?.partes[l.wod.pontuado];
+    if (!p) return "";
+    let s = "";
+    if (p.tipo === "for_time" && r.tempo && !r.cap) s = mmss(r.tempo);
+    else if ((p.tipo === "amrap" || (p.tipo === "for_time" && r.cap)) && (r.voltas || r.reps)) s = `${r.cap ? "Cap: " : ""}${r.voltas || 0} ${r.voltas === 1 ? "volta" : "voltas"}${r.reps ? ` + ${r.reps}` : ""}`;
+    else if (r.texto) s = r.texto;
+    const cargas = Object.entries(r.cargas || {}).filter(([, v]) => v > 0).map(([i, v]) => `${l.wod.partes[i]?.nome || "Força"} ${v} kg`);
+    return [s && `${s}${r.rx === false ? " (Scaled)" : r.rx ? " (RX)" : ""}`, ...cargas].filter(Boolean).join(" · ");
+  }
+  // Para comparar o mesmo WOD (benchmark): menor tempo ou mais voltas é melhor
+  const cfNome = (t) => norm(String(t || "")).replace(/[^a-z0-9]+/g, " ").trim();
+  function cfValor(l) {
+    const r = l.res || {}, p = l.wod.partes[l.wod.pontuado];
+    if (p?.tipo === "for_time" && r.tempo && !r.cap) return { v: -r.tempo, txt: mmss(r.tempo) };
+    if (r.voltas || r.reps) return { v: (r.voltas || 0) * 1000 + (r.reps || 0) - (p?.tipo === "for_time" ? 1e7 : 0), txt: `${r.voltas || 0}+${r.reps || 0}` };
+    return null;
+  }
+  function cfAnteriores(titulo, ate = hojeKey) {
+    const n = cfNome(titulo);
+    return Object.entries(S.cf.logs).filter(([k, l]) => k < ate && l.done && l.wod && cfNome(l.wod.titulo) === n).map(([k, l]) => ({ k, l, val: cfValor(l) })).sort((a, b) => a.k.localeCompare(b.k));
+  }
+
+  /* ---------- API: ler a foto ou pedir um WOD ao Coach ---------- */
+  async function cfApi(corpo) {
+    const token = await tokenSB();
+    try {
+      const r = await fetch("/api/wod", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(corpo) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.wod) return d;
+      toast(d.erro === "ilegivel" ? "Não consegui ler um treino nessa foto. Tente mais perto e com o quadro inteiro, ou escreva o WOD." : d.erro === "limite" ? "Você chegou ao limite do Coach por hoje. Escreva o WOD à mão. 💪" : d.erro === "imagem" ? "Foto grande demais. Tente de novo." : "Não consegui falar com o Coach agora. Tente de novo.", 5000);
+    } catch { toast("Sem conexão. Confira a internet ou escreva o WOD à mão."); }
+    return null;
+  }
+  // Foto reduzida para 1600 px (o quadro precisa de resolução para ler letra pequena) em JPEG
+  function cfReduzir(arquivo, max = 1600, q = 0.82) {
+    return new Promise((ok, falha) => {
+      const img = new Image(), url = URL.createObjectURL(arquivo);
+      img.onload = () => {
+        const f = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement("canvas");
+        c.width = Math.round(img.width * f); c.height = Math.round(img.height * f);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        ok(c.toDataURL("image/jpeg", q).split(",")[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); falha(new Error("foto")); };
+      img.src = url;
+    });
+  }
+  async function cfLerFoto(arquivo) {
+    if (cfLendo) return;
+    let b64;
+    try { b64 = await cfReduzir(arquivo); if (b64.length > 1_300_000) b64 = await cfReduzir(arquivo, 1280, 0.75); } catch { toast("Não consegui abrir essa imagem."); return; }
+    cfLendo = "foto"; render();
+    const d = await cfApi({ acao: "foto", imagem: b64 });
+    cfLendo = false;
+    if (d) { cfSalvarWod(d.wod); toast("WOD lido! ✅ Confira e ajuste em Editar se precisar.", 4000); }
+    render();
+  }
+  async function cfGerar(pedido) {
+    if (cfLendo) return;
+    cfLendo = "gerar"; render();
+    const perfil = { nivel: S.cf.perfil?.nivel || S.nivel || "", equipamento: S.cf.perfil?.equip || "", idade: S.perfil.idade, peso: S.perfil.peso, ultimos: Object.entries(S.cf.logs).sort().slice(-5).map(([k, l]) => `${k} ${l.wod?.titulo}`).join("; ") };
+    const d = await cfApi({ acao: "gerar", pedido, perfil });
+    cfLendo = false;
+    if (d) { cfSalvarWod(d.wod); if (d.mensagem) S.cf.logs[hojeKey].msg = d.mensagem; save(); toast("WOD do Coach pronto! 🔥"); }
+    render();
+  }
+  function cfSalvarWod(wod, k = hojeKey) {
+    const l = S.cf.logs[k];
+    const mesmo = !!l?.wod && cfNome(l.wod.titulo) === cfNome(wod.titulo); // editar o mesmo WOD mantém o resultado
+    S.cf.logs[k] = { ...(l || {}), wod, res: mesmo ? l.res || {} : {}, done: mesmo ? !!l.done : false };
+    cfEdit = null; save();
+  }
+
+  /* ---------- Cronômetro do WOD ---------- */
+  // { k, i, tipo, ini (início em ms, depois dos 5 s de preparação), total (s), voltas, fim? }
+  const cfSeg = () => (cfTm ? (Date.now() - cfTm.ini) / 1000 : 0);
+  async function cfTimerIniciar(i) {
+    const l = cfLog(), p = l?.wod?.partes[i];
+    if (!p) return;
+    const total = p.tipo === "tabata" ? (p.minutos || 4 * Math.max(1, p.movimentos.length)) * 60 : (p.minutos || 0) * 60;
+    cfTm = { k: hojeKey, i, tipo: p.tipo, ini: Date.now() + 5000, total, voltas: 0, ultimoMin: -1, fase: "" };
+    clearInterval(cfTmId); cfTmId = setInterval(cfTick, 200);
+    try { cfWake = await navigator.wakeLock?.request("screen"); } catch {}
+    render();
+  }
+  function cfTimerParar(salvar) {
+    if (!cfTm) return;
+    const t = cfTm, s = Math.max(0, Math.round(cfSeg()));
+    clearInterval(cfTmId); cfTm = null;
+    try { cfWake?.release(); } catch {} cfWake = null;
+    if (salvar) {
+      const l = cfLog(t.k); if (!l) return;
+      l.res = { ...(l.res || {}) };
+      if (t.tipo === "for_time") { if (t.total && s >= t.total) { l.res.cap = true; l.res.voltas = t.voltas; } else { l.res.tempo = s; l.res.cap = false; } }
+      else if (t.tipo === "amrap") { l.res.voltas = t.voltas; }
+      save();
+    }
+    render();
+  }
+  function cfTick() {
+    if (!cfTm) return;
+    const s = cfSeg(), el = $("#cf-relogio");
+    let grande, sub = "";
+    if (s < 0) { grande = `${Math.ceil(-s)}`; sub = "Prepara…"; if (Math.ceil(-s) !== cfTm.prep) { cfTm.prep = Math.ceil(-s); try { navigator.vibrate?.(60); } catch {} } }
+    else if (cfTm.tipo === "amrap") {
+      const resta = cfTm.total - s;
+      if (resta <= 0) { vibrar(); toast("Tempo! ⏱ Anote as repetições da volta incompleta.", 4000); cfTimerParar(true); return; }
+      grande = mmss(Math.ceil(resta)); sub = `AMRAP · ${cfTm.voltas} ${cfTm.voltas === 1 ? "volta" : "voltas"}`;
+    } else if (cfTm.tipo === "emom") {
+      const min = Math.floor(s / 60), n = cfTm.total / 60 || 10;
+      if (min >= n) { vibrar(); toast("EMOM concluído! 💪"); cfTimerParar(false); return; }
+      if (min !== cfTm.ultimoMin) { if (cfTm.ultimoMin >= 0) vibrar(); cfTm.ultimoMin = min; }
+      grande = `${60 - Math.floor(s % 60)}`; sub = `Minuto ${min + 1} de ${n}`;
+    } else if (cfTm.tipo === "tabata") {
+      const ciclo = Math.floor(s / 30), dentro = s % 30, trab = dentro < 20, n = Math.round(cfTm.total / 30);
+      if (ciclo >= n) { vibrar(); toast("Tabata concluído! 🔥"); cfTimerParar(false); return; }
+      const fase = trab ? "t" : "d"; if (fase !== cfTm.fase) { if (cfTm.fase) vibrar(); cfTm.fase = fase; }
+      grande = `${Math.ceil((trab ? 20 : 30) - dentro)}`; sub = `${trab ? "Trabalho 🔥" : "Descanso 😮‍💨"} · ${ciclo + 1} de ${n}`;
+    } else {
+      if (cfTm.total && s >= cfTm.total) { vibrar(); toast("Time cap! ⏱ Anote até onde chegou.", 4000); cfTimerParar(true); return; }
+      grande = mmss(Math.floor(s)); sub = cfTm.tipo === "for_time" ? `For Time${cfTm.total ? ` · cap ${cfTm.total / 60}'` : ""}${cfTm.voltas ? ` · ${cfTm.voltas} ${cfTm.voltas === 1 ? "volta" : "voltas"}` : ""}` : "Cronômetro";
+    }
+    if (el) { el.querySelector("b").textContent = grande; el.querySelector("small").textContent = sub; el.classList.toggle("prep", s < 0); el.classList.toggle("descanso", cfTm.fase === "d"); }
+  }
+  function cfTimerHtml(i, p) {
+    if (cfTm && cfTm.i === i && cfTm.k === hojeKey) {
+      const voltas = cfTm.tipo === "amrap" || (cfTm.tipo === "for_time" && (p.rodadas > 1 || !!p.minutos));
+      return `<div class="cf-relogio" id="cf-relogio" role="timer" aria-live="off"><b>—</b><small></small>
+        <div class="cf-relogio-acoes">${voltas ? `<button class="btn cf-volta" data-cf-volta>+1 volta</button>` : ""}
+        <button class="btn btn-blue" data-cf-parar="1">${cfTm.tipo === "for_time" ? "Terminei" : cfTm.tipo === "amrap" ? "Parar e anotar" : "Parar"}</button>
+        <button class="lnk-btn" data-cf-parar="0">Cancelar</button></div></div>`;
+    }
+    if (!CF_TEMPO.includes(p.tipo) || cfTm) return "";
+    if ((p.tipo === "amrap" || p.tipo === "emom") && !p.minutos) return "";
+    return `<button class="btn btn-outline cf-iniciar" data-cf-timer="${i}">⏱ Iniciar ${p.tipo === "amrap" ? `AMRAP ${p.minutos}'` : p.tipo === "emom" ? `EMOM ${p.minutos}'` : p.tipo === "tabata" ? "Tabata" : p.minutos ? `(cap ${p.minutos}')` : "cronômetro"}</button>`;
+  }
+
+  /* ---------- Telas ---------- */
+  function cfWodHtml(l, editavel) {
+    const w = l.wod;
+    return `<div class="cf-wod">
+      <div class="cf-wod-head"><h2>${esc(w.titulo)}</h2>${editavel ? `<button class="lnk-btn" data-cf-editar>Editar</button>` : ""}</div>
+      ${w.partes.map((p, i) => `<div class="cf-parte${i === w.pontuado ? " pont" : ""}">
+        <div class="cf-parte-head"><strong>${esc(p.nome)}</strong><span class="cf-tag">${esc(cfParteTxt(p))}</span>${i === w.pontuado ? `<span class="cf-tag pont">Resultado</span>` : ""}</div>
+        ${p.descricao ? `<p class="cf-desc">${esc(p.descricao)}</p>` : ""}
+        ${p.movimentos.length ? `<ul class="cf-movs">${p.movimentos.map((m) => `<li>${m.reps ? `<b>${esc(m.reps)}</b> ` : ""}${esc(m.nome)}${m.carga ? ` <span>${esc(m.carga)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+        ${editavel && !l.done ? cfTimerHtml(i, p) : ""}
+      </div>`).join("")}
+      ${w.obs ? `<p class="note">${esc(w.obs)}</p>` : ""}
+      ${l.msg ? `<div class="note-box"><p>✨ ${esc(l.msg)}</p></div>` : ""}
+    </div>`;
+  }
+  function cfResultadoHtml(l, k) {
+    const w = l.wod, p = w.partes[w.pontuado], r = l.res || {};
+    const ant = cfAnteriores(w.titulo, k), melhor = ant.filter((x) => x.val).sort((a, b) => b.val.v - a.val.v)[0];
+    const forcas = w.partes.map((x, i) => [x, i]).filter(([x]) => x.tipo === "forca");
+    return `<form class="cf-res" id="cf-res" data-k="${k}">
+      <div class="sec-head"><h2>Resultado</h2>${ant.length ? `<span>Já fez ${ant.length} ${ant.length === 1 ? "vez" : "vezes"}${melhor ? ` · melhor ${esc(melhor.val.txt)}` : ""}</span>` : ""}</div>
+      ${p.tipo === "for_time" ? `<label class="cf-check"><input type="checkbox" name="cap" ${r.cap ? "checked" : ""}> Não terminei no time cap</label>
+        <div class="cf-campos" data-cf-sem-cap ${r.cap ? "hidden" : ""}><label>Tempo<input name="tempo" inputmode="numeric" placeholder="mm:ss" value="${r.tempo ? mmss(r.tempo) : ""}"></label></div>
+        <div class="cf-campos" data-cf-com-cap ${r.cap ? "" : "hidden"}><label>Voltas<input name="voltas" type="number" min="0" inputmode="numeric" value="${r.voltas ?? ""}"></label><label>+ reps<input name="reps" type="number" min="0" inputmode="numeric" value="${r.reps ?? ""}"></label></div>`
+      : p.tipo === "amrap" ? `<div class="cf-campos"><label>Voltas<input name="voltas" type="number" min="0" inputmode="numeric" value="${r.voltas ?? ""}"></label><label>+ reps<input name="reps" type="number" min="0" inputmode="numeric" value="${r.reps ?? ""}"></label></div>`
+      : `<label>Resultado<input name="texto" maxlength="80" placeholder="${p.tipo === "tabata" ? "Ex.: menor round 12" : p.tipo === "forca" ? "Ex.: 5×3 a 80 kg" : "Ex.: completei tudo RX"}" value="${esc(r.texto || "")}"></label>`}
+      ${forcas.map(([x, i]) => `<label>${esc(x.nome)}: maior carga (kg)<input name="carga-${i}" type="number" min="0" step="0.5" inputmode="decimal" value="${r.cargas?.[i] ?? ""}"></label>`).join("")}
+      <div class="seg seg2 cf-rx" role="radiogroup" aria-label="RX ou Scaled">
+        <label class="${r.rx !== false ? "on" : ""}"><input type="radio" name="rx" value="1" ${r.rx !== false ? "checked" : ""}>RX</label>
+        <label class="${r.rx === false ? "on" : ""}"><input type="radio" name="rx" value="0" ${r.rx === false ? "checked" : ""}>Scaled</label></div>
+      <textarea name="notas" maxlength="300" rows="2" placeholder="Notas: escalas, como se sentiu…">${esc(r.notas || "")}</textarea>
+      <button class="btn btn-blue" type="submit">${l.done ? "Atualizar resultado" : "Salvar resultado e concluir"}</button>
+      ${l.done ? `<button class="lnk-btn" type="button" data-cf-reabrir="${k}">Reabrir treino</button>` : ""}
+    </form>`;
+  }
+  function cfEditorHtml() {
+    const w = cfEdit;
+    return `<form class="cf-edit" id="cf-edit">
+      <label>Nome do WOD<input name="titulo" maxlength="60" value="${esc(w.titulo || "")}" placeholder="Ex.: Fran, AMRAP 15…" required></label>
+      ${w.partes.map((p, i) => `<fieldset class="cf-edit-parte" data-i="${i}">
+        <div class="cf-edit-linha"><input name="nome" maxlength="30" value="${esc(p.nome)}" aria-label="Nome do bloco">
+          <select name="tipo" aria-label="Formato">${Object.entries(CF_TIPOS).map(([k, n]) => `<option value="${k}"${p.tipo === k ? " selected" : ""}>${n}</option>`).join("")}</select></div>
+        <div class="cf-edit-linha"><label>Minutos<input name="minutos" type="number" min="0" max="120" inputmode="numeric" value="${p.minutos ?? ""}"></label>
+          <label>Voltas/séries<input name="rodadas" type="number" min="0" max="100" inputmode="numeric" value="${p.rodadas ?? ""}"></label>
+          <label>Esquema<input name="esquema" maxlength="40" value="${esc(p.esquema || "")}" placeholder="21-15-9"></label></div>
+        <label>Movimentos (um por linha: reps, nome e carga entre parênteses)<textarea name="movs" rows="${Math.max(3, p.movimentos.length + 1)}" placeholder="21 Thruster (43/29 kg)&#10;21 Pull-up">${esc(p.movimentos.map(cfMovTxt).join("\n"))}</textarea></label>
+        <div class="cf-edit-linha"><label class="cf-check"><input type="radio" name="pontuado" value="${i}" ${w.pontuado === i ? "checked" : ""}> Vale como resultado</label>
+          ${w.partes.length > 1 ? `<button type="button" class="lnk-btn" data-cf-tirar-parte="${i}">Remover bloco</button>` : ""}</div>
+      </fieldset>`).join("")}
+      <button type="button" class="btn btn-outline" data-cf-mais-parte>+ Bloco</button>
+      <div class="row2"><button type="button" class="btn btn-outline" data-cf-cancelar-edit>Cancelar</button><button type="submit" class="btn btn-blue">Salvar WOD</button></div>
+    </form>`;
+  }
+  const cfParteVazia = (nome = "WOD", tipo = "for_time") => ({ nome, tipo, movimentos: [] });
+  // "21 Thruster (43/29 kg)" → { reps: "21", nome: "Thruster", carga: "43/29 kg" }
+  function cfLerMov(linha) {
+    let s = linha.trim(), carga = "";
+    const c = s.match(/\(([^)]+)\)\s*$/) || s.match(/\s@\s*(.+)$/);
+    if (c) { carga = c[1].trim(); s = s.slice(0, c.index).trim(); }
+    const r = s.match(/^(\d+(?:[.,]\d+)?\s*(?:m|km|cal|s|seg|min|x)?|max|máx)\b\.?\s+(.+)$/i);
+    return { nome: (r ? r[2] : s).slice(0, 60), ...(r ? { reps: r[1].replace(/\s+/g, " ").slice(0, 30) } : {}), ...(carga ? { carga: carga.slice(0, 30) } : {}) };
+  }
+  function cfLerEditor(f) {
+    const partes = [...f.querySelectorAll(".cf-edit-parte")].map((fs) => {
+      const v = (n) => fs.querySelector(`[name=${n}]`).value.trim(), int = (n) => { const x = parseInt(v(n), 10); return x > 0 ? x : undefined; };
+      return { nome: v("nome") || "Bloco", tipo: v("tipo"), ...(int("minutos") ? { minutos: int("minutos") } : {}), ...(int("rodadas") ? { rodadas: int("rodadas") } : {}),
+        ...(v("esquema") ? { esquema: v("esquema") } : {}), movimentos: v("movs").split("\n").filter((x) => x.trim()).slice(0, 15).map(cfLerMov),
+        ...(cfEdit.partes[+fs.dataset.i]?.descricao ? { descricao: cfEdit.partes[+fs.dataset.i].descricao } : {}) };
+    });
+    const pont = Number(f.querySelector("[name=pontuado]:checked")?.value ?? partes.length - 1);
+    return { titulo: f.elements.titulo.value.trim().slice(0, 60) || "WOD", partes, pontuado: Math.min(pont, partes.length - 1), ...(cfEdit.obs ? { obs: cfEdit.obs } : {}) };
+  }
+  // Mantém o que já foi digitado no editor quando um bloco é incluído ou removido
+  const cfGuardarEditor = () => { const f = $("#cf-edit"); if (f) cfEdit = cfLerEditor(f); };
+
+  function cfAcoesHtml() {
+    if (cfLendo) return `<div class="cf-lendo" role="status"><span class="typing"><i></i><i></i><i></i></span><p>${cfLendo === "foto" ? "Lendo o quadro… isso leva uns segundos." : "O Coach está montando seu WOD…"}</p></div>`;
+    return `<div class="cf-acoes">
+      <label class="cf-acao principal">📷<span><strong>Fotografar o quadro</strong><small>A IA lê o WOD e já lança para você</small></span><input type="file" accept="image/*" capture="environment" data-cf-foto hidden></label>
+      <label class="cf-acao">🖼️<span><strong>Foto da galeria</strong><small>Print ou foto que alguém mandou no grupo do box</small></span><input type="file" accept="image/*" data-cf-foto hidden></label>
+      <button class="cf-acao" data-cf-escrever>✍️<span><strong>Escrever o WOD</strong><small>Digite os blocos e movimentos</small></span></button>
+      <button class="cf-acao" data-cf-gerar>✨<span><strong>Coach monta um WOD</strong><small>Para treinar na garagem ou no dia sem box</small></span></button>
+    </div>`;
+  }
+  function cfHistoricoHtml() {
+    const dias = Object.entries(S.cf.logs).filter(([k, l]) => l.wod && k !== hojeKey).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 20);
+    if (!dias.length) return "";
+    return `<div class="section"><div class="sec-head"><h2>Últimos WODs</h2><span>${Object.values(S.cf.logs).filter((l) => l.done).length} feitos</span></div>
+      <ul class="cf-hist">${dias.map(([k, l]) => `<li><a href="#/cf/${k}"><span class="cf-hist-data">${ddmm(k)}</span><span><strong>${esc(l.wod.titulo)}</strong><small>${esc(cfResTxt(l) || (l.done ? "Feito" : "Sem resultado"))}</small></span>${l.done ? "✅" : ""}</a></li>`).join("")}</ul></div>`;
+  }
+  function cfRecordesHtml() {
+    const grupos = {};
+    for (const [k, l] of Object.entries(S.cf.logs)) if (l.done && l.wod) (grupos[cfNome(l.wod.titulo)] ||= []).push({ k, l, val: cfValor(l) });
+    const reps = Object.values(grupos).filter((g) => g.length > 1 && g.some((x) => x.val)).map((g) => { const m = g.filter((x) => x.val).sort((a, b) => b.val.v - a.val.v)[0]; return { t: g[g.length - 1].l.wod.titulo, n: g.length, m }; });
+    if (!reps.length) return "";
+    return `<div class="section"><div class="sec-head"><h2>Recordes nos WODs repetidos</h2></div>
+      <ul class="cf-hist">${reps.map((x) => `<li><span class="cf-hist-data">🏆</span><span><strong>${esc(x.t)}</strong><small>Melhor: ${esc(x.m.val.txt)} em ${ddmm(x.m.k)} · ${x.n} vezes</small></span></li>`).join("")}</ul></div>`;
+  }
+  telas.cf = (p1) => {
+    setToolbar("plano");
+    const k = /^\d{4}-\d{2}-\d{2}$/.test(p1 || "") && p1 <= hojeKey ? p1 : hojeKey, l = cfLog(k), ehHoje = k === hojeKey;
+    const head = `<div class="page-head">${ehHoje ? "" : `<a class="icon-btn" href="#/cf" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a>`}<h1>${ehHoje ? "CrossFit" : `WOD de ${ddmm(k)}`}</h1><span class="spacer"></span></div>`;
+    let corpo;
+    if (cfEdit && cfEdit.k === k) corpo = cfEditorHtml();
+    else if (l?.wod) corpo = cfWodHtml(l, true) + cfResultadoHtml(l, k) + (ehHoje && !l.done && !cfTm ? `<button class="lnk-btn cf-trocar" data-cf-trocar>Trocar o WOD de hoje</button>` : "");
+    else corpo = ehHoje ? `<div class="sec-head"><h2>WOD de hoje</h2><span>${DIAS[hojeDia]}, ${ddmm(hojeKey)}</span></div>${cfAcoesHtml()}` : `<p class="note">Nenhum WOD neste dia.</p>`;
+    return `<section class="screen has-toolbar"><div class="list" style="gap:16px">${head}${ehHoje ? progSwitch("cf") : ""}
+      <div class="section cf">${corpo}</div></div>
+      ${ehHoje && !cfEdit ? cfRecordesHtml() + cfHistoricoHtml() : ""}</section>`;
+  };
+  // Card na tela inicial
+  function cfHome(principalAqui) {
+    const l = cfLog(), titulo = principalAqui ? "Treino de Hoje" : "CrossFit";
+    const head = `<div class="sec-head"><h2>${titulo}</h2><a href="#/cf">CrossFit</a></div>`;
+    if (!l?.wod) return head + `<a class="emerg" href="#/cf"><span>📷</span><div><strong>Fotografe o WOD do quadro</strong><small>A IA lê e lança o treino; você só anota o resultado</small></div></a>`;
+    const p = l.wod.partes[l.wod.pontuado];
+    return head + `<a class="emerg" href="#/cf"><span>${l.done ? "✅" : "🔥"}</span><div><strong>${esc(l.wod.titulo)}</strong><small>${l.done ? esc(cfResTxt(l) || "Feito") : esc(`${p.nome} · ${cfParteTxt(p)}`)}</small></div></a>`;
+  }
+  function cfContextoTexto() {
+    const ds = Object.entries(S.cf.logs).filter(([, l]) => l.wod).sort().slice(-12);
+    if (!ds.length) return "";
+    return "WODs de CrossFit registrados:\n" + ds.map(([k, l]) => `- ${k} ${l.wod.titulo}: ${l.wod.partes.map((p) => `${p.nome} (${cfParteTxt(p)}): ${p.movimentos.map(cfMovTxt).join(", ")}`).join(" | ")}. Resultado: ${cfResTxt(l) || (l.done ? "feito" : "não anotado")}${l.res?.notas ? `. Notas: ${l.res.notas}` : ""}`).join("\n");
+  }
+
+  /* ---------- Eventos ---------- */
+  document.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.matches("[data-cf-foto]") && t.files?.[0]) { cfLerFoto(t.files[0]); t.value = ""; }
+    else if (t.closest("#cf-res") && t.name === "cap") { const f = t.form; f.querySelector("[data-cf-sem-cap]").hidden = t.checked; f.querySelector("[data-cf-com-cap]").hidden = !t.checked; }
+    else if (t.closest(".cf-rx") && t.name === "rx") t.closest(".cf-rx").querySelectorAll("label").forEach((x) => x.classList.toggle("on", x.contains(t)));
+  });
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-cf-escrever],[data-cf-gerar],[data-cf-editar],[data-cf-trocar],[data-cf-timer],[data-cf-parar],[data-cf-volta],[data-cf-mais-parte],[data-cf-tirar-parte],[data-cf-cancelar-edit],[data-cf-reabrir]");
+    if (!t) return;
+    const ds = t.dataset, k = /^#\/cf\/(\d{4}-\d{2}-\d{2})/.exec(location.hash)?.[1] || hojeKey;
+    if (t.hasAttribute("data-cf-escrever")) { cfEdit = { k, titulo: "", partes: [cfParteVazia("Força", "forca"), cfParteVazia("WOD", "for_time")], pontuado: 1 }; render(); }
+    else if (t.hasAttribute("data-cf-gerar")) {
+      const pedido = prompt("O que você quer hoje? (tempo, equipamento, foco)\nEx.: 30 min, só halteres e barra fixa, foco em pernas", S.cf.ultimoPedido || "");
+      if (pedido === null) return;
+      S.cf.ultimoPedido = pedido.slice(0, 300); cfGerar(pedido);
+    }
+    else if (t.hasAttribute("data-cf-editar")) { const l = cfLog(k); cfEdit = { k, ...JSON.parse(JSON.stringify(l.wod)) }; render(); }
+    else if (t.hasAttribute("data-cf-trocar")) { if (!confirm("Trocar o WOD de hoje? O resultado anotado será apagado.")) return; delete S.cf.logs[hojeKey]; save(); render(); }
+    else if (ds.cfTimer) cfTimerIniciar(Number(ds.cfTimer));
+    else if (ds.cfParar) cfTimerParar(ds.cfParar === "1");
+    else if (t.hasAttribute("data-cf-volta")) { if (cfTm && cfSeg() >= 0) { cfTm.voltas++; try { navigator.vibrate?.(40); } catch {} cfTick(); } }
+    else if (t.hasAttribute("data-cf-mais-parte")) { cfGuardarEditor(); cfEdit.partes.push(cfParteVazia("Bloco", "livre")); cfEdit.k = k; render(); }
+    else if (ds.cfTirarParte) { cfGuardarEditor(); cfEdit.partes.splice(Number(ds.cfTirarParte), 1); cfEdit.pontuado = Math.min(cfEdit.pontuado, cfEdit.partes.length - 1); cfEdit.k = k; render(); }
+    else if (t.hasAttribute("data-cf-cancelar-edit")) { cfEdit = null; render(); }
+    else if (ds.cfReabrir) { const l = cfLog(ds.cfReabrir); if (l) { l.done = false; save(); render(); } }
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (f.id === "cf-edit") {
+      e.preventDefault();
+      const w = cfLerEditor(f), k = cfEdit.k;
+      if (!w.partes.some((p) => p.movimentos.length)) { toast("Escreva pelo menos um movimento."); return; }
+      cfSalvarWod(w, k); toast("WOD salvo ✓"); render();
+    } else if (f.id === "cf-res") {
+      e.preventDefault();
+      const k = f.dataset.k, l = cfLog(k), d = Object.fromEntries(new FormData(f)), int = (v) => { const n = parseInt(v, 10); return n >= 0 ? n : undefined; };
+      const p = l.wod.partes[l.wod.pontuado], res = { rx: d.rx !== "0", ...(d.notas?.trim() ? { notas: d.notas.trim().slice(0, 300) } : {}) };
+      if (p.tipo === "for_time" && !d.cap) {
+        const m = String(d.tempo || "").trim().match(/^(\d{1,3})(?::(\d{1,2}))?$/);
+        if (!m) { toast("Escreva o tempo como mm:ss (ex.: 7:42)."); return; }
+        res.tempo = m[2] != null ? Number(m[1]) * 60 + Number(m[2]) : Number(m[1]) * 60; res.cap = false;
+      } else if (p.tipo === "for_time" || p.tipo === "amrap") { Object.assign(res, { voltas: int(d.voltas) ?? 0, reps: int(d.reps) ?? 0 }); if (p.tipo === "for_time") res.cap = true; }
+      else if (d.texto?.trim()) res.texto = d.texto.trim().slice(0, 80);
+      const cargas = Object.fromEntries(Object.entries(d).filter(([n, v]) => n.startsWith("carga-") && Number(v) > 0).map(([n, v]) => [n.slice(6), Math.min(500, Number(v))]));
+      if (Object.keys(cargas).length) res.cargas = cargas;
+      const era = l.done;
+      l.res = res; l.done = true; save(); render();
+      const ant = cfAnteriores(l.wod.titulo, k).filter((x) => x.val), v = cfValor(l);
+      const pr = v && ant.length && v.v > Math.max(...ant.map((x) => x.val.v));
+      if (!era) { toast(pr ? `Novo recorde no ${l.wod.titulo}! 🏆 ${v.txt}` : `WOD concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`, 4000); if (k === hojeKey) convidarPost(); }
+      else toast("Resultado atualizado ✓");
+    }
   });
 
   document.addEventListener("click", (e) => {
@@ -1991,6 +2334,11 @@
       out.push({ data: k, programa: pk, titulo: (t ? t.titulo : IA[pk].rotulo).slice(0, 120), concluido: !!l.done, minutos: Math.min(600, iaMin(pk, l)),
         detalhes: { d: l.d, ...(l.w != null ? { w: l.w } : {}), sets: l.sets || {}, done: !!l.done } });
     }
+    for (const [k, l] of Object.entries(S.cf.logs)) {
+      if (!l.wod) continue;
+      out.push({ data: k, programa: "cf", titulo: String(l.wod.titulo || "WOD").slice(0, 120), concluido: !!l.done, minutos: Math.min(600, cfMinutos(l)),
+        detalhes: { wod: l.wod, res: l.res || {}, done: !!l.done, ...(l.msg ? { msg: l.msg } : {}) } });
+    }
     return out;
   }
 
@@ -2047,6 +2395,9 @@
       if (!/^\d{4}-\d{2}-\d{2}$/.test(r.data)) continue;
       if (r.programa === "calistenia" && !S.logs[r.data]) {
         S.logs[r.data] = { w: d.w === "E" ? "E" : Number(d.w) || 0, d: Number(d.d) || 0, sets: d.sets && typeof d.sets === "object" ? d.sets : {}, dur: Number(d.dur) || 0, done: !!d.done }; mudou = true;
+      }
+      if (r.programa === "cf" && !S.cf.logs[r.data] && d.wod && Array.isArray(d.wod.partes)) {
+        S.cf.logs[r.data] = { wod: d.wod, res: d.res && typeof d.res === "object" ? d.res : {}, done: !!d.done, ...(d.msg ? { msg: String(d.msg) } : {}) }; mudou = true;
       }
       if (IA[r.programa] && !S[r.programa].logs[r.data]) {
         const sets = {};
@@ -3100,7 +3451,7 @@
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
   const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Como funciona o programa?"];
-  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "Nutrição", "Minha evolução"];
+  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "CrossFit", "Nutrição", "Minha evolução"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
   const chatLogs = { coach: chatLog, nutri: [] };
@@ -3179,7 +3530,7 @@
     const t = norm(texto);
     const fera = norm(NOME_PROG);
     if (t === "nutricao") { openChat(null, "nutri"); return true; }
-    if (!["insanity", "calistenia", "hipertrofia", "academia", "ver meu treino", "calistenia 21 dias", fera].includes(t)) return false;
+    if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);
     const ir = async (msg, hash) => {
       const stop = typing(msgsEl); await wait(450); stop();
@@ -3209,6 +3560,9 @@
       if (!P) { ir("Nenhum programa do Insanity disponível.", "#/home"); return true; }
       const h = insHoje(P.k), tit = h ? insDia(P.k, h.w, h.d).titulo : "";
       ir(`Bora de <b>${esc(P.nome)}</b>!${tit ? ` Hoje é <b>${esc(tit)}</b>.` : ""} Abrindo… 🔥`, linkHojeVideo(P.k));
+    } else if (t === "crossfit") {
+      const l = cfLog();
+      ir(l?.wod ? `Bora de <b>CrossFit</b>! Hoje é <b>${esc(l.wod.titulo)}</b>. Abrindo… 🔥` : `Bora de <b>CrossFit</b>! Tire uma foto do quadro do box e eu lanço o WOD para você. 📷`, "#/cf");
     } else if (t === "ver meu treino") irIA(iaUltimo || "hiper");
     else irIA("hiper");
     return true;
@@ -3245,6 +3599,7 @@
       ...TRILHA.map((x, i) => `${i + 1}. ${x.nome} — nível ${x.nivel}. ${x.sobre}`),
       `Caminho natural: ${caminhoTxt()}. Quem está começando ou voltando começa pelo ${TRILHA[0].nome}.`,
       `Fora do caminho, montados pelo Coach AI depois de uma entrevista: ${HIPER.nome} (academia) — ${HIPER.sobre} | ${C21.nome} — ${C21.sobre}`,
+      `Também fora do caminho: ${CF.nome} — ${CF.sobre} Fica na aba CrossFit (menu → Treinos → CrossFit).`,
       "Como recomendar: pergunte (ou use o contexto) o nível e a rotina da pessoa e indique UM programa para começar, explicando o porquê em uma frase. Iniciante → 1º programa; já treina com regularidade → 2º; treina pesado e faz barra → 3º. Na dúvida, o mais acessível.",
       "Quando avançar: ao terminar o programa atual com constância (poucas faltas) e evolução clara (Max Out mais tarde nos vídeos do MAX:30; mais repetições no Fit Test do Insanity), sugira o próximo do caminho. Se a pessoa falhou muitos treinos ou parou mais de 2 semanas, sugira repetir o programa atual em vez de avançar.",
       "Para trocar o programa principal no app: Perfil → Seu programa principal."].join("\n");
@@ -3276,6 +3631,7 @@
         return `- ${k}: ${l.feitos.map((id) => `${INSV[id]?.nome || id}${l.max?.[id] ? ` (Max Out ${mmss(l.max[id])})` : ""}`).join("; ") || "nada"}${fit}`; }).join("\n"));
     }
     for (const pk of IAK) { const c = iaContextoTexto(pk); if (c) out.push(c); }
+    { const c = cfContextoTexto(); if (c) out.push(c); }
     const cs = comCorridas ? corridas().slice(0, 10) : [];
     if (comCorridas) out.push("Corridas do Strava:\n" + (cs.length ? cs.map((c) => `- ${c.data} ${c.nome}: ${km(c.dist)} km, ${fmtDur(c.tempo)}, ritmo ${ritmo(c.tempo, c.dist)}/km${c.fc ? `, FC ${Math.round(c.fc)}` : ""}`).join("\n") : "- nenhuma sincronizada"));
     return out.join("\n");
@@ -3384,6 +3740,11 @@
       }
       escolherPrograma(x.k);
       etapa = "fim";
+      if (x.k === "cf") {
+        await falar(`Fechado: <b>CrossFit</b>! No box, é só tirar uma foto do quadro: eu leio o WOD e lanço o treino. Depois você anota o tempo ou as voltas. 📷🔥`, 1000);
+        setChips(chips, ["Ver meu programa"], true);
+        return;
+      }
       if (IA[x.k]) {
         await falar(`Fechado: <b>${esc(x.nome)}</b>! Agora eu te faço umas perguntas rápidas (nível, objetivo, dias, peso…) e monto seu treino. 💪`, 1000);
         setChips(chips, ["Montar meu treino"], true);
