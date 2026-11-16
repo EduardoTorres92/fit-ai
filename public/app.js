@@ -626,11 +626,11 @@
         </div>
         <div class="section">
           ${grupoHome()}
+          ${ACAD.length && principal() !== "hiper" ? hxHome(false) : ""}
           ${principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : principal() === "hiper" ? hxHome(true) : treinoHojeVideo(principal())}
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
           ${videoHome(principal())}
-          ${principal() !== "hiper" ? hxHome(false) : ""}
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -847,58 +847,109 @@
     { k: "limitacoes", q: "Tem alguma dor, lesão ou exercício que você não pode fazer? Se tiver, escreva aqui embaixo.", op: ["Nenhuma"], livre: true },
     { k: "extra", q: "Quer me contar mais alguma coisa? Rotina, cardio, exercício que ama ou odeia… Se não, é só tocar no botão.", op: ["Não, pode montar!"], livre: true },
   ];
-  let hxSel = new Set(), hxGerando = false, hxRefazer = false, hxRevisando = false;
+  let hxGerando = false, hxRefazer = false, hxRevisando = false, hxChat = false;
   const hxResp = (p, v) => (p.multi ? (Array.isArray(v) && v.length ? v.map((d) => DIAS[d]).join(", ") : "Tanto faz") : p.fmt ? p.fmt(v) : p.num ? `${String(v).replace(".", ",")} ${p.un}` : String(v ?? ""));
-  function telaHxEntrevista() {
-    const P = S.hiper.perfil, et = Math.min(S.hiper.etapa || 0, HX_PASSOS.length), atual = HX_PASSOS[et];
-    const bolhas = [bubbleHTML({ html: `${S.hiper.plano ? "Vamos refazer seu treino." : `Bora montar seu treino de academia, ${esc(primeiroNome())}! 💪`} São ${HX_PASSOS.length} perguntas rápidas. Com elas o Coach AI monta seu plano semanal, com vídeo de execução em cada exercício, e depois acompanha suas cargas e ajusta o treino toda semana.` })];
-    HX_PASSOS.slice(0, et).forEach((p) => bolhas.push(bubbleHTML({ html: p.q }), bubbleHTML({ html: esc(hxResp(p, P[p.k])), me: true })));
-    let foot = "";
-    if (atual) {
-      bolhas.push(bubbleHTML({ html: atual.q }));
-      const voltar = et ? `<button type="button" class="chip" data-hx-voltar>↩ Voltar</button>` : "";
-      if (atual.multi) {
-        foot = `<div class="chips hx-chips">${DIAS.map((n, d) => `<button type="button" class="chip${hxSel.has(d) ? " on" : ""}" data-hx-dia="${d}" aria-pressed="${hxSel.has(d)}">${n}</button>`).join("")}</div>
-          <div class="chips hx-chips"><button type="button" class="chip primary" data-hx-pronto>Pronto${hxSel.size ? ` (${hxSel.size})` : ""}</button><button type="button" class="chip" data-hx-tantofaz>Tanto faz</button>${voltar}</div>`;
-      } else {
-        const ops = (atual.op || []).map((o, i) => `<button type="button" class="chip${atual.livre ? " primary" : ""}" data-hx-op="${i}">${esc(atual.fmt ? atual.fmt(o) : o)}</button>`);
-        const sug = atual.perfil && S.perfil[atual.perfil] ? String(S.perfil[atual.perfil]) : "";
-        foot = `${ops.length || voltar ? `<div class="chips hx-chips">${ops.join("")}${voltar}</div>` : ""}
-          ${atual.num || atual.livre ? `<form class="composer hx-form" data-hx-form autocomplete="off">
-            <input name="v" ${atual.num ? `type="number" inputmode="decimal" step="any" min="${atual.num[0]}" max="${atual.num[1]}"` : 'type="text" maxlength="400"'} value="${esc(sug)}" placeholder="${atual.num ? `Ex.: ${atual.k === "peso" ? "75" : atual.k === "altura" ? "175" : "30"} ${atual.un}` : "Escreva aqui"}" aria-label="${esc(atual.q.replace(/<[^>]+>/g, ""))}">
-            <button type="submit" class="send" aria-label="Enviar">${icon("arrow-up.svg", 20)}</button></form>` : ""}`;
-      }
-    } else if (hxGerando) {
-      bolhas.push(`<div class="msg"><div class="bubble"><p>Montando seu treino com base nas suas respostas… isso leva uns 30 segundos.</p><span class="typing"><i></i><i></i><i></i></span></div></div>`);
-    } else {
-      bolhas.push(bubbleHTML({ html: "Tudo pronto! Toque em <b>Montar meu treino</b> e o Coach AI faz o resto." }));
-      foot = `<div class="hx-acoes"><button class="btn btn-blue" data-hx-gerar>Montar meu treino</button><button class="btn btn-outline" data-hx-voltar>Mudar a última resposta</button></div>`;
-    }
+  // Tela do Hipertrofia antes do plano: a entrevista acontece no chat do Coach (botão do meio)
+  function telaHxComecar() {
+    const et = Math.min(S.hiper.etapa || 0, HX_PASSOS.length);
     return `<section class="screen has-toolbar">
-      ${hxBanner(S.hiper.plano ? "Refazer o treino" : "Hipertrofia", "Coach AI")}
+      ${hxBanner("Hipertrofia", "Coach AI")}
       ${progSwitch("hiper")}
-      <div class="hx-chat chat-msgs">${bolhas.join("")}</div>
-      <div class="hx-foot" id="hx-foot">${foot}${hxRefazer && S.hiper.plano ? `<button class="lnk-btn hx-cancelar" data-hx-cancelar>Cancelar e manter meu treino atual</button>` : ""}</div>
-    </section>`;
+      <div class="section"><div class="note-box">
+        <p><b>Treino de academia feito para você.</b> O Coach AI faz ${HX_PASSOS.length} perguntas rápidas (objetivo, dias, experiência, peso…) e monta seu plano semanal.</p>
+        <p>Depois ele acompanha suas cargas e ajusta o treino toda semana. Cada exercício tem vídeo de execução.</p>
+        <button class="btn btn-blue" data-hx-chat ${hxGerando ? "disabled" : ""}>${hxGerando ? "Montando seu treino…" : et ? `Continuar com o Coach (${et}/${HX_PASSOS.length})` : "Montar meu treino com o Coach"}</button>
+      </div></div></section>`;
   }
-  function hxResponder(v) {
-    const p = HX_PASSOS[S.hiper.etapa || 0];
-    if (!p) return;
-    if (p.num) {
-      const n = Number(String(v).replace(",", "."));
-      if (!(n >= p.num[0] && n <= p.num[1])) { toast(`Digite um número entre ${p.num[0]} e ${p.num[1]}.`); return; }
+  const HX_DIAS_ATALHO = { 2: ["Segunda e quinta", "Terça e sexta"], 3: ["Segunda, quarta e sexta", "Terça, quinta e sábado"], 4: ["Segunda, terça, quinta e sexta"], 5: ["Segunda a sexta"], 6: ["Segunda a sábado"] };
+  const HX_DIA_NOMES = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"];
+  // "seg, qua e sex", "segunda a sexta", "tanto faz" -> [0, 2, 4] | [] | null (não entendi)
+  function hxDiasDe(t) {
+    if (/tanto faz|qualquer|sem prefer/.test(t)) return [];
+    const idx = (w) => HX_DIA_NOMES.findIndex((n) => w.startsWith(n));
+    const faixa = t.match(/(seg|ter|qua|qui|sex|sab|dom)\w*\s+(?:a|ate)\s+(seg|ter|qua|qui|sex|sab|dom)/);
+    if (faixa) { const a = idx(faixa[1]), b = idx(faixa[2]); if (a >= 0 && b >= a) return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
+    const ds = [...new Set((t.match(/[a-z]+/g) || []).map(idx).filter((i) => i >= 0))].sort();
+    return ds.length ? ds : null;
+  }
+  // Grava a resposta da etapa atual. Devolve "" se aceitou ou o motivo de não aceitar.
+  function hxResponder(texto) {
+    const p = HX_PASSOS[S.hiper.etapa || 0], t = norm(texto);
+    if (!p) return "";
+    let v;
+    if (p.multi) {
+      v = hxDiasDe(t);
+      if (v === null) return "Não entendi os dias. Escreva, por exemplo, <b>seg, qua e sex</b>, ou toque numa opção.";
+      const n = Number(S.hiper.perfil.dias) || 0;
+      if (v.length && n && v.length !== n) return `Você disse ${n} dias por semana, mas escolheu ${v.length}. Escolha ${n} dias ou toque em <b>Tanto faz</b>.`;
+    } else if (p.num) {
+      const n = Number((String(texto).replace(",", ".").match(/\d+(\.\d+)?/) || [])[0]);
+      if (!(n >= p.num[0] && n <= p.num[1])) return `Me diga um número entre ${p.num[0]} e ${p.num[1]} (${p.un}).`;
       v = String(Math.round(n * 10) / 10);
       if (p.perfil) S.perfil[p.perfil] = v;
-    } else if (!p.multi) {
-      v = String(v).trim().slice(0, 400);
-      if (!v) return;
+    } else if (p.k === "dias") {
+      const n = Number((t.match(/\d/) || [])[0]);
+      if (!(n >= 1 && n <= 7)) return "Quantos dias por semana? Um número de 1 a 7.";
+      v = String(n);
+    } else {
+      v = (p.op || []).find((o) => norm(o) === t) || String(texto).trim().slice(0, 400);
     }
     S.hiper.perfil[p.k] = v;
     S.hiper.etapa = (S.hiper.etapa || 0) + 1;
-    hxSel = new Set();
-    save(); render(); hxRolar();
+    save();
+    return "";
   }
-  const hxRolar = () => requestAnimationFrame(() => $("#hx-foot")?.scrollIntoView({ block: "end", behavior: "smooth" }));
+  const hxOpcoes = (p) => {
+    if (p.multi) return [...(HX_DIAS_ATALHO[Number(S.hiper.perfil.dias)] || []), "Tanto faz"];
+    if (p.num) return p.perfil && S.perfil[p.perfil] ? [`${String(S.perfil[p.perfil]).replace(".", ",")} ${p.un}`] : [];
+    return (p.op || []).map((o) => (p.fmt ? p.fmt(o) : o));
+  };
+  async function hxPerguntaChat(ms = 500) {
+    const p = HX_PASSOS[S.hiper.etapa || 0], et = S.hiper.etapa || 0;
+    const stop = typing(msgsEl); await wait(ms); stop();
+    if (!p) {
+      addMsg(msgsEl, "Tudo pronto! Posso montar seu treino? 🏋️", false, chatLog);
+      setChips(chipsEl, ["Montar meu treino", "Mudar a última resposta", "Cancelar"], true);
+      return;
+    }
+    const q = p.multi ? "Quais dias ficam melhores? Toque numa opção ou escreva os dias (ex.: <b>seg, qua e sex</b>)." : p.num ? `${p.q} É só digitar.` : p.livre ? p.q.replace("aqui embaixo", "no campo abaixo") : p.q;
+    addMsg(msgsEl, `<span class="hx-passo">${et + 1}/${HX_PASSOS.length}</span> ${q}`, false, chatLog);
+    setChips(chipsEl, [...hxOpcoes(p), ...(et ? ["Voltar"] : []), "Cancelar"]);
+    const inp = $("#chat-input");
+    inp.placeholder = p.num ? `Digite em ${p.un}` : "Digite sua resposta";
+    inp.inputMode = p.num ? "decimal" : "text";
+    if (p.num || p.livre) inp.focus();
+  }
+  async function hxIniciarChat(refazer = false) {
+    if (!layer.hidden && hxChat) return;
+    if (layer.hidden) openChat();
+    hxChat = true; hxRefazer = refazer;
+    if (refazer) S.hiper.etapa = 0;
+    const et = S.hiper.etapa || 0;
+    const stop = typing(msgsEl); await wait(500); stop();
+    addMsg(msgsEl, et && et < HX_PASSOS.length ? "Vamos continuar de onde paramos. 💪"
+      : `${refazer ? "Vamos montar um treino novo!" : `Bora montar seu treino de academia, ${esc(primeiroNome())}! 💪`} São ${HX_PASSOS.length} perguntas rápidas e depois eu monto seu plano semanal, com vídeo de execução em cada exercício.`, false, chatLog);
+    hxPerguntaChat(600);
+  }
+  function hxSairChat(msg) {
+    hxChat = false;
+    const inp = $("#chat-input"); inp.placeholder = "Digite sua mensagem"; inp.inputMode = "text";
+    if (msg) addMsg(msgsEl, msg, false, chatLog);
+    setChips(chipsEl, CHIPS_HOJE);
+  }
+  // Mensagem digitada ou chip tocado durante a entrevista
+  async function hxChatResposta(texto) {
+    const t = norm(texto), et = S.hiper.etapa || 0;
+    if (t === "cancelar") return hxSairChat(`Tudo bem! Suas respostas ficam salvas. Quando quiser continuar, toque em <b>Hipertrofia</b>.`);
+    if (t === "voltar" || t === "mudar a ultima resposta") { S.hiper.etapa = Math.max(0, et - 1); save(); return hxPerguntaChat(); }
+    if (!HX_PASSOS[et]) {
+      if (/montar|sim|pode|bora|manda/.test(t)) return hxGerar();
+      return hxPerguntaChat();
+    }
+    const erro = hxResponder(texto);
+    if (erro) { const stop = typing(msgsEl); await wait(400); stop(); addMsg(msgsEl, erro, false, chatLog); return; }
+    hxPerguntaChat();
+  }
   async function hxApi(corpo) {
     const token = await tokenSB();
     try {
@@ -912,15 +963,19 @@
   const hxPerfil = () => ({ ...S.hiper.perfil, idade: S.hiper.perfil.idade || S.perfil.idade, peso: S.perfil.peso || S.hiper.perfil.peso, altura: S.hiper.perfil.altura || S.perfil.altura });
   async function hxGerar() {
     if (hxGerando) return;
-    hxGerando = true; render(); hxRolar();
+    hxGerando = true; busy = true; setChips(chipsEl, []);
+    addMsg(msgsEl, "Montando seu treino com base nas suas respostas… leva uns 30 segundos. ⏳", false, chatLog);
+    const stop = typing(msgsEl);
     const r = await hxApi({ acao: "plano", perfil: hxPerfil() });
-    hxGerando = false;
-    if (!r) { render(); return; }
+    stop(); hxGerando = false; busy = false;
+    if (!r) { addMsg(msgsEl, "Não consegui montar agora. Toque em <b>Montar meu treino</b> para tentar de novo.", false, chatLog); setChips(chipsEl, ["Montar meu treino", "Cancelar"], true); return; }
     if (S.hiper.plano) S.hiper.anterior = S.hiper.plano;
     S.hiper.plano = r.plano; S.hiper.inicio = hojeKey; S.hiper.atualizado = Date.now(); hxRefazer = false;
-    hxMsg(r.mensagem, "plano");
-    save(); location.hash = "#/hiper"; render(); scrollTo(0, 0);
-    toast("Seu treino está pronto! 🔥", 3500);
+    hxMsg(r.mensagem, "plano"); save();
+    hxSairChat();
+    const m = { html: `${md(r.mensagem)}<p>Seu plano: <b>${esc(r.plano.nome)}</b>, ${r.plano.dias.length} treinos por semana (${r.plano.dias.map((d) => DIAS[d.dia].slice(0, 3)).join(", ")}).</p>`, me: false, txt: r.mensagem };
+    chatLog.push(m); msgsEl.insertAdjacentHTML("beforeend", bubbleHTML(m)); msgsEl.scrollTo({ top: msgsEl.scrollHeight, behavior: "smooth" });
+    setChips(chipsEl, ["Ver meu treino", "Por que esse treino?"], true);
   }
   function hxMsg(txt, tipo) { S.hiper.msgs = [...(S.hiper.msgs || []), { k: hojeKey, txt: String(txt || "").slice(0, 1500), tipo }].slice(-12); }
 
@@ -1057,13 +1112,13 @@
 
   /* ---------- Tela inicial e Coach ---------- */
   function hxHome(principalAqui) {
-    if (!S.hiper.plano) return principalAqui ? `<div class="sec-head"><h2>Treino de Hoje</h2></div><a class="emerg" href="#/hiper"><span>${icon("sparkles-blue.svg", 20)}</span><div><strong>Monte seu treino de academia</strong><small>Responda umas perguntas e o Coach AI monta seu plano</small></div></a>` : "";
+    const titulo = principalAqui ? "Treino de Hoje" : "Academia";
+    if (!S.hiper.plano) return `<div class="sec-head"><h2>${titulo}</h2><a href="#/hiper">Hipertrofia</a></div><a class="emerg" href="#/hiper" data-hx-chat><span>${icon("sparkles-blue.svg", 20)}</span><div><strong>Monte seu treino de academia</strong><small>${S.hiper.etapa ? "Continue a conversa com o Coach AI" : "O Coach AI faz umas perguntas e monta seu plano"}</small></div></a>`;
     const d = hxDiaHoje(), t = d !== null ? hxDia(d) : null;
-    const head = `<div class="sec-head"${principalAqui ? "" : ' style="margin-top:8px"'}><h2>${principalAqui ? "Treino de Hoje" : "Academia"}</h2><a href="#/hiper">${esc(S.hiper.plano.nome)}</a></div>`;
+    const head = `<div class="sec-head"><h2>${titulo}</h2><a href="#/hiper">${esc(S.hiper.plano.nome)}</a></div>`;
     if (t) return head + hxCard(t);
-    if (!principalAqui) return "";
     const prox = S.hiper.plano.dias.find((x) => x.dia > hojeDia) || S.hiper.plano.dias[0];
-    return head + `<a class="emerg" href="#/hiper"><span>${icon("calendar-14.svg", 20)}</span><div><strong>Hoje é dia de descanso</strong><small>Próximo treino: ${DIAS[prox.dia]} · ${esc(prox.titulo)}</small></div></a>`;
+    return head + `<a class="emerg" href="#/hiper"><span>${icon("calendar-14.svg", 20)}</span><div><strong>Hoje é dia de descanso na academia</strong><small>Próximo treino: ${DIAS[prox.dia]} · ${esc(prox.titulo)}</small></div></a>`;
   }
   function hxProgramaTexto() {
     const pl = S.hiper.plano;
@@ -1083,26 +1138,16 @@
 
   telas.hiper = (p1) => {
     setToolbar("plano");
-    if (!S.hiper.plano || hxRefazer) return telaHxEntrevista();
+    if (!S.hiper.plano) return telaHxComecar();
     if (p1 !== undefined && hxDia(Number(p1))) return telaHxDia(Number(p1));
     return telaHxPlano();
   };
 
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-hx-op],[data-hx-dia],[data-hx-pronto],[data-hx-tantofaz],[data-hx-voltar],[data-hx-gerar],[data-hx-cancelar],[data-hx-play],[data-hx-del],[data-hx-hoje],[data-hx-concluir],[data-hx-ask],[data-hx-revisar],[data-hx-checkin],[data-hx-perguntar],[data-hx-refazer],[data-hx-desfazer]");
+    const t = e.target.closest("[data-hx-chat],[data-hx-play],[data-hx-del],[data-hx-hoje],[data-hx-concluir],[data-hx-ask],[data-hx-revisar],[data-hx-checkin],[data-hx-perguntar],[data-hx-refazer],[data-hx-desfazer]");
     if (!t) return;
     const ds = t.dataset;
-    if (ds.hxOp !== undefined) hxResponder(HX_PASSOS[S.hiper.etapa || 0].op[Number(ds.hxOp)]);
-    else if (ds.hxDia !== undefined) { const d = Number(ds.hxDia); hxSel.has(d) ? hxSel.delete(d) : hxSel.add(d); render(); }
-    else if (t.hasAttribute("data-hx-pronto")) {
-      const n = Number(S.hiper.perfil.dias) || 0;
-      if (!hxSel.size) { toast("Toque nos dias ou em Tanto faz."); return; }
-      if (n && hxSel.size !== n) { toast(`Você disse ${n} dias por semana: escolha ${n} dias (ou Tanto faz).`); return; }
-      hxResponder([...hxSel].sort());
-    } else if (t.hasAttribute("data-hx-tantofaz")) hxResponder([]);
-    else if (t.hasAttribute("data-hx-voltar")) { S.hiper.etapa = Math.max(0, (S.hiper.etapa || 0) - 1); hxSel = new Set(); save(); render(); hxRolar(); }
-    else if (t.hasAttribute("data-hx-gerar")) hxGerar();
-    else if (t.hasAttribute("data-hx-cancelar")) { hxRefazer = false; S.hiper.etapa = HX_PASSOS.length; save(); render(); }
+    if (t.hasAttribute("data-hx-chat")) { e.preventDefault(); hxIniciarChat(); }
     else if (ds.hxPlay) {
       const c = ACI[ds.hxPlay];
       t.closest(".hx-video").innerHTML = `<div class="video-frame hx-frame"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(c.yt)}?rel=0&playsinline=1&autoplay=1" title="${esc(c.nome)}: execução"
@@ -1126,7 +1171,7 @@
     else if (t.hasAttribute("data-hx-perguntar")) openChat("Como está minha evolução na academia? O que devo focar nos próximos treinos?");
     else if (t.hasAttribute("data-hx-refazer")) {
       if (!confirm("Refazer a entrevista? Seu treino atual continua até você montar o novo.")) return;
-      hxRefazer = true; S.hiper.etapa = 0; save(); render(); scrollTo(0, 0);
+      hxIniciarChat(true);
     } else if (t.hasAttribute("data-hx-desfazer")) {
       if (!confirm("Voltar ao plano anterior à última revisão?")) return;
       S.hiper.plano = S.hiper.anterior; S.hiper.anterior = null; S.hiper.atualizado = Date.now();
@@ -1135,7 +1180,6 @@
   });
   document.addEventListener("submit", (ev) => {
     const f = ev.target;
-    if (f.matches("[data-hx-form]")) { ev.preventDefault(); const v = f.elements.v.value; if (String(v).trim()) hxResponder(v); return; }
     if (!f.matches("[data-hx-add]")) return;
     ev.preventDefault();
     const id = f.dataset.hxAdd, r = parseInt(f.elements.r.value, 10), kg = f.elements.kg ? Number(String(f.elements.kg.value).replace(",", ".")) || 0 : 0;
@@ -2398,6 +2442,7 @@
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
   const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Como funciona o programa?"];
+  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "Minha evolução"];
   let chatLog = [];
   let busy = false;
 
@@ -2417,14 +2462,16 @@
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   function setChips(box, list, primary = false) {
     box.innerHTML = list.map((c) => `<button type="button" class="chip${primary ? " primary" : ""}" data-chip="${esc(c)}">${esc(c)}</button>`).join("");
+    box.scrollLeft = 0;
+    box.classList.toggle("wrap", box === chipsEl && hxChat); // na entrevista as opções quebram linha (todas à vista)
   }
   function openChat(pergunta) {
     layer.hidden = false;
     layer.classList.remove("closing");
-    if (!chatLog.length) chatLog.push({ html: `Olá, ${esc(primeiroNome())}! Sou seu Coach AI. Posso explicar a execução dos exercícios, mostrar sua evolução ou o treino de hoje.`, me: false });
+    if (!chatLog.length) chatLog.push({ html: `Olá, ${esc(primeiroNome())}! O que vamos fazer hoje? 💪`, me: false });
     msgsEl.innerHTML = chatLog.map(bubbleHTML).join("");
     msgsEl.scrollTop = msgsEl.scrollHeight;
-    if (!chipsEl.children.length) setChips(chipsEl, CHIPS_PADRAO);
+    if (!chipsEl.children.length) setChips(chipsEl, CHIPS_HOJE);
     if (pergunta) send(pergunta);
     else if (matchMedia("(hover: hover)").matches) $("#chat-input").focus();
   }
@@ -2437,6 +2484,8 @@
   async function send(texto) {
     texto = texto.trim();
     if (!texto || busy) return;
+    if (hxChat) { addMsg(msgsEl, esc(texto), true, chatLog); hxChatResposta(texto); return; }
+    if (atalhoHoje(texto)) return;
     busy = true;
     addMsg(msgsEl, esc(texto), true, chatLog);
     chatLog[chatLog.length - 1].txt = texto;
@@ -2451,6 +2500,33 @@
     addMsg(msgsEl, r.html, false, chatLog);
     setChips(chipsEl, r.chips || CHIPS_PADRAO);
     busy = false;
+  }
+  // Chips "O que vamos fazer hoje?": abrem o treino do programa escolhido (ou a entrevista do Hipertrofia)
+  function atalhoHoje(texto) {
+    const t = norm(texto);
+    if (!["insanity", "calistenia", "hipertrofia", "academia", "ver meu treino"].includes(t)) return false;
+    addMsg(msgsEl, esc(texto), true, chatLog);
+    const ir = async (msg, hash) => {
+      const stop = typing(msgsEl); await wait(450); stop();
+      addMsg(msgsEl, msg, false, chatLog);
+      await wait(900);
+      setChips(chipsEl, CHIPS_HOJE); // na próxima vez que abrir, o Coach oferece de novo as opções do dia
+      if (location.hash === hash) closeChat(); else location.hash = hash;
+    };
+    if (t === "calistenia") {
+      const { w, d } = ativoHoje(), tr = treino(w, d);
+      ir(tr ? `Bora de <b>${esc(NOME_PROG)}</b>! Hoje é <b>${esc(tr.titulo)}</b>. Abrindo… 💪` : `Abrindo o <b>${esc(NOME_PROG)}</b>… 💪`, tr ? `#/treino/${w}/${d}` : "#/plano");
+    } else if (t === "insanity") {
+      const P = VP[principal()] || VPROGS.find((x) => S[x.k].inicio) || VPROGS[0];
+      if (!P) { ir("Nenhum programa do Insanity disponível.", "#/home"); return true; }
+      const h = insHoje(P.k), tit = h ? insDia(P.k, h.w, h.d).titulo : "";
+      ir(`Bora de <b>${esc(P.nome)}</b>!${tit ? ` Hoje é <b>${esc(tit)}</b>.` : ""} Abrindo… 🔥`, linkHojeVideo(P.k));
+    } else if (!S.hiper.plano) hxIniciarChat();
+    else {
+      const d = hxDiaHoje();
+      ir(d !== null ? `Bora pra academia! Hoje é <b>${esc(hxDia(d).titulo)}</b>. Abrindo… 🏋️` : "Hoje é dia de descanso no seu plano de academia. Abrindo o plano da semana.", hxLinkHoje());
+    }
+    return true;
   }
   $("#chat-form").addEventListener("submit", (e) => { e.preventDefault(); const i = $("#chat-input"); send(i.value); i.value = ""; });
   chipsEl.addEventListener("click", (e) => { const c = e.target.closest("[data-chip]"); if (c) send(c.dataset.chip); });
@@ -2663,6 +2739,7 @@
         setChips(chips, ["Ver treino de hoje"], true);
       } else if (etapa === "fim") {
         S.onboarded = true; save(); location.hash = principal() === "plano" ? "#/home" : `#/${principal()}`;
+        if (principal() === "hiper" && !S.hiper.plano) setTimeout(() => hxIniciarChat(), 500);
       }
     }
     chips.addEventListener("click", (e) => { const c = e.target.closest("[data-chip]"); if (c) responder(c.dataset.chip); });
