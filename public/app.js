@@ -1410,28 +1410,36 @@
   }
 
   /* ---------- Cronômetro do WOD ---------- */
-  // { k, i, tipo, ini (início em ms, depois dos 5 s de preparação), total (s), voltas, fim? }
+  // { k ("avulso" no Timer do menu), i, tipo, ini (início em ms, depois dos 5 s de preparação), total (s), voltas,
+  //   trab/desc/n (Tabata e intervalos: segundos de trabalho, de descanso e número de rodadas) }
   const cfSeg = () => (cfTm ? (Date.now() - cfTm.ini) / 1000 : 0);
-  async function cfTimerIniciar(i) {
-    const l = cfLog(), p = l?.wod?.partes[i];
-    if (!p) return;
-    const total = p.tipo === "tabata" ? (p.minutos || 4 * Math.max(1, p.movimentos.length)) * 60 : (p.minutos || 0) * 60;
-    cfTm = { k: hojeKey, i, tipo: p.tipo, ini: Date.now() + 5000, total, voltas: 0, ultimoMin: -1, fase: "" };
+  async function cfTimerComecar(cfg) {
+    cfTm = { voltas: 0, ultimoMin: -1, fase: "", ...cfg, ini: Date.now() + 5000 };
     clearInterval(cfTmId); cfTmId = setInterval(cfTick, 200);
     try { cfWake = await navigator.wakeLock?.request("screen"); } catch {}
     render();
+  }
+  function cfTimerIniciar(i) {
+    const l = cfLog(), p = l?.wod?.partes[i];
+    if (!p) return;
+    if (p.tipo === "tabata") { const n = Math.round(((p.minutos || 4 * Math.max(1, p.movimentos.length)) * 60) / 30); return cfTimerComecar({ k: hojeKey, i, tipo: "tabata", trab: 20, desc: 10, n }); }
+    cfTimerComecar({ k: hojeKey, i, tipo: p.tipo, total: (p.minutos || 0) * 60 });
   }
   function cfTimerParar(salvar) {
     if (!cfTm) return;
     const t = cfTm, s = Math.max(0, Math.round(cfSeg()));
     clearInterval(cfTmId); cfTm = null;
     try { cfWake?.release(); } catch {} cfWake = null;
-    if (salvar) {
-      const l = cfLog(t.k); if (!l) return;
-      l.res = { ...(l.res || {}) };
-      if (t.tipo === "for_time") { if (t.total && s >= t.total) { l.res.cap = true; l.res.voltas = t.voltas; } else { l.res.tempo = s; l.res.cap = false; } }
-      else if (t.tipo === "amrap") { l.res.voltas = t.voltas; }
-      save();
+    if (t.k === "avulso") {
+      if (salvar && s > 0) toast(t.tipo === "amrap" ? `AMRAP: ${t.voltas} ${t.voltas === 1 ? "volta" : "voltas"} ✓` : `Tempo: ${mmss(s)}${t.voltas ? ` · ${t.voltas} voltas` : ""} ✓`, 4000);
+    } else if (salvar) {
+      const l = cfLog(t.k);
+      if (l) {
+        l.res = { ...(l.res || {}) };
+        if (t.tipo === "for_time") { if (t.total && s >= t.total) { l.res.cap = true; l.res.voltas = t.voltas; } else { l.res.tempo = s; l.res.cap = false; } }
+        else if (t.tipo === "amrap") { l.res.voltas = t.voltas; }
+        save();
+      }
     }
     render();
   }
@@ -1445,29 +1453,27 @@
       if (resta <= 0) { vibrar(); toast("Tempo! ⏱ Anote as repetições da volta incompleta.", 4000); cfTimerParar(true); return; }
       grande = mmss(Math.ceil(resta)); sub = `AMRAP · ${cfTm.voltas} ${cfTm.voltas === 1 ? "volta" : "voltas"}`;
     } else if (cfTm.tipo === "emom") {
-      const min = Math.floor(s / 60), n = cfTm.total / 60 || 10;
-      if (min >= n) { vibrar(); toast("EMOM concluído! 💪"); cfTimerParar(false); return; }
+      const cada = cfTm.cada || 60, min = Math.floor(s / cada), n = Math.round(cfTm.total / cada) || 10;
+      if (min >= n) { vibrar(); toast(`${cada === 60 ? "EMOM" : `E${cada / 60}MOM`} concluído! 💪`); cfTimerParar(false); return; }
       if (min !== cfTm.ultimoMin) { if (cfTm.ultimoMin >= 0) vibrar(); cfTm.ultimoMin = min; }
-      grande = `${60 - Math.floor(s % 60)}`; sub = `Minuto ${min + 1} de ${n}`;
-    } else if (cfTm.tipo === "tabata") {
-      const ciclo = Math.floor(s / 30), dentro = s % 30, trab = dentro < 20, n = Math.round(cfTm.total / 30);
-      if (ciclo >= n) { vibrar(); toast("Tabata concluído! 🔥"); cfTimerParar(false); return; }
+      grande = mmss(cada - Math.floor(s % cada)); sub = `${cada === 60 ? "Minuto" : "Rodada"} ${min + 1} de ${n}`;
+    } else if (cfTm.trab) { // Tabata e intervalos
+      const ciclo = cfTm.trab + cfTm.desc, r = Math.floor(s / ciclo), dentro = s % ciclo, trab = dentro < cfTm.trab;
+      if (r >= cfTm.n) { vibrar(); toast(cfTm.tipo === "tabata" ? "Tabata concluído! 🔥" : "Intervalos concluídos! 🔥"); cfTimerParar(false); return; }
       const fase = trab ? "t" : "d"; if (fase !== cfTm.fase) { if (cfTm.fase) vibrar(); cfTm.fase = fase; }
-      grande = `${Math.ceil((trab ? 20 : 30) - dentro)}`; sub = `${trab ? "Trabalho 🔥" : "Descanso 😮‍💨"} · ${ciclo + 1} de ${n}`;
+      grande = mmss(Math.ceil((trab ? cfTm.trab : ciclo) - dentro)); sub = `${trab ? "Trabalho 🔥" : "Descanso 😮‍💨"} · ${r + 1} de ${cfTm.n}`;
     } else {
       if (cfTm.total && s >= cfTm.total) { vibrar(); toast("Time cap! ⏱ Anote até onde chegou.", 4000); cfTimerParar(true); return; }
       grande = mmss(Math.floor(s)); sub = cfTm.tipo === "for_time" ? `For Time${cfTm.total ? ` · cap ${cfTm.total / 60}'` : ""}${cfTm.voltas ? ` · ${cfTm.voltas} ${cfTm.voltas === 1 ? "volta" : "voltas"}` : ""}` : "Cronômetro";
     }
     if (el) { el.querySelector("b").textContent = grande; el.querySelector("small").textContent = sub; el.classList.toggle("prep", s < 0); el.classList.toggle("descanso", cfTm.fase === "d"); }
   }
+  const cfRelogioHtml = (voltas) => `<div class="cf-relogio" id="cf-relogio" role="timer" aria-live="off"><b>—</b><small></small>
+    <div class="cf-relogio-acoes">${voltas ? `<button class="btn cf-volta" data-cf-volta>+1 volta</button>` : ""}
+    <button class="btn btn-blue" data-cf-parar="1">${cfTm.tipo === "for_time" ? "Terminei" : cfTm.tipo === "amrap" ? "Parar e anotar" : "Parar"}</button>
+    <button class="lnk-btn" data-cf-parar="0">Cancelar</button></div></div>`;
   function cfTimerHtml(i, p) {
-    if (cfTm && cfTm.i === i && cfTm.k === hojeKey) {
-      const voltas = cfTm.tipo === "amrap" || (cfTm.tipo === "for_time" && (p.rodadas > 1 || !!p.minutos));
-      return `<div class="cf-relogio" id="cf-relogio" role="timer" aria-live="off"><b>—</b><small></small>
-        <div class="cf-relogio-acoes">${voltas ? `<button class="btn cf-volta" data-cf-volta>+1 volta</button>` : ""}
-        <button class="btn btn-blue" data-cf-parar="1">${cfTm.tipo === "for_time" ? "Terminei" : cfTm.tipo === "amrap" ? "Parar e anotar" : "Parar"}</button>
-        <button class="lnk-btn" data-cf-parar="0">Cancelar</button></div></div>`;
-    }
+    if (cfTm && cfTm.i === i && cfTm.k === hojeKey) return cfRelogioHtml(cfTm.tipo === "amrap" || (cfTm.tipo === "for_time" && (p.rodadas > 1 || !!p.minutos)));
     if (!CF_TEMPO.includes(p.tipo) || cfTm) return "";
     if ((p.tipo === "amrap" || p.tipo === "emom") && !p.minutos) return "";
     return `<button class="btn btn-outline cf-iniciar" data-cf-timer="${i}">⏱ Iniciar ${p.tipo === "amrap" ? `AMRAP ${p.minutos}'` : p.tipo === "emom" ? `EMOM ${p.minutos}'` : p.tipo === "tabata" ? "Tabata" : p.minutos ? `(cap ${p.minutos}')` : "cronômetro"}</button>`;
@@ -1557,31 +1563,152 @@
       <button class="cf-acao" data-cf-gerar>✨<span><strong>Coach monta um WOD</strong><small>Para treinar na garagem ou no dia sem box</small></span></button>
     </div>`;
   }
-  function cfHistoricoHtml() {
-    const dias = Object.entries(S.cf.logs).filter(([k, l]) => l.wod && k !== hojeKey).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 20);
-    if (!dias.length) return "";
-    return `<div class="section"><div class="sec-head"><h2>Últimos WODs</h2><span>${Object.values(S.cf.logs).filter((l) => l.done).length} feitos</span></div>
-      <ul class="cf-hist">${dias.map(([k, l]) => `<li><a href="#/cf/${k}"><span class="cf-hist-data">${ddmm(k)}</span><span><strong>${esc(l.wod.titulo)}</strong><small>${esc(cfResTxt(l) || (l.done ? "Feito" : "Sem resultado"))}</small></span>${l.done ? "✅" : ""}</a></li>`).join("")}</ul></div>`;
+  /* ---------- Menu do CrossFit: Hoje · Timer · Histórico · PRs · Benchmarks ---------- */
+  const CF_MENU = [["", "📋", "Hoje"], ["timer", "⏱️", "Timer"], ["historico", "🗓️", "Histórico"], ["prs", "🏋️", "PRs"], ["benchmarks", "🏆", "Benchmarks"]];
+  const cfMenu = (on) => `<nav class="cf-menu" aria-label="Menu do CrossFit">${CF_MENU.map(([r, ic, n]) =>
+    `<a href="#/cf${r ? `/${r}` : ""}" class="${on === r ? "on" : ""}"${on === r ? ' aria-current="page"' : ""}><span aria-hidden="true">${ic}</span>${n}</a>`).join("")}</nav>`;
+
+  // WODs clássicos (Girls e Heroes), no mesmo formato dos WODs lançados
+  const M_ = (nome, reps, carga) => ({ nome, ...(reps ? { reps } : {}), ...(carga ? { carga } : {}) });
+  const B_ = (titulo, cat, tipo, movimentos, extra = {}) => ({ titulo, cat, wod: { titulo, pontuado: 0, partes: [{ nome: "WOD", tipo, movimentos, ...extra }] } });
+  const CF_BENCH = [
+    B_("Fran", "Girls", "for_time", [M_("Thruster", "", "43/29 kg"), M_("Pull-up")], { esquema: "21-15-9" }),
+    B_("Grace", "Girls", "for_time", [M_("Clean and jerk", "30", "61/43 kg")]),
+    B_("Isabel", "Girls", "for_time", [M_("Snatch", "30", "61/43 kg")]),
+    B_("Diane", "Girls", "for_time", [M_("Deadlift", "", "102/70 kg"), M_("Handstand push-up")], { esquema: "21-15-9" }),
+    B_("Elizabeth", "Girls", "for_time", [M_("Clean", "", "61/43 kg"), M_("Ring dip")], { esquema: "21-15-9" }),
+    B_("Helen", "Girls", "for_time", [M_("Corrida", "400 m"), M_("Kettlebell swing", "21", "24/16 kg"), M_("Pull-up", "12")], { rodadas: 3 }),
+    B_("Karen", "Girls", "for_time", [M_("Wall ball", "150", "9/6 kg")]),
+    B_("Annie", "Girls", "for_time", [M_("Double under"), M_("Abdominal (sit-up)")], { esquema: "50-40-30-20-10" }),
+    B_("Jackie", "Girls", "for_time", [M_("Remo", "1000 m"), M_("Thruster", "50", "20/15 kg"), M_("Pull-up", "30")]),
+    B_("Nancy", "Girls", "for_time", [M_("Corrida", "400 m"), M_("Overhead squat", "15", "43/29 kg")], { rodadas: 5 }),
+    B_("Kelly", "Girls", "for_time", [M_("Corrida", "400 m"), M_("Box jump", "30", "60/50 cm"), M_("Wall ball", "30", "9/6 kg")], { rodadas: 5 }),
+    B_("Angie", "Girls", "for_time", [M_("Pull-up", "100"), M_("Flexão", "100"), M_("Abdominal (sit-up)", "100"), M_("Agachamento", "100")]),
+    B_("Cindy", "Girls", "amrap", [M_("Pull-up", "5"), M_("Flexão", "10"), M_("Agachamento", "15")], { minutos: 20 }),
+    B_("Mary", "Girls", "amrap", [M_("Handstand push-up", "5"), M_("Pistol alternado", "10"), M_("Pull-up", "15")], { minutos: 20 }),
+    B_("Chelsea", "Girls", "emom", [M_("Pull-up", "5"), M_("Flexão", "10"), M_("Agachamento", "15")], { minutos: 30 }),
+    B_("Murph", "Heroes", "for_time", [M_("Corrida", "1,6 km"), M_("Pull-up", "100"), M_("Flexão", "200"), M_("Agachamento", "300"), M_("Corrida", "1,6 km")], { descricao: "Com colete de 9/6 kg. Pode dividir pull-ups, flexões e agachamentos como quiser (ex.: 20 voltas de 5-10-15)." }),
+    B_("DT", "Heroes", "for_time", [M_("Deadlift", "12", "70/47 kg"), M_("Hang power clean", "9", "70/47 kg"), M_("Push jerk", "6", "70/47 kg")], { rodadas: 5 }),
+  ];
+
+  /* ---------- PRs (levantamentos) ---------- */
+  const CF_LIFTS = ["Back squat", "Front squat", "Overhead squat", "Deadlift", "Clean", "Power clean", "Squat clean", "Clean and jerk", "Snatch", "Power snatch", "Push press", "Push jerk", "Split jerk", "Strict press", "Bench press", "Thruster"];
+  const est1rm = (kg, reps) => (reps <= 1 ? kg : Math.round(kg * (1 + reps / 30) * 2) / 2); // Epley
+  function cfPrsPorMov() {
+    const g = {};
+    for (const x of S.cf.prs || []) (g[cfNome(x.mov)] ||= { mov: x.mov, itens: [] }).itens.push(x);
+    return Object.values(g).map((m) => {
+      m.itens.sort((a, b) => b.k.localeCompare(a.k) || b.kg - a.kg);
+      const melhorPorReps = {};
+      for (const x of m.itens) if (!melhorPorReps[x.reps] || x.kg > melhorPorReps[x.reps].kg) melhorPorReps[x.reps] = x;
+      m.porReps = Object.values(melhorPorReps).sort((a, b) => a.reps - b.reps);
+      m.rm1 = melhorPorReps[1]?.kg || 0; m.est = Math.max(...m.itens.map((x) => est1rm(x.kg, x.reps)));
+      m.ultimo = m.itens[0].k;
+      return m;
+    }).sort((a, b) => b.ultimo.localeCompare(a.ultimo));
   }
-  function cfRecordesHtml() {
-    const grupos = {};
-    for (const [k, l] of Object.entries(S.cf.logs)) if (l.done && l.wod) (grupos[cfNome(l.wod.titulo)] ||= []).push({ k, l, val: cfValor(l) });
-    const reps = Object.values(grupos).filter((g) => g.length > 1 && g.some((x) => x.val)).map((g) => { const m = g.filter((x) => x.val).sort((a, b) => b.val.v - a.val.v)[0]; return { t: g[g.length - 1].l.wod.titulo, n: g.length, m }; });
-    if (!reps.length) return "";
-    return `<div class="section"><div class="sec-head"><h2>Recordes nos WODs repetidos</h2></div>
-      <ul class="cf-hist">${reps.map((x) => `<li><span class="cf-hist-data">🏆</span><span><strong>${esc(x.t)}</strong><small>Melhor: ${esc(x.m.val.txt)} em ${ddmm(x.m.k)} · ${x.n} vezes</small></span></li>`).join("")}</ul></div>`;
+  function cfAddPr(mov, reps, kg, k, origem) {
+    S.cf.prs = [...(S.cf.prs || []), { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), mov: String(mov).trim().slice(0, 40), reps, kg, k, ...(origem ? { origem } : {}) }].slice(-300);
+    S.cf.prsEm = Date.now();
   }
+  // Repetições de um bloco de força pelo esquema ("5-5-5-5-5" → 5, "5x3" → 3, "1RM" → 1); null se não der para saber
+  function cfRepsForca(p) {
+    const e = String(p.esquema || "").toLowerCase().replace(/\s/g, "");
+    if (/^(\d+)rm$/.test(e)) return Number(e.match(/^(\d+)/)[1]);
+    if (/^\d+x\d+$/.test(e)) return Number(e.split("x")[1]);
+    const ns = e.split(/[-,/]/).map(Number);
+    return ns.length && ns.every((n) => n > 0) ? Math.min(...ns) : null;
+  }
+  function cfTelaPrs() {
+    const ms = cfPrsPorMov(), aberto = S.cf.prAberto;
+    return `<form class="cf-res cf-pr-form" id="cf-pr-form">
+      <div class="sec-head"><h2>Novo PR</h2></div>
+      <label>Movimento<input name="mov" list="cf-lifts" maxlength="40" required placeholder="Ex.: Back squat" value="${esc(S.cf.ultimoMov || "")}"></label>
+      <datalist id="cf-lifts">${CF_LIFTS.map((x) => `<option value="${x}">`).join("")}</datalist>
+      <div class="cf-campos cf-campos3"><label>Reps<select name="reps">${[1, 2, 3, 5, 10].map((n) => `<option value="${n}">${n}RM</option>`).join("")}</select></label>
+        <label>Carga (kg)<input name="kg" type="number" min="1" max="500" step="0.5" inputmode="decimal" required></label>
+        <label>Data<input name="k" type="date" max="${hojeKey}" value="${hojeKey}"></label></div>
+      <button class="btn btn-blue" type="submit">Salvar PR</button></form>
+    ${ms.length ? `<div class="sec-head"><h2>Seus PRs</h2><span>${ms.length} ${ms.length === 1 ? "movimento" : "movimentos"}</span></div>
+      <div class="cf-prs">${ms.map((m) => `<details class="cf-pr"${aberto === cfNome(m.mov) ? " open" : ""} data-cf-pr-mov="${esc(cfNome(m.mov))}">
+        <summary><span><strong>${esc(m.mov)}</strong><small>${m.porReps.map((x) => `${x.reps}RM ${kgTxt(x.kg)}`).join(" · ")}</small></span><b>${m.rm1 ? kgTxt(m.rm1) : `~${kgTxt(m.est)}`}</b></summary>
+        <p class="note">${m.rm1 ? "1RM" : "1RM estimado (fórmula de Epley)"}: <b>${kgTxt(m.rm1 || m.est)}</b>. Porcentagens para os treinos:</p>
+        <div class="cf-pct">${[50, 60, 65, 70, 75, 80, 85, 90, 95].map((p) => `<span><small>${p}%</small><b>${kgTxt(Math.round(((m.rm1 || m.est) * p) / 100 * 2) / 2)}</b></span>`).join("")}</div>
+        <ul class="cf-pr-hist">${m.itens.slice(0, 12).map((x) => `<li><span>${ddmm(x.k)}</span><span>${x.reps}RM · <b>${kgTxt(x.kg)}</b>${x.origem === "wod" ? " <small>(WOD)</small>" : ""}</span><button class="lnk-btn" data-cf-pr-apagar="${x.id}" aria-label="Apagar">✕</button></li>`).join("")}</ul>
+      </details>`).join("")}</div>` : `<p class="note">Anote seus PRs de levantamento (1RM, 3RM, 5RM…). O app calcula as porcentagens que o coach pede no quadro (ex.: 5×3 a 75%).</p>`}`;
+  }
+  const kgTxt = (n) => `${fmtKg(n)} kg`;
+
+  /* ---------- Timer avulso ---------- */
+  const CF_TIMER_PADRAO = { tipo: "for_time", cap: 0, min: 12, emomMin: 10, cada: 1, rodadas: 8, trab: 20, desc: 10 };
+  function cfTelaTimer() {
+    if (cfTm?.k === "avulso") return `<div class="sec-head"><h2>${CF_TIPOS[cfTm.tipo] || "Timer"}</h2></div>${cfRelogioHtml(cfTm.tipo === "amrap" || cfTm.tipo === "for_time")}`;
+    if (cfTm) return `<p class="note">Tem um cronômetro rodando no WOD de hoje. <a class="lnk" href="#/cf">Voltar para ele</a></p>`;
+    const c = { ...CF_TIMER_PADRAO, ...(S.cf.timer || {}) }, t = c.tipo;
+    const campo = (n, rot, v, extra = "") => `<label>${rot}<input name="${n}" type="number" min="0" inputmode="numeric" value="${v}" ${extra}></label>`;
+    return `<form class="cf-res" id="cf-timer-form">
+      <div class="cf-formatos" role="radiogroup" aria-label="Formato">${["for_time", "amrap", "emom", "tabata", "intervalos"].map((k) =>
+        `<label class="${t === k ? "on" : ""}"><input type="radio" name="tipo" value="${k}" ${t === k ? "checked" : ""}>${CF_TIPOS[k]}</label>`).join("")}</div>
+      <div class="cf-campos">${t === "for_time" ? campo("cap", "Time cap (min, opcional)", c.cap || "", 'max="180" placeholder="sem cap"')
+        : t === "amrap" ? campo("min", "Duração (min)", c.min, 'min="1" max="120" required')
+        : t === "emom" ? campo("emomMin", "Duração (min)", c.emomMin, 'min="1" max="120" required') + `<label>A cada<select name="cada">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}"${c.cada === n ? " selected" : ""}>${n} min</option>`).join("")}</select></label>`
+        : campo("rodadas", "Rodadas", c.rodadas, 'min="1" max="100" required') + campo("trab", "Trabalho (s)", c.trab, 'min="5" max="600" required') + campo("desc", "Descanso (s)", c.desc, 'min="0" max="600" required')}</div>
+      <p class="note">${t === "for_time" ? "Conta para cima. Use +1 volta para marcar as voltas e Terminei para parar." : t === "amrap" ? "Contagem regressiva; marque cada volta com +1 volta." : t === "emom" ? "O celular vibra no começo de cada rodada." : t === "tabata" ? "Padrão: 8 rodadas de 20 s de trabalho e 10 s de descanso (4 min)." : "Trabalho e descanso alternados; o celular vibra a cada troca."}</p>
+      <button class="btn btn-blue cf-iniciar" type="submit">⏱ Iniciar</button></form>`;
+  }
+
+  /* ---------- Histórico ---------- */
+  function cfTelaHistorico() {
+    const dias = Object.entries(S.cf.logs).filter(([, l]) => l.wod).sort((a, b) => b[0].localeCompare(a[0]));
+    if (!dias.length) return `<p class="note">Os WODs que você lançar aparecem aqui, com o resultado de cada dia.</p>`;
+    const feitos = dias.filter(([, l]) => l.done), rx = feitos.filter(([, l]) => l.res?.rx !== false).length;
+    const mes = hojeKey.slice(0, 7), noMes = feitos.filter(([k]) => k.startsWith(mes)).length;
+    const meses = {};
+    for (const d of dias) (meses[d[0].slice(0, 7)] ||= []).push(d);
+    const nomeMes = (m) => new Date(`${m}-15T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return `<div class="stats-row">${stat("circle-check.svg", feitos.length, "WODs feitos")}${stat("calendar-14.svg", noMes, "Neste mês")}</div>
+      <div class="stats-row">${stat("flame.svg", feitos.length ? `${Math.round((rx / feitos.length) * 100)}%` : "—", "Em RX")}${stat("zap.svg", (S.cf.prs || []).length, "PRs anotados")}</div>
+      ${Object.entries(meses).map(([m, ds]) => `<div class="sec-head"><h2 class="cf-mes">${esc(nomeMes(m))}</h2><span>${ds.filter(([, l]) => l.done).length} feitos</span></div>
+        <ul class="cf-hist">${ds.map(([k, l]) => `<li><a href="#/cf/${k}"><span class="cf-hist-data">${ddmm(k)}</span><span><strong>${esc(l.wod.titulo)}</strong><small>${esc(cfResTxt(l) || (l.done ? "Feito" : "Sem resultado"))}</small></span>${l.done ? "✅" : ""}</a></li>`).join("")}</ul>`).join("")}`;
+  }
+
+  /* ---------- Benchmarks ---------- */
+  function cfTelaBenchmarks() {
+    const linha = (b) => {
+      const ant = cfAnteriores(b.titulo, "9999-12-31"), m = ant.filter((x) => x.val).sort((a, c) => c.val.v - a.val.v)[0], p = b.wod.partes[0];
+      return `<details class="cf-bench"><summary><span><strong>${esc(b.titulo)}</strong><small>${esc(cfParteTxt(p))}</small></span>${m ? `<b>🏆 ${esc(m.val.txt)}</b>` : ant.length ? "<b>✅</b>" : ""}</summary>
+        <ul class="cf-movs">${p.movimentos.map((x) => `<li>${x.reps ? `<b>${esc(x.reps)}</b> ` : ""}${esc(x.nome)}${x.carga ? ` <span>${esc(x.carga)}</span>` : ""}</li>`).join("")}</ul>
+        ${p.descricao ? `<p class="cf-desc">${esc(p.descricao)}</p>` : ""}
+        ${ant.length ? `<p class="note">Você já fez ${ant.length} ${ant.length === 1 ? "vez" : "vezes"}: ${ant.slice(-4).map((x) => `${ddmm(x.k)} ${x.val ? x.val.txt : "feito"}`).join(" · ")}</p>` : ""}
+        <button class="btn btn-blue" data-cf-bench="${esc(b.titulo)}">Fazer hoje</button></details>`;
+    };
+    return `<p class="note">Os WODs de referência do CrossFit. Repita de tempos em tempos para medir a evolução: o app guarda o seu melhor resultado.</p>
+      <div class="sec-head"><h2>Girls</h2></div><div class="cf-prs">${CF_BENCH.filter((b) => b.cat === "Girls").map(linha).join("")}</div>
+      <div class="sec-head"><h2>Heroes</h2></div><div class="cf-prs">${CF_BENCH.filter((b) => b.cat === "Heroes").map(linha).join("")}</div>`;
+  }
+
   telas.cf = (p1) => {
     setToolbar("plano");
-    const k = /^\d{4}-\d{2}-\d{2}$/.test(p1 || "") && p1 <= hojeKey ? p1 : hojeKey, l = cfLog(k), ehHoje = k === hojeKey;
-    const head = `<div class="page-head">${ehHoje ? "" : `<a class="icon-btn" href="#/cf" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a>`}<h1>${ehHoje ? "CrossFit" : `WOD de ${ddmm(k)}`}</h1><span class="spacer"></span></div>`;
+    const sub = CF_MENU.some(([r]) => r && r === p1) ? p1 : null;
+    const dia = !sub && /^\d{4}-\d{2}-\d{2}$/.test(p1 || "") && p1 <= hojeKey ? p1 : null;
+    const k = dia || hojeKey, l = cfLog(k), ehHoje = k === hojeKey;
+    if (dia && !ehHoje) {
+      const corpo = cfEdit && cfEdit.k === k ? cfEditorHtml() : l?.wod ? cfWodHtml(l, true) + cfResultadoHtml(l, k) : `<p class="note">Nenhum WOD neste dia.</p>`;
+      return `<section class="screen has-toolbar"><div class="list" style="gap:16px">
+        <div class="page-head"><a class="icon-btn" href="#/cf/historico" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a><h1>WOD de ${ddmm(k)}</h1><span class="spacer"></span></div>
+        <div class="section cf">${corpo}</div></div></section>`;
+    }
     let corpo;
-    if (cfEdit && cfEdit.k === k) corpo = cfEditorHtml();
-    else if (l?.wod) corpo = cfWodHtml(l, true) + cfResultadoHtml(l, k) + (ehHoje && !l.done && !cfTm ? `<button class="lnk-btn cf-trocar" data-cf-trocar>Trocar o WOD de hoje</button>` : "");
-    else corpo = ehHoje ? `<div class="sec-head"><h2>WOD de hoje</h2><span>${DIAS[hojeDia]}, ${ddmm(hojeKey)}</span></div>${cfAcoesHtml()}` : `<p class="note">Nenhum WOD neste dia.</p>`;
-    return `<section class="screen has-toolbar"><div class="list" style="gap:16px">${head}${ehHoje ? progSwitch("cf") : ""}
-      <div class="section cf">${corpo}</div></div>
-      ${ehHoje && !cfEdit ? cfRecordesHtml() + cfHistoricoHtml() : ""}</section>`;
+    if (sub === "timer") corpo = cfTelaTimer();
+    else if (sub === "historico") corpo = cfTelaHistorico();
+    else if (sub === "prs") corpo = cfTelaPrs();
+    else if (sub === "benchmarks") corpo = cfTelaBenchmarks();
+    else if (cfEdit && cfEdit.k === k) corpo = cfEditorHtml();
+    else if (l?.wod) corpo = cfWodHtml(l, true) + cfResultadoHtml(l, k) + (!l.done && !cfTm ? `<button class="lnk-btn cf-trocar" data-cf-trocar>Trocar o WOD de hoje</button>` : "");
+    else corpo = `<div class="sec-head"><h2>WOD de hoje</h2><span>${DIAS[hojeDia]}, ${ddmm(hojeKey)}</span></div>${cfAcoesHtml()}`;
+    return `<section class="screen has-toolbar"><div class="list" style="gap:16px">
+      <div class="page-head"><h1>CrossFit</h1><span class="spacer"></span></div>${progSwitch("cf")}${cfMenu(sub || "")}
+      <div class="section cf">${corpo}</div></div></section>`;
   };
   // Card na tela inicial
   function cfHome(principalAqui) {
@@ -1593,8 +1720,9 @@
   }
   function cfContextoTexto() {
     const ds = Object.entries(S.cf.logs).filter(([, l]) => l.wod).sort().slice(-12);
-    if (!ds.length) return "";
-    return "WODs de CrossFit registrados:\n" + ds.map(([k, l]) => `- ${k} ${l.wod.titulo}: ${l.wod.partes.map((p) => `${p.nome} (${cfParteTxt(p)}): ${p.movimentos.map(cfMovTxt).join(", ")}`).join(" | ")}. Resultado: ${cfResTxt(l) || (l.done ? "feito" : "não anotado")}${l.res?.notas ? `. Notas: ${l.res.notas}` : ""}`).join("\n");
+    const prs = cfPrsPorMov().map((m) => `${m.mov}: ${m.porReps.map((x) => `${x.reps}RM ${fmtKg(x.kg)} kg`).join(", ")}`).join("; ");
+    if (!ds.length) return prs ? `PRs de levantamento (CrossFit): ${prs}` : "";
+    return (prs ? `PRs de levantamento (CrossFit): ${prs}\n` : "") + "WODs de CrossFit registrados:\n" + ds.map(([k, l]) => `- ${k} ${l.wod.titulo}: ${l.wod.partes.map((p) => `${p.nome} (${cfParteTxt(p)}): ${p.movimentos.map(cfMovTxt).join(", ")}`).join(" | ")}. Resultado: ${cfResTxt(l) || (l.done ? "feito" : "não anotado")}${l.res?.notas ? `. Notas: ${l.res.notas}` : ""}`).join("\n");
   }
 
   /* ---------- Eventos ---------- */
@@ -1603,11 +1731,19 @@
     if (t.matches("[data-cf-foto]") && t.files?.[0]) { cfLerFoto(t.files[0]); t.value = ""; }
     else if (t.closest("#cf-res") && t.name === "cap") { const f = t.form; f.querySelector("[data-cf-sem-cap]").hidden = t.checked; f.querySelector("[data-cf-com-cap]").hidden = !t.checked; }
     else if (t.closest(".cf-rx") && t.name === "rx") t.closest(".cf-rx").querySelectorAll("label").forEach((x) => x.classList.toggle("on", x.contains(t)));
+    else if (t.closest("#cf-timer-form") && t.name === "tipo") { S.cf.timer = { ...(S.cf.timer || {}), tipo: t.value }; save(); render(); }
   });
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-cf-escrever],[data-cf-gerar],[data-cf-editar],[data-cf-trocar],[data-cf-timer],[data-cf-parar],[data-cf-volta],[data-cf-mais-parte],[data-cf-tirar-parte],[data-cf-cancelar-edit],[data-cf-reabrir]");
+    const t = e.target.closest("[data-cf-bench],[data-cf-pr-apagar],[data-cf-escrever],[data-cf-gerar],[data-cf-editar],[data-cf-trocar],[data-cf-timer],[data-cf-parar],[data-cf-volta],[data-cf-mais-parte],[data-cf-tirar-parte],[data-cf-cancelar-edit],[data-cf-reabrir]");
     if (!t) return;
     const ds = t.dataset, k = /^#\/cf\/(\d{4}-\d{2}-\d{2})/.exec(location.hash)?.[1] || hojeKey;
+    if (ds.cfBench) {
+      const b = CF_BENCH.find((x) => x.titulo === ds.cfBench), l = cfLog();
+      if (!b) return;
+      if (l?.wod && cfNome(l.wod.titulo) !== cfNome(b.titulo) && !confirm(`Trocar o WOD de hoje (${l.wod.titulo}) por ${b.titulo}?`)) return;
+      cfSalvarWod(JSON.parse(JSON.stringify(b.wod))); toast(`${b.titulo} é o WOD de hoje. Bora! 🔥`); location.hash = "#/cf"; return;
+    }
+    if (ds.cfPrApagar) { if (!confirm("Apagar este registro?")) return; S.cf.prs = (S.cf.prs || []).filter((x) => x.id !== ds.cfPrApagar); S.cf.prsEm = Date.now(); save(); render(); return; }
     if (t.hasAttribute("data-cf-escrever")) { cfEdit = { k, titulo: "", partes: [cfParteVazia("Força", "forca"), cfParteVazia("WOD", "for_time")], pontuado: 1 }; render(); }
     else if (t.hasAttribute("data-cf-gerar")) {
       const pedido = prompt("O que você quer hoje? (tempo, equipamento, foco)\nEx.: 30 min, só halteres e barra fixa, foco em pernas", S.cf.ultimoPedido || "");
@@ -1624,8 +1760,34 @@
     else if (t.hasAttribute("data-cf-cancelar-edit")) { cfEdit = null; render(); }
     else if (ds.cfReabrir) { const l = cfLog(ds.cfReabrir); if (l) { l.done = false; save(); render(); } }
   });
+  document.addEventListener("toggle", (e) => { const d = e.target; if (d.matches?.(".cf-pr")) S.cf.prAberto = d.open ? d.dataset.cfPrMov : S.cf.prAberto === d.dataset.cfPrMov ? null : S.cf.prAberto; }, true);
   document.addEventListener("submit", (e) => {
     const f = e.target;
+    if (f.id === "cf-timer-form") {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f)), n = (v, a, b, pad) => { const x = parseInt(v, 10); return Number.isFinite(x) ? Math.min(b, Math.max(a, x)) : pad; };
+      const tipo = d.tipo || "for_time", c = { ...CF_TIMER_PADRAO, ...(S.cf.timer || {}), tipo };
+      if (tipo === "for_time") c.cap = n(d.cap, 0, 180, 0);
+      else if (tipo === "amrap") c.min = n(d.min, 1, 120, 12);
+      else if (tipo === "emom") { c.emomMin = n(d.emomMin, 1, 120, 10); c.cada = n(d.cada, 1, 5, 1); }
+      else Object.assign(c, { rodadas: n(d.rodadas, 1, 100, 8), trab: n(d.trab, 5, 600, 20), desc: n(d.desc, 0, 600, 10) });
+      S.cf.timer = c; save();
+      const base = { k: "avulso", i: -1, tipo };
+      cfTimerComecar(tipo === "for_time" ? { ...base, total: c.cap * 60 } : tipo === "amrap" ? { ...base, total: c.min * 60 }
+        : tipo === "emom" ? { ...base, total: c.emomMin * 60, cada: c.cada * 60 } : { ...base, trab: c.trab, desc: c.desc, n: c.rodadas });
+      return;
+    }
+    if (f.id === "cf-pr-form") {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f)), kg = Number(String(d.kg).replace(",", "."));
+      if (!d.mov?.trim() || !(kg > 0)) { toast("Preencha o movimento e a carga."); return; }
+      const k = /^\d{4}-\d{2}-\d{2}$/.test(d.k) && d.k <= hojeKey ? d.k : hojeKey, reps = Number(d.reps) || 1;
+      const antes = cfPrsPorMov().find((m) => m.mov && cfNome(m.mov) === cfNome(d.mov));
+      const melhor = antes?.porReps.find((x) => x.reps === reps)?.kg || 0;
+      cfAddPr(d.mov, reps, Math.min(500, kg), k); S.cf.ultimoMov = d.mov.trim(); S.cf.prAberto = cfNome(d.mov); save(); render();
+      toast(melhor && kg > melhor ? `Novo PR! 🏆 ${d.mov.trim()} ${reps}RM: ${kgTxt(kg)} (+${fmtKg(kg - melhor)} kg)` : `PR salvo ✓ ${d.mov.trim()} ${reps}RM ${kgTxt(kg)}`, 4000);
+      return;
+    }
     if (f.id === "cf-edit") {
       e.preventDefault();
       const w = cfLerEditor(f), k = cfEdit.k;
@@ -1642,7 +1804,16 @@
       } else if (p.tipo === "for_time" || p.tipo === "amrap") { Object.assign(res, { voltas: int(d.voltas) ?? 0, reps: int(d.reps) ?? 0 }); if (p.tipo === "for_time") res.cap = true; }
       else if (d.texto?.trim()) res.texto = d.texto.trim().slice(0, 80);
       const cargas = Object.fromEntries(Object.entries(d).filter(([n, v]) => n.startsWith("carga-") && Number(v) > 0).map(([n, v]) => [n.slice(6), Math.min(500, Number(v))]));
-      if (Object.keys(cargas).length) res.cargas = cargas;
+      if (Object.keys(cargas).length) {
+        res.cargas = cargas;
+        // A carga do bloco de força vira um registro de PR do 1º movimento (quando o esquema diz as repetições)
+        for (const [i, kg] of Object.entries(cargas)) {
+          const pf = l.wod.partes[i], mov = pf?.movimentos[0]?.nome, reps = pf && cfRepsForca(pf);
+          if (!mov || !reps || l.res?.cargas?.[i] === kg) continue;
+          S.cf.prs = (S.cf.prs || []).filter((x) => !(x.origem === "wod" && x.k === k && cfNome(x.mov) === cfNome(mov)));
+          cfAddPr(mov, reps, kg, k, "wod");
+        }
+      }
       const era = l.done;
       l.res = res; l.done = true; save(); render();
       const ant = cfAnteriores(l.wod.titulo, k).filter((x) => x.val), v = cfValor(l);
@@ -2369,6 +2540,13 @@
         const { error } = await sb.from("hiper").upsert({ usuario_id: uid, programa: pk, dados: dd, atualizado_em: new Date().toISOString() });
         if (!error) { enviados[`${uid}|ia|${pk}`] = JSON.stringify(dd); guardarEnviados(); }
       }
+      if ((S.cf.prs || []).length || S.cf.prsEm) { // PRs do CrossFit: uma linha "cf" na tabela hiper
+        const dd = { prs: S.cf.prs || [], atualizado: S.cf.prsEm || 0 };
+        if (enviados[`${uid}|ia|cf`] !== JSON.stringify(dd)) {
+          const { error } = await sb.from("hiper").upsert({ usuario_id: uid, programa: "cf", dados: dd, atualizado_em: new Date().toISOString() });
+          if (!error) { enviados[`${uid}|ia|cf`] = JSON.stringify(dd); guardarEnviados(); }
+        }
+      }
       const aguaPend = aguaLinhas().filter((r) => r.data >= keyOf(addDays(hoje, -30)) && enviados[`${uid}|agua|${r.data}`] !== `${r.ml}/${r.meta}`);
       if (aguaPend.length) {
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
@@ -2422,6 +2600,11 @@
       const { data: planos } = await sb.from("hiper").select("programa, dados").eq("usuario_id", uid);
       for (const row of planos || []) {
         const pk = row.programa, r = row.dados;
+        if (pk === "cf" && r && Array.isArray(r.prs)) {
+          if ((r.atualizado || 0) > (S.cf.prsEm || 0)) { S.cf.prs = r.prs.filter((x) => x && x.mov && x.kg > 0 && /^\d{4}-\d{2}-\d{2}$/.test(x.k)); S.cf.prsEm = r.atualizado; mudou = true; }
+          enviados[`${uid}|ia|cf`] = JSON.stringify({ prs: S.cf.prs || [], atualizado: S.cf.prsEm || 0 });
+          continue;
+        }
         if (!IA[pk] || !r) continue;
         if ((r.plano || r.etapa) && (!S[pk].plano || (r.atualizado || 0) > (S[pk].atualizado || 0))) {
           Object.assign(S[pk], { perfil: r.perfil || {}, etapa: r.etapa || 0, plano: r.plano || null, inicio: r.inicio || null, checkins: r.checkins || [], msgs: r.msgs || [], atualizado: r.atualizado || 0 });
@@ -3175,6 +3358,7 @@
     else if (rota === "grupo" && (p1 === "entrar" || p1 === "membro") && p2) alvo += `/${p1}/${p2}`;
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     else if (IA[rota] && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
+    else if (rota === "cf" && p1 !== undefined) alvo += `/${p1}`;
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
     app.innerHTML = telas[rota](p1, p2);

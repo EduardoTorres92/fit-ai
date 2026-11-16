@@ -795,7 +795,7 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .cf-volta { background: #fff; color: #000; padding: 12px 22px; font-size: 16px; font-weight: 700; }
 .cf-res, .cf-edit { display: flex; flex-direction: column; gap: 12px; }
 .cf-res label, .cf-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
-.cf-res input:not([type=checkbox]):not([type=radio]), .cf-res textarea, .cf-edit input:not([type=radio]), .cf-edit select, .cf-edit textarea {
+.cf-res input:not([type=checkbox]):not([type=radio]), .cf-res textarea, .cf-res select, .cf-edit input:not([type=radio]), .cf-edit select, .cf-edit textarea {
   font: inherit; font-size: 15px; color: var(--fg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; min-width: 0; }
 .cf-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .cf-campos[hidden] { display: none; }
@@ -819,3 +819,42 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .cf-hist small { font-size: 12px; color: var(--muted); }
 .cf-hist-data { font-size: 12px; font-weight: 700; color: var(--blue); min-width: 38px; }
 .cf-campos:has(> label:only-child) { grid-template-columns: 1fr; }
+
+/* ---------- Menu do CrossFit ---------- */
+.cf-menu { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; margin: 0 20px; border-radius: 18px; background: #0a0a0b; }
+.cf-menu a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 7px; border-radius: 14px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,.65); transition: background-color .2s, color .2s; }
+.cf-menu a span { font-size: 18px; line-height: 1; }
+.cf-menu a.on { background: #fff; color: #0a0a0b; }
+@media (hover: hover) { .cf-menu a:not(.on):hover { background: rgba(255,255,255,.1); color: #fff; } }
+.cf-menu a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cf-formatos { display: flex; flex-wrap: wrap; gap: 6px; }
+.cf-formatos label { flex-direction: row !important; padding: 8px 14px; border-radius: 99px; background: var(--secondary); font-size: 13px !important; font-weight: 600; color: var(--fg) !important; cursor: pointer; }
+.cf-formatos label.on { background: #0a0a0b; color: #fff !important; }
+.cf-formatos input { position: absolute; opacity: 0; pointer-events: none; }
+.cf-formatos label:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cf-campos3 { grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+.cf-campos > label > * { width: 100%; }
+.cf-res input[type=date] { font-size: 13px; padding: 10px 6px; }
+.cf-prs { display: flex; flex-direction: column; gap: 8px; }
+.cf-pr, .cf-bench { border: 1px solid var(--line); border-radius: 14px; padding: 0 14px; }
+.cf-pr[open], .cf-bench[open] { padding-bottom: 14px; }
+.cf-pr summary, .cf-bench summary { display: flex; align-items: center; gap: 12px; padding: 12px 0; cursor: pointer; list-style: none; }
+.cf-pr summary::-webkit-details-marker, .cf-bench summary::-webkit-details-marker { display: none; }
+.cf-pr summary > span, .cf-bench summary > span { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cf-pr summary strong, .cf-bench summary strong { font-size: 15px; }
+.cf-pr summary small, .cf-bench summary small { font-size: 12px; color: var(--muted); }
+.cf-pr summary b { font-family: var(--display); font-weight: 400; font-size: 22px; }
+.cf-bench summary b { font-size: 13px; }
+.cf-pr[open] > *:not(summary), .cf-bench[open] > *:not(summary) { margin-top: 8px; }
+.cf-bench .btn { width: 100%; }
+.cf-pct { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cf-pct span { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: 10px; background: var(--secondary); }
+.cf-pct small { font-size: 11px; color: var(--muted); }
+.cf-pct b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.cf-pr-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.cf-pr-hist li { display: flex; align-items: center; gap: 10px; }
+.cf-pr-hist li > span:first-child { color: var(--blue); font-weight: 700; font-size: 12px; min-width: 38px; }
+.cf-pr-hist li > span:nth-child(2) { flex: 1; }
+.cf-pr-hist small { color: var(--muted); }
+.cf-pr-hist .lnk-btn { color: var(--muted); align-self: center; }
+.cf-mes::first-letter { text-transform: uppercase; }
