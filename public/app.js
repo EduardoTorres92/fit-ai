@@ -1371,16 +1371,20 @@
     return { tmb, fator, gasto, kcal, minimo, prot, gord, carb, agua, obj };
   }
   const aguaHoje = () => soma((S.agua?.[hojeKey] || []).map((x) => x.ml || 0));
+  // Minha água por dia, no mesmo formato da tabela "agua" do Supabase
+  const aguaLinhas = () => Object.entries(S.agua || {}).map(([data, l]) => ({ data, ml: soma(l.map((x) => x.ml || 0)), meta: S.aguaMeta?.[data] || nutriMetas().agua })).filter((r) => r.ml > 0);
   const fmtL = (ml) => `${(ml / 1000).toFixed(ml % 1000 ? 1 : 0).replace(".", ",")} L`;
   function aguaAdd(ml) {
     S.agua = S.agua || {};
     const d = new Date();
     (S.agua[hojeKey] = S.agua[hojeKey] || []).push({ t: `${pad(d.getHours())}:${pad(d.getMinutes())}`, ml });
-    for (const k of Object.keys(S.agua)) if (k < keyOf(addDays(hoje, -30))) delete S.agua[k]; // guarda só 30 dias
+    S.aguaMeta = { ...(S.aguaMeta || {}), [hojeKey]: nutriMetas().agua };
+    for (const k of Object.keys(S.agua)) if (k < keyOf(addDays(hoje, -120))) { delete S.agua[k]; delete S.aguaMeta?.[k]; } // guarda 120 dias
     save();
     aguaAvisarServidor("bebeu");
     const meta = nutriMetas().agua, tot = aguaHoje();
     toast(tot >= meta && tot - ml < meta ? `Meta de água batida! 💧 ${fmtL(tot)}` : `+${ml} ml 💧 ${fmtL(tot)} de ${fmtL(meta)}`);
+    if (uid && G.grupos?.length) G.carregadoEm = 0; // o ranking de água do grupo atualiza na próxima visita
   }
 
   /* ---------- Lembrete de água (push) ---------- */
@@ -1994,6 +1998,11 @@
         const { error } = await sb.from("hiper").upsert({ usuario_id: uid, programa: pk, dados: dd, atualizado_em: new Date().toISOString() });
         if (!error) { enviados[`${uid}|ia|${pk}`] = JSON.stringify(dd); guardarEnviados(); }
       }
+      const aguaPend = aguaLinhas().filter((r) => r.data >= keyOf(addDays(hoje, -30)) && enviados[`${uid}|agua|${r.data}`] !== `${r.ml}/${r.meta}`);
+      if (aguaPend.length) {
+        const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
+        if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
+      }
       const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
@@ -2027,6 +2036,13 @@
           ...(Array.isArray(d.avulso) ? { avulso: d.avulso.filter((x) => INSV[x]) } : {}), ...(Number(d.dur) > 0 ? { dur: Number(d.dur) } : {}) }; mudou = true;
       }
     }
+    try {
+      const { data: ag } = await sb.from("agua").select("data, ml, meta").eq("usuario_id", uid).gte("data", keyOf(addDays(hoje, -120)));
+      for (const r of ag || []) {
+        if (!S.agua?.[r.data]?.length && r.ml > 0) { S.agua = { ...(S.agua || {}), [r.data]: [{ t: "--:--", ml: r.ml }] }; S.aguaMeta = { ...(S.aguaMeta || {}), [r.data]: r.meta }; mudou = true; }
+        enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`;
+      }
+    } catch {}
     // Planos dos programas do Coach: traz da conta se este aparelho não tem plano ou tem um mais antigo
     try {
       const { data: planos } = await sb.from("hiper").select("programa, dados").eq("usuario_id", uid);
@@ -2133,7 +2149,16 @@
     return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
       melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
       insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length, fits: fitTests(rows).length,
-      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0 };
+      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0, ...aguaMetricas() };
+  }
+  // Água: melhor semana (litros), total e maior sequência de dias batendo a meta
+  function aguaMetricas() {
+    const linhas = aguaLinhas(), sem = {};
+    linhas.forEach((r) => { const k = keyOf(mondayOf(parseKey(r.data))); sem[k] = (sem[k] || 0) + r.ml; });
+    const ok = new Set(linhas.filter((r) => r.ml >= r.meta).map((r) => r.data));
+    let seq = 0, melhor = 0;
+    for (const k of [...ok].sort()) { seq = ok.has(keyOf(addDays(parseKey(k), -1))) ? seq + 1 : 1; melhor = Math.max(melhor, seq); }
+    return { aguaSemana: Math.floor(Math.max(0, ...Object.values(sem)) / 1000), aguaTotal: Math.floor(soma(linhas.map((r) => r.ml)) / 1000), aguaSeq: melhor, aguaMetas: ok.size };
   }
   const CONQ = [
     ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
@@ -2159,6 +2184,12 @@
     ["desafio1", "⚔️", "Primeiro desafio", (m) => [m.desafios, 1]],
     ["desafio5", "🥋", "5 desafios", (m) => [m.desafios, 5]],
     ["desafio10", "🦾", "10 desafios", (m) => [m.desafios, 10]],
+    ["agua1", "💧", "Bateu a meta de água", (m) => [m.aguaMetas, 1]],
+    ["aguas10", "🥤", "10 L de água numa semana", (m) => [m.aguaSemana, 10]],
+    ["aguas15", "🚰", "15 L de água numa semana", (m) => [m.aguaSemana, 15]],
+    ["aguas20", "🌊", "20 L de água numa semana", (m) => [m.aguaSemana, 20]],
+    ["aguaseq7", "🐳", "7 dias seguidos na meta de água", (m) => [m.aguaSeq, 7]],
+    ["agua100", "🏝️", "100 L de água no total", (m) => [m.aguaTotal, 100]],
   ];
   const CONQI = Object.fromEntries(CONQ.map((c) => [c[0], c]));
   function verificarConquistas(silencioso = false) {
@@ -2234,7 +2265,7 @@
   }
 
   /* ---------- Grupos ---------- */
-  const G = { grupos: null, sel: null, membros: [], perfis: {}, linhas: [], conq: [], desafios: [], feitos: [], meusDesafios: null, carregadoEm: 0, carregando: false, erro: false, periodo: "semana", rank: "treinos" };
+  const G = { grupos: null, sel: null, membros: [], perfis: {}, linhas: [], agua: [], conq: [], desafios: [], feitos: [], meusDesafios: null, carregadoEm: 0, carregando: false, erro: false, periodo: "semana", rank: "treinos" };
   async function carregarGrupos(forcar = false) {
     if (!uid || !sb || G.carregando) return;
     if (!forcar && G.grupos && Date.now() - G.carregadoEm < 60000) return;
@@ -2262,6 +2293,8 @@
       sb.from("treinos").select("usuario_id, data, programa, titulo, concluido, minutos, detalhes, atualizado_em").in("usuario_id", ids).gte("data", keyOf(addDays(parseKey(desde), -35))),
       sb.from("conquistas").select("usuario_id, codigo, ganha_em").in("usuario_id", ids).order("ganha_em", { ascending: false }).limit(30),
     ]);
+    const ag = await sb.from("agua").select("usuario_id, data, ml, meta, atualizado_em").in("usuario_id", ids).gte("data", desde);
+    G.agua = ag.data || [];
     const ds = await sb.from("desafios").select("id, semana, titulo, descricao, link, medida, criado_por, criado_em").eq("grupo_id", id).gte("semana", keyOf(addDays(mondayOf(hoje), -7 * 11))).order("semana", { ascending: false });
     const dids = (ds.data || []).map((d) => d.id);
     const fs = dids.length ? await sb.from("desafio_feitos").select("desafio_id, usuario_id, resultado, prova, feito_em").in("desafio_id", dids) : { data: [] };
@@ -2274,6 +2307,10 @@
   const grupoSel = () => (G.grupos || []).find((g) => g.id === G.sel) || null;
   const linhasDe = (id) => (id === uid ? linhasLocais().map((r) => ({ ...r, usuario_id: uid })) : G.linhas.filter((r) => r.usuario_id === id));
   const linhasGrupo = () => G.membros.flatMap(linhasDe);
+  // Água de cada pessoa do grupo (a minha vem do aparelho, que está sempre em dia)
+  const aguaDe = (id) => (id === uid ? aguaLinhas().map((r) => ({ ...r, usuario_id: uid })) : G.agua.filter((r) => r.usuario_id === id));
+  const aguaGrupo = () => G.membros.flatMap(aguaDe);
+  const mlNoPeriodo = (lista, ini, fim = hojeKey) => soma(lista.filter((r) => r.data >= ini && r.data <= fim).map((r) => r.ml));
   async function entrarComCodigo(codigo) {
     codigo = String(codigo || "").trim().toUpperCase();
     if (!codigo) return;
@@ -2315,6 +2352,10 @@
       ["🙌", "Todo mundo treinou", todos, 1, `${todos} ${todos === 1 ? "dia" : "dias"}`],
       ["🔥", "Grupo em chamas", seq, 7, seq >= 7 ? `${seq} dias seguidos` : `${seq}/7 dias seguidos`],
       ["💯", "100 treinos juntos", rows.length, 100, `${Math.min(rows.length, 100)}/100`],
+      ...(() => { const sem = {}, dias = {};
+        aguaGrupo().filter((r) => r.data >= PERIODOS.tudo[1]()).forEach((r) => { const k = keyOf(mondayOf(parseKey(r.data))); sem[k] = (sem[k] || 0) + r.ml; if (r.ml >= r.meta) (dias[r.data] = dias[r.data] || new Set()).add(r.usuario_id); });
+        const melhor = Math.max(0, ...Object.values(sem)), todos = G.membros.length > 1 ? Object.values(dias).filter((x) => x.size >= G.membros.length).length : 0;
+        return [["💧", "100 L numa semana", melhor, 100000, `${fmtL(Math.min(melhor, 100000))}/100 L`], ["🌊", "Todo mundo hidratado", todos, 1, `${todos} ${todos === 1 ? "dia" : "dias"}`]]; })(),
       ["⚔️", "4 desafios da semana", ...(() => { const n = G.desafios.filter((d) => G.feitos.some((f) => f.desafio_id === d.id)).length; return [n, 4, `${Math.min(n, 4)}/4 semanas`]; })()],
     ];
     return `<div class="badges">${lista.map(([ic, nome, v, alvo, txt]) => `<div class="badge${v >= alvo ? " on" : ""}"><span class="b-ic">${ic}</span><strong>${nome}</strong><small>${txt}</small></div>`).join("")}</div>`;
@@ -2329,7 +2370,8 @@
     });
     const cq = G.conq.filter((c) => CONQI[c.codigo]).map((c) => ({ t: c.ganha_em, id: c.usuario_id, html: `<b>${nomeDe(c.usuario_id)}</b> ganhou ${CONQI[c.codigo][1]} <b>${esc(CONQI[c.codigo][2])}</b>`, k: c.ganha_em.slice(0, 10) }));
     const df = G.feitos.map((f) => { const d = G.desafios.find((x) => x.id === f.desafio_id); return d && { t: f.feito_em, id: f.usuario_id, html: `<b>${nomeDe(f.usuario_id)}</b> cumpriu o desafio <b>${esc(d.titulo)}</b>${f.resultado ? ` · ${esc(fmtRes(d, f.resultado))}` : ""} ⚔️`, k: String(f.feito_em || hojeKey).slice(0, 10) }; }).filter(Boolean);
-    const itens = [...tr, ...cq, ...df].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 12);
+    const ag = G.agua.filter((r) => r.data >= keyOf(addDays(hoje, -10)) && r.ml >= r.meta).map((r) => ({ t: r.atualizado_em || r.data, id: r.usuario_id, html: `<b>${nomeDe(r.usuario_id)}</b> bateu a meta de água: <b>${fmtL(r.ml)}</b> 💧`, k: r.data }));
+    const itens = [...tr, ...cq, ...df, ...ag].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 12);
     if (!itens.length) return `<p class="note">Ainda sem atividade. Conclua um treino e puxe o grupo! 💪</p>`;
     return `<ul class="feed">${itens.map((i) => `<li>${avatar(G.perfis[i.id], 32)}<p>${i.html}<small>${ddmm(i.k)}</small></p></li>`).join("")}</ul>`;
   }
@@ -2340,10 +2382,11 @@
     maxout: ["Max Out", (k) => k.maxMedio, (v) => (v ? mmss(v) : "—")],
     fit: ["Fit Test", (k) => k.fit, (v) => (v ? `${v} reps` : "—")],
     fitevo: ["Evolução Fit Test", (k) => k.fitEvo, (v) => (v ? `${v > 0 ? "+" : ""}${v} reps` : "—")],
+    agua: ["💧 Água", (k) => k.agua, (v) => (v ? fmtL(v) : "—")],
   };
   function ranking() {
     const [, val, fmt] = RANKS[G.rank];
-    const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual } }; })
+    const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual, agua: mlNoPeriodo(aguaDe(id), PERIODOS[G.periodo][1]()) } }; })
       .sort((a, b) => val(b.k) - val(a.k) || b.k.treinos - a.k.treinos);
     const med = ["🥇", "🥈", "🥉"];
     return `<ol class="rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}" data-membro="${x.id}" role="link" tabindex="0" aria-label="Ver perfil de ${esc(x.p?.nome || "Atleta")}">
@@ -2353,7 +2396,22 @@
       ${G.rank === "maxout" ? `<p class="note small">Média do Max Out nos vídeos do ${esc(NOMES_MAXOUT)} no período: quanto mais tarde a pessoa cansou, melhor.</p>` : ""}
       ${G.rank === "fit" ? `<p class="note small">Total de repetições no último Fit Test do Insanity feito no período.</p>` : ""}
       ${G.rank === "fitevo" ? `<p class="note small">Quantas repetições a pessoa ganhou do primeiro ao último Fit Test do período.</p>` : ""}
-      ${G.rank === "minutos" ? `<p class="note small">Tempo dos vídeos concluídos e do cronômetro. Na calistenia sem cronômetro, conta 3 min por série.</p>` : ""}`;
+      ${G.rank === "minutos" ? `<p class="note small">Tempo dos vídeos concluídos e do cronômetro. Na calistenia sem cronômetro, conta 3 min por série.</p>` : ""}
+      ${G.rank === "agua" ? `<p class="note small">Litros de água anotados no período (aba Nutrição ou “Bebi” na notificação).</p>` : ""}`;
+  }
+  // Hidratação do dia no grupo: quem está bebendo mais hoje e quem já bateu a meta
+  function hidratacaoGrupo() {
+    const lista = G.membros.map((id) => { const r = aguaDe(id).find((x) => x.data === hojeKey); return { id, ml: r?.ml || 0, meta: r?.meta || (id === uid ? nutriMetas().agua : 2500) }; })
+      .sort((a, b) => b.ml - a.ml);
+    const batidas = lista.filter((x) => x.ml >= x.meta).length, semana = mlNoPeriodo(aguaGrupo(), keyOf(mondayOf(hoje)));
+    return `<div class="hidra">
+      <div class="sec-head"><h2>💧 Hidratação de hoje</h2><span>${batidas}/${lista.length} bateram a meta</span></div>
+      <ol class="hidra-lista">${lista.map((x, i) => { const pct = Math.min(100, Math.round((x.ml / x.meta) * 100));
+        return `<li class="${x.id === uid ? "eu" : ""}"><span class="pos">${x.ml && i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>${avatar(G.perfis[x.id], 28)}
+          <div class="hidra-bar"><span>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</span><div class="bar"><i style="width:${pct}%"></i></div></div>
+          <strong>${fmtL(x.ml)}${pct >= 100 ? " ✓" : ""}</strong></li>`; }).join("")}</ol>
+      <div class="hidra-pe"><span>Grupo na semana: <b>${fmtL(semana)}</b></span><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
+    </div>`;
   }
   const evoSwitch = (on) => `<nav class="seg prog" aria-label="Evolução">
       <a href="#/evolucao" class="${on === "eu" ? "on" : ""}">Minha evolução</a>
@@ -2364,7 +2422,7 @@
     if (p1 === "membro" && p2 && uid && G.grupos) return telaMembro(p2);
     const head = `<header class="header"><span class="logo-txt dark">Fit.ai</span></header>${evoSwitch("grupo")}`;
     if (!uid) return `<section class="screen has-toolbar">${head}<div class="section">
-      <p class="note">Os grupos juntam amigos num ranking de treinos, tempo, sequência e Max Out. Para participar, entre com uma conta.</p>
+      <p class="note">Os grupos juntam amigos num ranking de treinos, tempo, sequência, Max Out e água. Para participar, entre com uma conta.</p>
       <button class="btn btn-blue" id="ir-login" style="width:100%">Entrar ou criar conta</button></div></section>`;
     if (!G.grupos || (Date.now() - G.carregadoEm > 60000 && !G.carregando)) carregarGrupos();
     if (!G.grupos) return `<section class="screen has-toolbar">${head}<p class="note" style="padding:20px">Carregando seus grupos…</p></section>`;
@@ -2386,6 +2444,7 @@
         <div class="meta-g"><div class="sec-head"><h2>Meta da semana</h2><span>${semana}/${g.meta_semanal} treinos</span></div>
           <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
           ${g.dono === uid ? `<button class="lnk-btn" id="g-meta">Mudar meta</button>` : ""}</div>
+        ${hidratacaoGrupo()}
         ${cardDesafio(g)}
         <div class="sec-head"><h2>Conquistas da semana</h2><span>${G.desafios.filter((d) => G.feitos.some((f) => f.desafio_id === d.id)).length} de 12 semanas</span></div>
         ${historicoDesafios()}
@@ -2423,6 +2482,7 @@
       <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""}</strong><span>${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
       <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
       <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
+      <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
       <div>${recordesHtml(rows, `${esc((p.nome || "Essa pessoa").split(" ")[0])} ainda não registrou Max Out nem Fit Test.`)}</div>
       </div></section>`;
   }
@@ -2437,6 +2497,8 @@
       <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
       ${(() => { const d = desafioDaSemana(), n = d ? feitosDe(d).length : 0;
         return `<p class="d-mini">⚔️ ${d ? `${esc(d.titulo)} · ${n ? `🏅 ${n} cumpriu${n > 1 ? "ram" : ""}` : "ninguém cumpriu ainda"}` : "Sem desafio esta semana. Lance um!"}</p>`; })()}
+      ${(() => { const top = G.membros.map((id) => ({ id, ml: aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0 })).sort((a, b) => b.ml - a.ml)[0];
+        return `<p class="d-mini">💧 ${top?.ml ? `${top.id === uid ? "Você lidera" : `${esc((G.perfis[top.id]?.nome || "Alguém").split(" ")[0])} lidera`} a água de hoje com ${fmtL(top.ml)}` : "Ninguém anotou água hoje ainda"}</p>`; })()}
       <div class="avs">${G.membros.slice(0, 8).map((id) => avatar(G.perfis[id], 28)).join("")}</div></a>`;
   }
 

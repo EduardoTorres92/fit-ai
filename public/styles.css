@@ -699,3 +699,16 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .guia-ref ul { list-style: none; margin: 0; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
 .guia-ref li { display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; }
 .guia-ref li small { color: var(--blue); font-weight: 600; font-size: 12px; }
+
+/* ---------- Hidratação do grupo ---------- */
+.hidra { border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.hidra-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hidra-lista li { display: flex; align-items: center; gap: 10px; }
+.hidra-lista .pos { width: 22px; text-align: center; font-weight: 600; font-size: 14px; color: var(--muted); flex: none; }
+.hidra-bar { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; }
+.hidra-bar .bar { height: 6px; border-radius: 99px; background: var(--secondary); overflow: hidden; }
+.hidra-bar .bar i { display: block; height: 100%; background: #22a6f2; border-radius: 99px; }
+.hidra-lista strong { font-size: 14px; font-variant-numeric: tabular-nums; flex: none; }
+.hidra-lista li.eu .hidra-bar span { font-weight: 600; }
+.hidra-pe { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); }
+.hidra-pe .btn { height: 34px; padding: 0 12px; font-size: 13px; }
