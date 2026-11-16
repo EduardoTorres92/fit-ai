@@ -6,8 +6,7 @@
 //    e limite geral por dia (contadores no Netlify Blobs).
 // A chave da Anthropic fica só no servidor (variável ANTHROPIC_API_KEY), nunca no navegador.
 import Anthropic from "@anthropic-ai/sdk";
-import { getStore } from "../lib/blobs.mjs";
-import { createHash } from "node:crypto";
+import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/limite.mjs";
 import { emailDoToken } from "../lib/dono.mjs";
 import { ehEmailDono } from "../lib/sessao.mjs";
 
@@ -16,10 +15,6 @@ const MODO = {
   membro: { model: "claude-haiku-5-5", max_tokens: 3000, mensagens: 16, porMensagem: 1500, contexto: 16000, programa: 40000 },
   visitante: { model: "claude-haiku-5-5", max_tokens: 2000, mensagens: 10, porMensagem: 800, contexto: 8000, programa: 40000 },
 };
-const LIMITE_VISITANTE_DIA = Number(process.env.LIMITE_VISITANTE_DIA) || 10;
-const LIMITE_MEMBRO_DIA = Number(process.env.LIMITE_MEMBRO_DIA) || 30;
-const LIMITE_GERAL_DIA = Number(process.env.LIMITE_GERAL_DIA) || 300;
-
 const COMO_RESPONDER = `Como responder:
 - Português do Brasil, tom de parceiro de treino: direto, animado sem exagero.
 - Respostas curtas para ler no celular entre uma série e outra: 2 a 6 frases, ou uma lista curta quando ajudar. Nada de títulos.
@@ -37,19 +32,6 @@ const SISTEMA = {
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 const corta = (t, n) => String(t ?? "").slice(0, n);
-const hojeBR = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-
-// Conta uma pergunta do visitante. Devolve false se ele ou o app já passaram do limite de hoje.
-// (Os contadores não são atômicos; numa corrida de requisições pode passar 1 ou 2 do limite, o que é aceitável aqui.)
-async function cabeNoLimite(ip, limite = LIMITE_VISITANTE_DIA) {
-  const loja = getStore({ name: "coach-limites", consistency: "strong" });
-  const dia = hojeBR();
-  const quem = createHash("sha256").update(`${dia}|${ip}|fitai`).digest("hex").slice(0, 24); // IP não é guardado
-  const [geral, dele] = await Promise.all([loja.get(`geral/${dia}`, { type: "json" }), loja.get(`v/${dia}/${quem}`, { type: "json" })]);
-  if ((geral?.n || 0) >= LIMITE_GERAL_DIA || (dele?.n || 0) >= limite) return false;
-  await Promise.all([loja.setJSON(`geral/${dia}`, { n: (geral?.n || 0) + 1 }), loja.setJSON(`v/${dia}/${quem}`, { n: (dele?.n || 0) + 1 })]);
-  return true;
-}
 
 export default async (req, context) => {
   if (req.method !== "POST") return json(405, { erro: "metodo" });

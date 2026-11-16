@@ -623,3 +623,29 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .sem span { font-size: 16px; }
 .sem small { font-size: 10px; color: var(--muted); }
 .rank .lnk-btn { align-self: center; }
+
+/* ---------- Hipertrofia (academia) ---------- */
+.hx-chat { flex: none; overflow: visible; padding-bottom: 8px; }
+.hx-foot { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 24px; }
+.hx-chips { flex-wrap: wrap; overflow: visible; }
+.chip.on { background: var(--blue); color: #fff; }
+.hx-form { border-top: 0; padding: 4px 20px 0; }
+.hx-acoes { display: flex; flex-direction: column; gap: 10px; padding: 0 20px; }
+.section .hx-acoes { padding: 0; margin-top: 4px; }
+.hx-acoes .lnk-btn { align-self: center; }
+.hx-cancelar { align-self: center; }
+.hx-coach .lnk-btn { align-self: flex-start; }
+.hx-coach ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.hx-coach p b img { vertical-align: -2px; }
+.hx-meta { font-size: 13px; line-height: 1.4; color: var(--blue); font-weight: 600; margin-top: -4px; }
+.hx-video { display: flex; flex-direction: column; gap: 8px; }
+.hx-video .hx-play { height: 40px; font-size: 14px; }
+.hx-video .lnk-btn { align-self: flex-start; }
+.hx-frame { border-radius: 12px; overflow: hidden; }
+.hx-como summary::after { content: "Ver dicas"; }
+.hx-como[open] summary::after { content: "Ocultar"; }
+.hx-dica { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+.hx-add input[name="kg"] { width: 68px; }
+.hx-add input[name="r"] { width: 56px; }
+.hx-x { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hx-graf { font-size: 12px; margin: 14px 0 4px; }
