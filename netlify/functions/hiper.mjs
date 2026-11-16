@@ -21,7 +21,7 @@ const COMUM = `- Use SOMENTE exercícios do catálogo, pelo id exato.
 - Limitações ou dores: evite os exercícios que agravam e diga isso na mensagem. Se a pessoa relatar dor aguda ou lesão séria, oriente procurar um profissional de saúde.
 - Na revisão, use o histórico real (cargas, repetições e tempos): quem bateu o alvo em todas as séries progride; quem ficou abaixo mantém ou recua; troque exercícios só com motivo (estagnação, dor, falta de equipamento, pedido da pessoa). Comente o peso dos check-ins em relação ao objetivo.
 - Você não é médico nem nutricionista; alimentação só em linhas gerais.
-- Responda chamando a ferramenta salvar_plano. A mensagem é curta (3 a 6 frases), em português do Brasil, tom de personal trainer parceiro.`;
+- Responda SEMPRE chamando a ferramenta salvar_plano (nunca só com texto). A mensagem é curta (3 a 6 frases), em português do Brasil, tom de personal trainer parceiro.`;
 
 const PROGRAMAS = {
   hiper: {
@@ -177,12 +177,17 @@ export default async (req, context) => {
       try {
         const r = await client.messages.create({
           model: dono ? "claude-opus-5-5" : "claude-sonnet-5-5", max_tokens: P.semanas ? 16000 : 8000,
-          system: P.sistema, tools: [FERRAMENTA], tool_choice: { type: "tool", name: FERRAMENTA.name },
+          system: P.sistema, tools: [FERRAMENTA], tool_choice: { type: "auto" }, // o Opus 5.5 não aceita forçar a ferramenta; o sistema pede para chamá-la
           messages: [{ role: "user", content: partes.join("\n\n") }],
         });
-        const uso = r.content.find((b) => b.type === "tool_use");
-        const plano = limparPlano(uso?.input?.plano, P);
-        saida = plano ? { mensagem: txt(uso.input.mensagem, 1500), plano } : { erro: "plano_invalido" };
+        // Normalmente vem na ferramenta; se a IA responder em texto, tenta ler o JSON do texto
+        let entrada = r.content.find((b) => b.type === "tool_use")?.input;
+        if (!entrada) {
+          const texto = r.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+          try { entrada = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1)); } catch {}
+        }
+        const plano = limparPlano(entrada?.plano, P);
+        saida = plano ? { mensagem: txt(entrada.mensagem, 1500), plano } : { erro: "plano_invalido" };
         if (!plano) console.error("hiper plano inválido", c.programa, r.stop_reason);
       } catch (e) {
         const status = e instanceof Anthropic.APIError ? e.status : 0;
