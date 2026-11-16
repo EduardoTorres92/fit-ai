@@ -1315,7 +1315,7 @@
     } else if (ds.iaConcluir) {
       const l = iaGarantirLog(ds.iaConcluir);
       l.done = !l.done; save(); render();
-      if (l.done) toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`);
+      if (l.done) { toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); convidarPost(); };
     } else if (ds.iaAsk) openChat(`Como executar corretamente o ${exDe(pk, ds.iaAsk)?.nome || ds.iaAsk}? Quais os erros comuns${IA[pk]?.carga ? " e que carga eu deveria usar hoje" : " e como deixar mais fácil ou mais difícil"}?`);
     else if (ds.iaRevisar) iaRevisar(ds.iaRevisar);
     else if (ds.iaCheckin) iaCheckin(ds.iaCheckin);
@@ -2303,6 +2303,7 @@
     G.perfis = Object.fromEntries((pf.data || []).map((p) => [p.id, p]));
     G.linhas = tr.data || [];
     G.conq = cq.data || [];
+    try { await carregarMural(id); } catch (e) { console.error("mural", e); M.posts = []; }
   }
   const grupoSel = () => (G.grupos || []).find((g) => g.id === G.sel) || null;
   const linhasDe = (id) => (id === uid ? linhasLocais().map((r) => ({ ...r, usuario_id: uid })) : G.linhas.filter((r) => r.usuario_id === id));
@@ -2449,6 +2450,7 @@
         <div class="sec-head"><h2>Conquistas da semana</h2><span>${G.desafios.filter((d) => G.feitos.some((f) => f.desafio_id === d.id)).length} de 12 semanas</span></div>
         ${historicoDesafios()}
       </div>
+      ${muralHtml()}
       <div class="section">
         <div class="seg seg3">${Object.entries(PERIODOS).map(([k, [n]]) => `<button class="${G.periodo === k ? "on" : ""}" data-g-periodo="${k}">${n}</button>`).join("")}</div>
         <div class="stats-row" style="margin-top:12px">
@@ -2501,6 +2503,184 @@
         return `<p class="d-mini">💧 ${top?.ml ? `${top.id === uid ? "Você lidera" : `${esc((G.perfis[top.id]?.nome || "Alguém").split(" ")[0])} lidera`} a água de hoje com ${fmtL(top.ml)}` : "Ninguém anotou água hoje ainda"}</p>`; })()}
       <div class="avs">${G.membros.slice(0, 8).map((id) => avatar(G.perfis[id], 28)).join("")}</div></a>`;
   }
+
+  /* ==========================================================
+     Mural do grupo (rede social entre amigos): post com texto, foto e o treino do dia; reações e comentários.
+     Supabase: posts, post_reacoes, post_comentarios; fotos no bucket privado "posts" (grupo/usuario/arquivo.jpg),
+     mostradas por link assinado. Só quem está no grupo vê.
+     ========================================================== */
+  const REACOES = ["🔥", "💪", "👏", "😂", "❤️"];
+  const M = { posts: [], reacoes: [], coments: [], urls: {}, abertos: new Set() };
+  async function carregarMural(gid) {
+    const ps = await sb.from("posts").select("id, grupo_id, usuario_id, texto, foto, treino, criado_em").eq("grupo_id", gid).order("criado_em", { ascending: false }).limit(30);
+    M.posts = ps.data || [];
+    const ids = M.posts.map((p) => p.id);
+    const [rs, cs] = ids.length ? await Promise.all([
+      sb.from("post_reacoes").select("post_id, usuario_id, emoji").in("post_id", ids),
+      sb.from("post_comentarios").select("id, post_id, usuario_id, texto, criado_em").in("post_id", ids).order("criado_em"),
+    ]) : [{ data: [] }, { data: [] }];
+    M.reacoes = rs.data || []; M.coments = cs.data || [];
+    const fotos = M.posts.map((p) => p.foto).filter((f) => f && !M.urls[f]);
+    if (fotos.length) {
+      const { data } = await sb.storage.from("posts").createSignedUrls(fotos, 6 * 3600);
+      (data || []).forEach((x) => { if (x.signedUrl) M.urls[x.path] = x.signedUrl; });
+    }
+  }
+  const quando = (iso) => {
+    const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+    return s < 60 ? "agora" : s < 3600 ? `${Math.floor(s / 60)} min` : s < 86400 ? `${Math.floor(s / 3600)} h` : s < 7 * 86400 ? `${Math.floor(s / 86400)} d` : ddmm(String(iso).slice(0, 10));
+  };
+  const nomeCurto = (id) => esc((G.perfis[id]?.nome || "Alguém").split(" ")[0]);
+  function postHtml(p) {
+    const g = grupoSel(), meu = p.usuario_id === uid, podeApagar = meu || g?.dono === uid;
+    const rs = M.reacoes.filter((r) => r.post_id === p.id), cs = M.coments.filter((c) => c.post_id === p.id);
+    const aberto = M.abertos.has(p.id), mostra = aberto ? cs : cs.slice(-2);
+    const t = p.treino;
+    return `<article class="post" data-post="${p.id}">
+      <header class="post-head">${avatar(G.perfis[p.usuario_id], 36)}<div><strong>${esc(G.perfis[p.usuario_id]?.nome || "Atleta")}</strong><small>${quando(p.criado_em)}</small></div>
+        ${podeApagar ? `<button class="lnk-btn post-del" data-post-apagar="${p.id}" aria-label="Apagar post">Apagar</button>` : ""}</header>
+      ${t?.titulo ? `<p class="post-treino">${t.concluido === false ? "⏳" : "✅"} ${esc(t.titulo)}${t.minutos ? ` · ${fmtMin(t.minutos)}` : ""}${t.programa ? ` · ${esc(progDe(t.programa)?.curto || IA[t.programa]?.nome || (t.programa === "calistenia" ? NOME_PROG : t.programa))}` : ""}</p>` : ""}
+      ${p.texto ? `<p class="post-txt">${esc(p.texto)}</p>` : ""}
+      ${p.foto ? (M.urls[p.foto] ? `<img class="post-foto" src="${esc(M.urls[p.foto])}" alt="Foto de ${nomeCurto(p.usuario_id)}" loading="lazy">` : `<div class="post-foto vazia">📷</div>`) : ""}
+      <div class="post-reacoes">${REACOES.map((e) => { const n = rs.filter((r) => r.emoji === e).length, eu = rs.some((r) => r.emoji === e && r.usuario_id === uid);
+        return `<button class="reacao${eu ? " on" : ""}" data-reagir="${e}" data-post-id="${p.id}" aria-pressed="${eu}" title="${rs.filter((r) => r.emoji === e).map((r) => (G.perfis[r.usuario_id]?.nome || "").split(" ")[0]).join(", ")}">${e}${n ? ` <b>${n}</b>` : ""}</button>`; }).join("")}</div>
+      ${cs.length > 2 && !aberto ? `<button class="lnk-btn" data-post-coments="${p.id}">Ver os ${cs.length} comentários</button>` : ""}
+      ${mostra.length ? `<ul class="coments">${mostra.map((c) => `<li><b>${nomeCurto(c.usuario_id)}</b> ${esc(c.texto)} <small>${quando(c.criado_em)}</small>${c.usuario_id === uid || meu ? ` <button class="lnk-btn" data-coment-apagar="${c.id}" aria-label="Apagar comentário">✕</button>` : ""}</li>`).join("")}</ul>` : ""}
+      <form class="coment-form" data-comentar="${p.id}" autocomplete="off"><input name="t" maxlength="300" placeholder="Comente…" aria-label="Escreva um comentário"><button type="submit" class="btn btn-blue">Enviar</button></form>
+    </article>`;
+  }
+  function muralHtml() {
+    return `<div class="section mural">
+      <div class="sec-head"><h2>📣 Mural do grupo</h2><button class="lnk-btn" data-mural-atualizar>Atualizar</button></div>
+      <button class="mural-novo" data-post-novo>${avatar(G.perfis[uid] || { nome: nomeCompleto(), foto_url: S.user?.foto }, 32)}<span>Como foi o treino? Poste uma foto ou um comentário…</span><b>📸</b></button>
+      ${M.posts.length ? M.posts.map(postHtml).join("") : `<p class="note">Ninguém postou ainda. Depois do treino, mostre para a galera! 💪</p>`}
+    </div>`;
+  }
+  const refazerPost = (id) => { const el = document.querySelector(`.post[data-post="${id}"]`), p = M.posts.find((x) => x.id === id); if (el && p) el.outerHTML = postHtml(p); };
+
+  /* ---------- Novo post ---------- */
+  let postFoto = null; // Blob já reduzido
+  function treinosParaPost() {
+    const ontem = keyOf(addDays(hoje, -1));
+    return linhasLocais().filter((r) => r.data >= ontem && (r.concluido || r.minutos > 0)).sort((a, b) => b.data.localeCompare(a.data) || b.concluido - a.concluido);
+  }
+  function reduzirParaPost(arquivo, max = 1080) {
+    return new Promise((ok, falha) => {
+      const img = new Image(), url = URL.createObjectURL(arquivo);
+      img.onload = () => {
+        const esc_ = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement("canvas");
+        c.width = Math.round(img.width * esc_); c.height = Math.round(img.height * esc_);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob((b) => (b ? ok(b) : falha(new Error("foto"))), "image/jpeg", 0.8);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); falha(new Error("foto")); };
+      img.src = url;
+    });
+  }
+  function abrirNovoPost(msg = "") {
+    if (!uid || !sb) { toast("Entre com uma conta para postar no grupo."); return; }
+    if (!(G.grupos || []).length) { toast("Entre num grupo para postar."); location.hash = "#/grupo"; return; }
+    postFoto = null;
+    const tr = treinosParaPost();
+    let dlg = $("#post-dlg");
+    if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "post-dlg"; dlg.className = "post-dlg"; $(".device").appendChild(dlg); }
+    dlg.innerHTML = `<form class="post-form" id="post-form">
+      <div class="post-form-head"><strong>Postar no grupo</strong><button type="button" class="icon-btn" data-post-fechar aria-label="Fechar">${icon("x.svg", 22)}</button></div>
+      ${msg ? `<p class="note">${msg}</p>` : ""}
+      ${G.grupos.length > 1 ? `<label>Grupo<select name="grupo">${G.grupos.map((g) => `<option value="${g.id}"${g.id === G.sel ? " selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>` : `<input type="hidden" name="grupo" value="${G.grupos[0].id}">`}
+      <label>Treino<select name="treino"><option value="">Sem treino</option>${tr.map((r, i) => `<option value="${i}"${i === 0 ? " selected" : ""}>${r.data === hojeKey ? "Hoje" : "Ontem"} · ${esc(r.titulo)}${r.concluido ? "" : " (em andamento)"}</option>`).join("")}</select></label>
+      <textarea name="texto" maxlength="500" rows="3" placeholder="Como foi? Bateu recorde? Sofreu? 😅"></textarea>
+      <div class="post-foto-prev" id="post-prev"></div>
+      <div class="post-form-acoes"><label class="btn btn-outline post-foto-btn">📷 Foto<input type="file" id="post-arquivo" accept="image/*" hidden></label>
+        <button type="submit" class="btn btn-blue">Postar</button></div>
+    </form>`;
+    dlg._treinos = tr;
+    dlg.showModal();
+  }
+  async function enviarPost(f) {
+    const d = Object.fromEntries(new FormData(f)), texto = String(d.texto || "").trim().slice(0, 500);
+    if (!texto && !postFoto) { toast("Escreva algo ou escolha uma foto."); return; }
+    const btn = f.querySelector("button[type=submit]"); btn.disabled = true; btn.textContent = "Postando…";
+    try {
+      const gid = d.grupo, r = d.treino !== "" ? $("#post-dlg")._treinos[Number(d.treino)] : null;
+      let foto = null;
+      if (postFoto) {
+        foto = `${gid}/${uid}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const up = await sb.storage.from("posts").upload(foto, postFoto, { contentType: "image/jpeg", cacheControl: "86400" });
+        if (up.error) throw up.error;
+      }
+      const treino = r ? { data: r.data, programa: r.programa, titulo: r.titulo, minutos: r.minutos, concluido: r.concluido } : null;
+      const { error } = await sb.from("posts").insert({ grupo_id: gid, usuario_id: uid, texto, foto, treino });
+      if (error) throw error;
+      $("#post-dlg").close(); postFoto = null;
+      G.sel = gid; G.carregadoEm = 0; await carregarGrupos(true);
+      toast("Postado no grupo! 📣");
+      if (!location.hash.startsWith("#/grupo")) location.hash = "#/grupo";
+    } catch (e) { console.error("post", e); toast("Não consegui postar agora. Tente de novo."); btn.disabled = false; btn.textContent = "Postar"; }
+  }
+  // Depois de concluir um treino: convida a postar no grupo
+  function convidarPost() {
+    if (!uid || !(G.grupos || []).length) return;
+    setTimeout(() => {
+      if ($("#post-dlg")?.open) return;
+      abrirNovoPost("Treino concluído! 🔥 Quer contar para o grupo? Pode mandar uma foto também.");
+    }, 1400);
+  }
+
+  document.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-post-novo],[data-post-fechar],[data-reagir],[data-post-coments],[data-post-apagar],[data-coment-apagar],[data-mural-atualizar]");
+    if (!t) return;
+    const ds = t.dataset;
+    if (t.hasAttribute("data-post-novo")) abrirNovoPost();
+    else if (t.hasAttribute("data-post-fechar")) $("#post-dlg")?.close();
+    else if (t.hasAttribute("data-mural-atualizar")) { G.carregadoEm = 0; carregarGrupos(true); toast("Atualizando…"); }
+    else if (ds.reagir) {
+      const pid = ds.postId, e2 = ds.reagir, ja = M.reacoes.find((r) => r.post_id === pid && r.usuario_id === uid && r.emoji === e2);
+      // otimista: muda na tela e depois grava
+      if (ja) M.reacoes = M.reacoes.filter((r) => r !== ja); else M.reacoes.push({ post_id: pid, usuario_id: uid, emoji: e2 });
+      refazerPost(pid);
+      const { error } = ja ? await sb.from("post_reacoes").delete().eq("post_id", pid).eq("usuario_id", uid).eq("emoji", e2)
+        : await sb.from("post_reacoes").insert({ post_id: pid, usuario_id: uid, emoji: e2 });
+      if (error) { toast("Não consegui reagir agora."); G.carregadoEm = 0; carregarGrupos(true); }
+    } else if (ds.postComents) { M.abertos.add(ds.postComents); refazerPost(ds.postComents); }
+    else if (ds.postApagar) {
+      if (!confirm("Apagar este post?")) return;
+      const p = M.posts.find((x) => x.id === ds.postApagar);
+      const { error } = await sb.from("posts").delete().eq("id", ds.postApagar);
+      if (error) { toast("Não consegui apagar."); return; }
+      if (p?.foto && p.usuario_id === uid) sb.storage.from("posts").remove([p.foto]);
+      M.posts = M.posts.filter((x) => x.id !== ds.postApagar); render();
+    } else if (ds.comentApagar) {
+      const c = M.coments.find((x) => x.id === ds.comentApagar);
+      const { error } = await sb.from("post_comentarios").delete().eq("id", ds.comentApagar);
+      if (error) { toast("Não consegui apagar o comentário."); return; }
+      M.coments = M.coments.filter((x) => x !== c); if (c) refazerPost(c.post_id);
+    }
+  });
+  document.addEventListener("change", async (e) => {
+    if (e.target.id !== "post-arquivo" || !e.target.files[0]) return;
+    const a = e.target.files[0];
+    if (!/^image\//.test(a.type)) { toast("Escolha uma imagem."); return; }
+    try {
+      postFoto = await reduzirParaPost(a);
+      if (postFoto.size > 1500000) postFoto = await reduzirParaPost(a, 800);
+      $("#post-prev").innerHTML = `<img src="${URL.createObjectURL(postFoto)}" alt="Prévia da foto"><button type="button" class="lnk-btn" data-post-tirar>Remover foto</button>`;
+    } catch { toast("Não consegui abrir essa imagem."); }
+  });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-post-tirar]")) { postFoto = null; $("#post-prev").innerHTML = ""; } });
+  document.addEventListener("submit", async (ev) => {
+    const f = ev.target;
+    if (f.id === "post-form") { ev.preventDefault(); enviarPost(f); return; }
+    if (!f.matches("[data-comentar]")) return;
+    ev.preventDefault();
+    const pid = f.dataset.comentar, texto = String(f.elements.t.value || "").trim().slice(0, 300);
+    if (!texto) return;
+    f.elements.t.value = "";
+    const { data, error } = await sb.from("post_comentarios").insert({ post_id: pid, usuario_id: uid, texto }).select("id, post_id, usuario_id, texto, criado_em").single();
+    if (error) { toast("Não consegui comentar agora."); f.elements.t.value = texto; return; }
+    M.coments.push(data); M.abertos.add(pid); refazerPost(pid);
+  });
 
   /* ---------- Desafio da semana (por grupo) ---------- */
   // medida: feito (só cumprir) | reps (mais é melhor) | tempo (completar no menor tempo) | duracao (aguentar mais tempo)
@@ -2804,7 +2984,7 @@
       const arr = t.dataset.av === "1" ? (l.avulso = l.avulso || []) : l.feitos, i = arr.indexOf(id);
       i >= 0 ? arr.splice(i, 1) : arr.push(id);
       save();
-      if (insFeito(p, k) !== era) { render(); if (insFeito(p, k)) toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); }
+      if (insFeito(p, k) !== era) { render(); if (insFeito(p, k)) { toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); convidarPost(); }; }
       else insRefazer(p, id);
     } else if (t.dataset.insSemana !== undefined) {
       const p = t.dataset.p, n = Number(t.dataset.insSemana);
@@ -2832,7 +3012,7 @@
         if (timer.seg) { l.dur = timer.seg; clearInterval(timer.id); Object.assign(timer, { ativo: false, seg: 0 }); }
       }
       save(); render();
-      if (l.done) toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`);
+      if (l.done) { toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); convidarPost(); };
     } else if (t.id === "puxar-tiros") {
       const l = garantirLog();
       const atuais = l.sets["tiro-200"] || [];
