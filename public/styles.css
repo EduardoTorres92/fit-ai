@@ -691,3 +691,11 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 #form-agua input[name="ml"] { width: 80px; }
 .nutri-form input:focus, .nutri-form select:focus { border-color: var(--blue); background: #fff; }
 .nutri-chips { flex-wrap: wrap; overflow: visible; padding: 12px 0 0; row-gap: 8px; }
+.seg-guia { grid-template-columns: 1fr 1fr; margin-bottom: 12px; }
+.guia-refs { display: flex; flex-direction: column; gap: 8px; }
+.guia-ref { margin-top: 8px; }
+.guia-ref summary::after { content: "Ver"; }
+.guia-ref[open] summary::after { content: "Ocultar"; }
+.guia-ref ul { list-style: none; margin: 0; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.guia-ref li { display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; }
+.guia-ref li small { color: var(--blue); font-weight: 600; font-size: 12px; }

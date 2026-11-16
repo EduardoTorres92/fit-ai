@@ -8,6 +8,7 @@ import { emailDoToken } from "../lib/dono.mjs";
 import { ehEmailDono } from "../lib/sessao.mjs";
 import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/limite.mjs";
 import { REFERENCIA, LEGENDA } from "../lib/ref-calistenia21.mjs";
+import { ROTEIRO_FORTALECIMENTO, CALENDARIO_CALISTENICO } from "../lib/ref-calistenia-base.mjs";
 import "../../public/academia.js";
 import "../../public/calistenia21.js";
 
@@ -38,14 +39,21 @@ ${COMUM}`,
   },
   c21: {
     cat: globalThis.FITAI_CAL21 || [], semanas: 3, maxEx: 12,
-    sistema: `Você é o Coach AI do FIT.AI e monta programas de CALISTENIA DE 21 DIAS (3 semanas) para resistência muscular, a partir dos treinos de referência do treinador que estão em <referencia>.
+    sistema: `Você é o Coach AI do FIT.AI e monta programas de CALISTENIA DE 21 DIAS (3 semanas), a partir do material do treinador: os treinos de 21 dias de resistência (<referencia>), o Roteiro de Fortalecimento (<fortalecimento>) e o Calendário Calistênico (<calendario>).
+Qual base usar:
+- Iniciante (ainda não faz 4–6 barras ou 15–20 flexões): monte em cima do Roteiro de Fortalecimento (negativas, isometrias, australianas, flexão inclinada e de joelhos, ativação escapular, core), misturado com circuitos leves dos 21 dias. Sem barra, troque os dias de barra por remada/core com peso do corpo.
+- Intermediário: os circuitos dos 21 dias, com dias de força como "Força e resistência" e "Isometria e controle" do calendário se tiver barra.
+- Avançado ou objetivo de habilidades (parada de mão, front lever, planche, muscle up): combine circuitos de resistência com dias de habilidade do calendário (handstand, front lever, planche, muscle up, L-sit, explosão e controle), no nível certo.
+- Dias de habilidade e de força usam séries tradicionais (circuito = false, séries e descanso por exercício, como no calendário: 2–5 séries, descanso de 90 a 180 s, mais curto que no material para caber no tempo). Dias de resistência são circuitos (circuito = true).
 Regras:
-- Siga o estilo da referência: cada treino é um CIRCUITO de 7 a 10 exercícios feito em voltas ("3x" = 3 voltas), misturando cardio (polichinelo, skipping, pé na bunda, burpee), força (flexões, agachamentos, afundos, barra) e core (prancha, abdominais). Alterne treinos de corpo inteiro, pernas e superior/core como na referência.
+- Nos circuitos, siga o estilo da referência: cada treino é um CIRCUITO de 7 a 10 exercícios feito em voltas ("3x" = 3 voltas), misturando cardio (polichinelo, skipping, pé na bunda, burpee), força (flexões, agachamentos, afundos, barra) e core (prancha, abdominais). Alterne treinos de corpo inteiro, pernas e superior/core como na referência.
 - Equipamento: "Só peso do corpo" → só exercícios com equip "corpo" (base nos treinos de peso do corpo); "Tenho barra fixa" → "corpo" e "barra" (base nos treinos com barra fixa); com paralelas também "paralela".
 - Nível: iniciante → versões mais fáceis (flexão de joelhos, inclinada, pistol com apoio), 2 a 3 voltas, menos repetições e tempos menores (20–30 s); intermediário → como a referência; avançado → variações explosivas e unilaterais, 3 a 4 voltas, 40–60 s.
 - O programa tem 3 semanas: use o campo "semana" (0, 1 e 2) e "dia" (0 = segunda … 6 = domingo) em cada treino. Treine nos dias da semana que a pessoa pediu; os outros dias são descanso. A semana 2 e a semana 3 ficam um pouco mais difíceis (mais repetições, mais tempo ou variação mais difícil). Pode repetir treinos de uma semana para outra com progressão, como a referência faz.
 - Seja enxuto: no máximo 10 exercícios por treino; "obs" só quando for essencial (ex.: versão mais fácil).
-- Cada exercício: "series" = número de voltas do circuito (igual a "rodadas" do dia); "reps" = repetições (ex.: "15"), "máx" ou tempo em segundos (ex.: "30 s"); "descanso" = pausa até o próximo exercício, em segundos (0 a 20). No dia, "rodadas" = voltas e "descansoRodada" = pausa entre as voltas (45 a 90 s).
+- Circuito: "series" de cada exercício = número de voltas (igual a "rodadas" do dia); "descanso" = pausa até o próximo exercício (0 a 20 s); "descansoRodada" = pausa entre as voltas (45 a 90 s).
+- Séries tradicionais (circuito = false): sem "rodadas"; "series" e "descanso" (60 a 180 s) por exercício.
+- "reps" = repetições (ex.: "15", "6-8"), "máx" ou tempo em segundos (ex.: "30 s", "10-15 s").
 - Duração compatível com o tempo por treino que a pessoa informou.
 ${COMUM}
 
@@ -53,7 +61,15 @@ ${COMUM}
 ${LEGENDA}
 
 ${REFERENCIA}
-</referencia>`,
+</referencia>
+
+<fortalecimento>
+${ROTEIRO_FORTALECIMENTO}
+</fortalecimento>
+
+<calendario>
+${CALENDARIO_CALISTENICO}
+</calendario>`,
   },
 };
 for (const P of Object.values(PROGRAMAS)) P.ci = indice(P.cat);
@@ -81,7 +97,8 @@ const FERRAMENTA = {
                 dia: { type: "integer", minimum: 0, maximum: 6, description: "0 = segunda … 6 = domingo" },
                 titulo: { type: "string", description: "Ex.: 'A · Peito e tríceps' ou 'Treino 3 · Superior e core'" },
                 foco: { type: "string", description: "Grupo principal em 1 ou 2 palavras" },
-                rodadas: { type: "integer", minimum: 1, maximum: 6, description: "Voltas do circuito (programa de 21 dias)" },
+                circuito: { type: "boolean", description: "Programa de 21 dias: true = circuito em voltas; false = séries tradicionais (força/habilidade)" },
+                rodadas: { type: "integer", minimum: 1, maximum: 6, description: "Voltas do circuito (só quando circuito = true)" },
                 descansoRodada: { type: "integer", description: "Descanso entre as voltas, em segundos" },
                 exercicios: {
                   type: "array",
@@ -120,14 +137,15 @@ function limparPlano(p, P) {
     const dia = num(d?.dia, 0, 6, -1), semana = P.semanas ? num(d?.semana, 0, P.semanas - 1, -1) : null;
     const chave = `${semana}-${dia}`;
     if (dia < 0 || semana === -1 || vistos.has(chave)) return null;
-    const rodadas = P.semanas ? num(d.rodadas, 1, 6, 3) : null;
+    const circuito = P.semanas && d.circuito !== false && d.rodadas != null; // no 21 dias, dias de força/habilidade vêm sem voltas
+    const rodadas = circuito ? num(d.rodadas, 1, 6, 3) : null;
     const ex = (Array.isArray(d.exercicios) ? d.exercicios : []).filter((e) => P.ci[e?.id]).slice(0, P.maxEx).map((e) => ({
-      id: e.id, series: num(rodadas || e.series, 1, 6, 3), reps: txt(e.reps, 20) || "10", descanso: num(e.descanso, 0, P.semanas ? 60 : 300, P.semanas ? 15 : 90),
+      id: e.id, series: num(rodadas || e.series, 1, 6, 3), reps: txt(e.reps, 20) || "10", descanso: num(e.descanso, 0, circuito ? 60 : 300, circuito ? 15 : 90),
       ...(txt(e.obs, 160) ? { obs: txt(e.obs, 160) } : {}),
     }));
     if (!ex.length) return null;
     vistos.add(chave);
-    return { ...(P.semanas ? { semana, rodadas, descansoRodada: num(d.descansoRodada, 0, 300, 60) } : {}), dia,
+    return { ...(P.semanas ? { semana } : {}), ...(circuito ? { rodadas, descansoRodada: num(d.descansoRodada, 0, 300, 60) } : {}), dia,
       titulo: txt(d.titulo, 60) || `Treino de ${DIAS[dia]}`, foco: txt(d.foco, 20) || P.ci[ex[0].id].grupo, exercicios: ex };
   }).filter(Boolean).sort((a, b) => (a.semana ?? 0) - (b.semana ?? 0) || a.dia - b.dia);
   if (!dias.length) return null;

@@ -806,11 +806,11 @@
   };
   if (CAL21.length) IA.c21 = {
     k: "c21", nome: "Calistenia 21 dias", rotulo: "Calistenia 21 dias", cat: CAL21, banner: "login.jpg", semanas: 3, carga: false,
-    convite: "Calistenia em 21 dias, montada para você", resumoConvite: "O Coach AI faz {n} perguntas (nível, objetivo, equipamento, dias…) e monta 3 semanas de circuitos com base nos treinos do treinador: peso do corpo ou barra fixa. Você marca cada volta, o tempo das isometrias e vê a evolução.",
+    convite: "Calistenia em 21 dias, montada para você", resumoConvite: "O Coach AI faz {n} perguntas (nível, objetivo, equipamento, dias…) e monta 3 semanas com base no material do treinador: circuitos de 21 dias, Roteiro de Fortalecimento (para chegar às primeiras barras e flexões) e Calendário Calistênico (habilidades). Você marca cada série ou volta, o tempo das isometrias e vê a evolução.",
     intro: "Bora montar sua Calistenia 21 dias", oQue: "3 semanas de circuitos no seu nível, baseadas nos treinos do treinador",
     passos: [
-      { k: "nivel", q: "Qual o seu nível hoje?", op: ["Iniciante: ainda não faço flexão completa", "Intermediário: faço flexões e agachamentos tranquilo", "Avançado: faço barra fixa e flexões variadas"] },
-      { k: "objetivo", q: "Qual o seu objetivo nesses 21 dias?", op: ["Resistência muscular", "Perder gordura", "Ganhar força (barra, mais flexões)", "Condicionamento e saúde"] },
+      { k: "nivel", q: "Qual o seu nível hoje?", op: ["Iniciante: ainda não faço 4–6 barras ou 15–20 flexões", "Intermediário: faço 4–6 barras e 15–20 flexões", "Avançado: faço mais de 10 barras e já treino habilidades"] },
+      { k: "objetivo", q: "Qual o seu objetivo nesses 21 dias?", op: ["Resistência muscular", "Perder gordura", "Ganhar força (primeira barra, mais flexões)", "Aprender habilidades (parada de mão, front lever, planche, muscle up)", "Condicionamento e saúde"] },
       { k: "equipamento", q: "O que você tem para treinar?", op: ["Só peso do corpo", "Tenho barra fixa", "Barra fixa e paralelas"] },
       { k: "dias", q: "Quantos dias por semana você vai treinar?", op: ["3", "4", "5", "6"], fmt: (v) => `${v} dias por semana` },
       { k: "diasSemana", q: "Quais dias ficam melhores?", multi: true },
@@ -1348,22 +1348,26 @@
      S.agua = { "AAAA-MM-DD": [{ t: "HH:MM", ml }] }   S.aguaLembrete = { on, intervalo, ml, ini, fim, push }
      ========================================================== */
   const NUTRI_OBJ = ["Perder gordura", "Manter o peso", "Ganhar massa muscular"];
-  const NUTRI_ATIV = [["auto", "Automático (pelos meus treinos)"], ["1.2", "Pouco ativo"], ["1.375", "1 a 3 treinos por semana"], ["1.55", "3 a 5 treinos por semana"], ["1.725", "6 ou 7 treinos por semana"]];
+  const NUTRI_ATIV = [["auto", "Automático (pelos meus treinos)"], ["1.2", "Sedentário"], ["1.375", "Leve: 1 a 3 treinos por semana"], ["1.55", "Moderado: 3 a 5 treinos por semana"], ["1.725", "Ativo: 6 ou 7 treinos por semana"], ["1.9", "Muito ativo: trabalho físico ou 2 treinos por dia"]];
+  const GUIA = window.FITAI_GUIA || null;
   const nutriSexo = () => S.nutri?.sexo || S.hiper?.perfil?.sexo || S.c21?.perfil?.sexo || "";
   const treinos14 = () => linhasLocais().filter((r) => r.concluido && r.data > keyOf(addDays(hoje, -14))).length;
-  // Estimativas: Mifflin-St Jeor × atividade; proteína por kg; gordura 0,9 g/kg; carboidrato completa as calorias
+  // Estimativas do Guia de Alimentação: TMB (Harris-Benedict) × fator de atividade; déficit de 15% ou superávit de 10%;
+  // proteína 2,0 g/kg (emagrecer), 2,2 (hipertrofia) ou 1,8 (manter); gordura 0,9 g/kg (mín. 20% das calorias); carboidrato completa
   function nutriMetas() {
     const N = S.nutri || {}, peso = Number(String(S.perfil.peso).replace(",", ".")), alt = Number(S.perfil.altura), idade = Number(S.perfil.idade);
     const treinoHoje = feito(hojeKey) || parcial(hojeKey);
     const agua = Math.round(((peso > 0 ? peso * 35 : 2500) + (treinoHoje ? 500 : 0)) / 50) * 50;
     if (!(peso > 0 && alt > 0 && idade > 0)) return { falta: true, agua };
-    const sx = norm(nutriSexo()), ajuste = sx.startsWith("masc") ? 5 : sx.startsWith("fem") ? -161 : -78;
-    const tmb = Math.round(10 * peso + 6.25 * alt - 5 * idade + ajuste);
+    const sx = norm(nutriSexo());
+    const tmbH = 88.36 + 13.4 * peso + 4.8 * alt - 5.7 * idade, tmbM = 447.6 + 9.2 * peso + 3.1 * alt - 4.3 * idade;
+    const tmb = Math.round(sx.startsWith("masc") ? tmbH : sx.startsWith("fem") ? tmbM : (tmbH + tmbM) / 2);
     const semana = treinos14() / 2, fator = N.atividade && N.atividade !== "auto" ? Number(N.atividade) : semana >= 6 ? 1.725 : semana >= 3 ? 1.55 : semana >= 1 ? 1.375 : 1.2;
     const gasto = Math.round(tmb * fator), obj = N.objetivo || "Manter o peso";
     const minimo = Math.round(Math.max(tmb * 1.1, sx.startsWith("fem") ? 1300 : 1500)); // nunca abaixo disso
     const kcal = Math.round(Math.max(minimo, obj === "Perder gordura" ? gasto * 0.85 : obj === "Ganhar massa muscular" ? gasto * 1.1 : gasto) / 10) * 10;
-    const prot = Math.round(peso * (obj === "Perder gordura" ? 2 : 1.8)), gord = Math.round(peso * 0.9), carb = Math.max(0, Math.round((kcal - prot * 4 - gord * 9) / 4));
+    const prot = Math.round(peso * (obj === "Perder gordura" ? 2 : obj === "Ganhar massa muscular" ? 2.2 : 1.8));
+    const gord = Math.round(Math.max(peso * 0.9, (kcal * 0.2) / 9)), carb = Math.max(0, Math.round((kcal - prot * 4 - gord * 9) / 4));
     return { tmb, fator, gasto, kcal, minimo, prot, gord, carb, agua, obj };
   }
   const aguaHoje = () => soma((S.agua?.[hojeKey] || []).map((x) => x.ml || 0));
@@ -1479,8 +1483,9 @@
           <div class="macro"><strong>${M.carb} g</strong><span>carboidrato</span></div>
           <div class="macro"><strong>${M.gord} g</strong><span>gordura</span></div>
         </div>
-        <p class="note">Objetivo: <b>${esc(M.obj)}</b>. Gasto estimado ${M.gasto} kcal/dia (metabolismo ${M.tmb} kcal × atividade ${String(M.fator).replace(".", ",")}). São estimativas para orientar; para um plano individual, procure um nutricionista.</p>`}
+        <p class="note">Objetivo: <b>${esc(M.obj)}</b>. Gasto estimado ${M.gasto} kcal/dia (metabolismo ${M.tmb} kcal × atividade ${String(M.fator).replace(".", ",")}), pelas fórmulas do Guia de Alimentação. São estimativas para orientar; para um plano individual, procure um nutricionista.</p>`}
       </div>
+      ${GUIA ? guiaCardapio(M) : ""}
       <div class="section">
         <div class="sec-head"><h2>Nutri AI</h2></div>
         <div class="note-box"><p><b>Sua nutricionista virtual.</b> Pergunte o que comer, quando e quanto. Ela usa suas metas, seus treinos e a água de hoje.</p>
@@ -1509,6 +1514,20 @@
       </div></section>`;
   };
 
+  /* ---------- Cardápio do Guia de Alimentação ---------- */
+  let guiaModo = null; // "emagrecer" | "hipertrofia" (padrão: pelo objetivo)
+  function guiaCardapio(M) {
+    const modo = guiaModo || ((S.nutri?.objetivo || "") === "Ganhar massa muscular" ? "hipertrofia" : "emagrecer");
+    return `<div class="section">
+      <div class="sec-head"><h2>Cardápio do guia</h2></div>
+      <nav class="seg seg-guia" aria-label="Cardápio"><button class="${modo === "emagrecer" ? "on" : ""}" data-guia="emagrecer">Emagrecimento</button><button class="${modo === "hipertrofia" ? "on" : ""}" data-guia="hipertrofia">Hipertrofia</button></nav>
+      <div class="guia-refs">${GUIA.refeicoes.map((r, i) => `<details class="musc guia-ref"${i === 0 ? " open" : ""}><summary><span>🍽️ ${esc(r.nome)}</span></summary><ul>
+        ${r[modo].map((o) => `<li><span>${esc(o.txt)}</span><small>${o.kcal} kcal · P ${o.p} g · C ${o.c} g · G ${o.g} g</small></li>`).join("")}</ul></details>`).join("")}</div>
+      <details class="musc guia-ref"><summary><span>💡 Dicas e mitos do guia</span></summary><ul>${[...GUIA.dicas, ...GUIA.mitos].map((t) => `<li><span>${esc(t)}</span></li>`).join("")}</ul></details>
+      ${M.falta ? "" : `<p class="note">Some as opções do dia até chegar perto de <b>${M.kcal} kcal</b> e <b>${M.prot} g de proteína</b>. Peça à Nutri AI para montar o seu dia com elas.</p>`}
+    </div>`;
+  }
+
   /* ---------- Contexto para a Nutri AI ---------- */
   function nutriBase() {
     const M = nutriMetas(), N = S.nutri || {};
@@ -1517,7 +1536,7 @@
       `Objetivo: ${N.objetivo || "Manter o peso"}. Refeições por dia: ${N.refeicoes || "4"}. Horário do treino: ${N.treinoHora || "não informado"}.`,
       `Restrições/alergias: ${N.restricoes || "nenhuma informada"}. Preferências: ${N.preferencias || "nenhuma informada"}.`,
       M.falta ? "Metas: faltam peso, altura ou idade para calcular calorias; peça para preencher na aba Nutrição." :
-        `Metas estimadas pelo app (Mifflin-St Jeor): metabolismo ${M.tmb} kcal, gasto ${M.gasto} kcal (atividade ${M.fator}), meta ${M.kcal} kcal/dia (mínimo seguro ${M.minimo} kcal), proteína ${M.prot} g, carboidrato ${M.carb} g, gordura ${M.gord} g.`,
+        `Metas estimadas pelo app (fórmulas do Guia de Alimentação: Harris-Benedict × fator de atividade): metabolismo ${M.tmb} kcal, gasto ${M.gasto} kcal (atividade ${M.fator}), meta ${M.kcal} kcal/dia (mínimo seguro ${M.minimo} kcal), proteína ${M.prot} g, carboidrato ${M.carb} g, gordura ${M.gord} g.`,
       `Meta de água: ${M.agua} ml/dia. Lembrete de água: ${S.aguaLembrete?.on ? `ligado, ${S.aguaLembrete.ml} ml a cada ${S.aguaLembrete.intervalo} min` : "desligado"}.`,
       `Programa principal de treino: ${progDe(principal())?.nome || NOME_PROG}.${S.hiper?.perfil?.objetivo ? ` Objetivo na academia: ${S.hiper.perfil.objetivo}.` : ""}`].join("\n");
   }
@@ -1531,8 +1550,9 @@
   }
 
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-agua],[data-agua-desfazer],[data-agua-desligar],[data-nutri-chat],[data-nutri-q]");
+    const t = e.target.closest("[data-agua],[data-agua-desfazer],[data-agua-desligar],[data-nutri-chat],[data-nutri-q],[data-guia]");
     if (!t) return;
+    if (t.dataset.guia) { guiaModo = t.dataset.guia; render(); return; }
     if (t.dataset.agua) { aguaAdd(Number(t.dataset.agua)); render(); }
     else if (t.hasAttribute("data-agua-desfazer")) { (S.agua?.[hojeKey] || []).pop(); save(); render(); }
     else if (t.hasAttribute("data-agua-desligar")) aguaDesligar();
