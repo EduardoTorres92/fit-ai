@@ -858,3 +858,8 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .cf-pr-hist small { color: var(--muted); }
 .cf-pr-hist .lnk-btn { color: var(--muted); align-self: center; }
 .cf-mes::first-letter { text-transform: uppercase; }
+.cf-sug { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; margin-top: 2px; }
+.cf-sug::-webkit-scrollbar { display: none; }
+.cf-sug-op { flex: none; padding: 7px 12px; border-radius: 99px; background: var(--blue-08); color: var(--blue); font-size: 13px; font-weight: 600; white-space: nowrap; border: 1px solid var(--blue-soft); }
+.cf-sug-op:first-child { background: var(--blue); color: #fff; border-color: var(--blue); }
+.cf-sug-op:active { scale: .96; }

@@ -1518,14 +1518,14 @@
   function cfEditorHtml() {
     const w = cfEdit;
     return `<form class="cf-edit" id="cf-edit">
-      <label>Nome do WOD<input name="titulo" maxlength="60" value="${esc(w.titulo || "")}" placeholder="Ex.: Fran, AMRAP 15…" required></label>
+      <label>Nome do WOD<input name="titulo" maxlength="60" value="${esc(w.titulo || "")}" placeholder="Ex.: Fran, AMRAP 15…" required data-cf-auto="titulo" autocomplete="off"></label>
       ${w.partes.map((p, i) => `<fieldset class="cf-edit-parte" data-i="${i}">
         <div class="cf-edit-linha"><input name="nome" maxlength="30" value="${esc(p.nome)}" aria-label="Nome do bloco">
           <select name="tipo" aria-label="Formato">${Object.entries(CF_TIPOS).map(([k, n]) => `<option value="${k}"${p.tipo === k ? " selected" : ""}>${n}</option>`).join("")}</select></div>
         <div class="cf-edit-linha"><label>Minutos<input name="minutos" type="number" min="0" max="120" inputmode="numeric" value="${p.minutos ?? ""}"></label>
           <label>Voltas/séries<input name="rodadas" type="number" min="0" max="100" inputmode="numeric" value="${p.rodadas ?? ""}"></label>
           <label>Esquema<input name="esquema" maxlength="40" value="${esc(p.esquema || "")}" placeholder="21-15-9"></label></div>
-        <label>Movimentos (um por linha: reps, nome e carga entre parênteses)<textarea name="movs" rows="${Math.max(3, p.movimentos.length + 1)}" placeholder="21 Thruster (43/29 kg)&#10;21 Pull-up">${esc(p.movimentos.map(cfMovTxt).join("\n"))}</textarea></label>
+        <label>Movimentos (um por linha: reps, nome e carga entre parênteses)<textarea name="movs" data-cf-auto="movs" autocomplete="off" autocapitalize="sentences" rows="${Math.max(3, p.movimentos.length + 1)}" placeholder="21 Thruster (43/29 kg)&#10;21 Pull-up">${esc(p.movimentos.map(cfMovTxt).join("\n"))}</textarea></label>
         <div class="cf-edit-linha"><label class="cf-check"><input type="radio" name="pontuado" value="${i}" ${w.pontuado === i ? "checked" : ""}> Vale como resultado</label>
           ${w.partes.length > 1 ? `<button type="button" class="lnk-btn" data-cf-tirar-parte="${i}">Remover bloco</button>` : ""}</div>
       </fieldset>`).join("")}
@@ -1540,7 +1540,8 @@
     const c = s.match(/\(([^)]+)\)\s*$/) || s.match(/\s@\s*(.+)$/);
     if (c) { carga = c[1].trim(); s = s.slice(0, c.index).trim(); }
     const r = s.match(/^(\d+(?:[.,]\d+)?\s*(?:m|km|cal|s|seg|min|x)?|max|máx)\b\.?\s+(.+)$/i);
-    return { nome: (r ? r[2] : s).slice(0, 60), ...(r ? { reps: r[1].replace(/\s+/g, " ").slice(0, 30) } : {}), ...(carga ? { carga: carga.slice(0, 30) } : {}) };
+    const nome = (r ? r[2] : s).slice(0, 60), canon = CF_MOVS.find((x) => cfNome(x) === cfNome(nome)) || CF_SIGLAS[norm(nome.trim())]; // "pull-up" → "Pull-up", "DU" → "Double under"
+    return { nome: canon || nome, ...(r ? { reps: r[1].replace(/\s+/g, " ").slice(0, 30) } : {}), ...(carga ? { carga: carga.slice(0, 30) } : {}) };
   }
   function cfLerEditor(f) {
     const partes = [...f.querySelectorAll(".cf-edit-parte")].map((fs) => {
@@ -1624,8 +1625,7 @@
     const ms = cfPrsPorMov(), aberto = S.cf.prAberto;
     return `<form class="cf-res cf-pr-form" id="cf-pr-form">
       <div class="sec-head"><h2>Novo PR</h2></div>
-      <label>Movimento<input name="mov" list="cf-lifts" maxlength="40" required placeholder="Ex.: Back squat" value="${esc(S.cf.ultimoMov || "")}"></label>
-      <datalist id="cf-lifts">${CF_LIFTS.map((x) => `<option value="${x}">`).join("")}</datalist>
+      <label>Movimento<input name="mov" data-cf-auto="mov" autocomplete="off" maxlength="40" required placeholder="Ex.: Back squat" value="${esc(S.cf.ultimoMov || "")}"></label>
       <div class="cf-campos cf-campos3"><label>Reps<select name="reps">${[1, 2, 3, 5, 10].map((n) => `<option value="${n}">${n}RM</option>`).join("")}</select></label>
         <label>Carga (kg)<input name="kg" type="number" min="1" max="500" step="0.5" inputmode="decimal" required></label>
         <label>Data<input name="k" type="date" max="${hojeKey}" value="${hojeKey}"></label></div>
@@ -1639,6 +1639,95 @@
       </details>`).join("")}</div>` : `<p class="note">Anote seus PRs de levantamento (1RM, 3RM, 5RM…). O app calcula as porcentagens que o coach pede no quadro (ex.: 5×3 a 75%).</p>`}`;
   }
   const kgTxt = (n) => `${fmtKg(n)} kg`;
+
+
+  /* ---------- Autocompletar nomes (movimentos, PRs e nome do WOD) ---------- */
+  // Lista dos movimentos mais comuns nos quadros, mais as siglas (DU, T2B, HSPU…). Os que a pessoa já usou vêm primeiro.
+  const CF_MOVS = [
+    "Back squat", "Front squat", "Overhead squat", "Air squat", "Agachamento", "Goblet squat", "Pistol", "Deadlift", "Sumo deadlift", "Sumo deadlift high pull", "Romanian deadlift",
+    "Clean", "Power clean", "Squat clean", "Hang power clean", "Hang squat clean", "Clean and jerk", "Squat clean and jerk",
+    "Snatch", "Power snatch", "Squat snatch", "Hang power snatch", "Hang squat snatch", "Overhead lunge",
+    "Push press", "Push jerk", "Split jerk", "Strict press", "Bench press", "Thruster", "Cluster", "Good morning", "Hip thrust",
+    "Wall ball", "Kettlebell swing", "Russian kettlebell swing", "American kettlebell swing", "Kettlebell snatch", "Kettlebell clean", "Turkish get-up",
+    "Dumbbell snatch", "Dumbbell clean", "Dumbbell clean and jerk", "Dumbbell thruster", "Dumbbell push press", "Dumbbell walking lunge", "Devil press", "Man maker",
+    "Front rack lunge", "Walking lunge", "Jumping lunge", "Afundo", "Box step-up", "Farmer carry", "Sandbag carry", "Sandbag clean",
+    "Pull-up", "Strict pull-up", "Kipping pull-up", "Butterfly pull-up", "Chest to bar", "Muscle up", "Bar muscle up", "Ring muscle up",
+    "Toes to bar", "Knees to elbow", "Hanging knee raise", "Handstand push-up", "Strict handstand push-up", "Handstand walk", "Handstand hold", "Wall walk",
+    "Ring dip", "Bar dip", "Push-up", "Flexão", "Hand release push-up", "Ring row", "Rope climb", "Legless rope climb",
+    "Sit-up", "Abdominal (sit-up)", "GHD sit-up", "Hollow rock", "Hollow hold", "V-up", "L-sit", "Plank", "Prancha", "Back extension", "Hip extension", "Superman",
+    "Burpee", "Bar-facing burpee", "Burpee over the bar", "Burpee box jump over", "Box jump", "Box jump over", "Broad jump", "Tuck jump", "Jumping jack", "Polichinelo", "Mountain climber", "Wall sit",
+    "Double under", "Single under", "Triple under", "Corrida", "Shuttle run", "Remo", "Bike", "Assault bike", "Echo bike", "Ski erg", "Natação",
+  ];
+  const CF_SIGLAS = { du: "Double under", su: "Single under", t2b: "Toes to bar", ttb: "Toes to bar", k2e: "Knees to elbow", hspu: "Handstand push-up", shspu: "Strict handstand push-up",
+    c2b: "Chest to bar", ctb: "Chest to bar", mu: "Muscle up", bmu: "Bar muscle up", rmu: "Ring muscle up", wb: "Wall ball", kb: "Kettlebell swing", kbs: "Kettlebell swing",
+    ohs: "Overhead squat", dl: "Deadlift", pc: "Power clean", sc: "Squat clean", hpc: "Hang power clean", ps: "Power snatch", hps: "Hang power snatch", pp: "Push press", pj: "Push jerk",
+    bs: "Back squat", fs: "Front squat", bj: "Box jump", bjo: "Box jump over", bbjo: "Burpee box jump over", bfb: "Bar-facing burpee", sdhp: "Sumo deadlift high pull",
+    ghd: "GHD sit-up", rc: "Rope climb", hsw: "Handstand walk", cj: "Clean and jerk", "c&j": "Clean and jerk", tgu: "Turkish get-up", rdl: "Romanian deadlift",
+    run: "Corrida", row: "Remo", flexao: "Flexão", abdominal: "Abdominal (sit-up)" };
+  function cfUsados(tipo) {
+    const n = {};
+    if (tipo === "titulo") { for (const l of Object.values(S.cf.logs)) if (l.wod?.titulo) n[l.wod.titulo] = (n[l.wod.titulo] || 0) + 1; }
+    else {
+      for (const l of Object.values(S.cf.logs)) for (const p of l.wod?.partes || []) for (const m of p.movimentos) n[m.nome] = (n[m.nome] || 0) + 1;
+      for (const x of S.cf.prs || []) n[x.mov] = (n[x.mov] || 0) + 2;
+    }
+    return Object.entries(n).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  }
+  function cfSugestoes(q, tipo) {
+    const t = cfNome(q);
+    if (!t || /^\d/.test(t)) return [];
+    const base = tipo === "titulo" ? [...cfUsados("titulo"), ...CF_BENCH.map((b) => b.titulo)] : tipo === "mov" ? [...cfUsados("mov"), ...CF_LIFTS, ...CF_MOVS] : [...cfUsados("mov"), ...CF_MOVS];
+    const vistos = new Set(), out = [];
+    const add = (x) => { const k = cfNome(x); if (!k || vistos.has(k) || out.length >= 8) return; vistos.add(k); out.push(x); };
+    const sigla = CF_SIGLAS[norm(String(q).trim())];
+    if (sigla && tipo !== "titulo") add(sigla);
+    if (tipo !== "titulo" && t.length >= 2) for (const [k, v] of Object.entries(CF_SIGLAS)) if (k.length >= 3 && k.startsWith(t)) add(v); // run → Corrida, row → Remo
+    for (const x of base) if (cfNome(x).startsWith(t)) add(x);
+    for (const x of base) if (cfNome(x).split(" ").some((w) => w.startsWith(t))) add(x);
+    if (t.length >= 3) for (const x of base) if (cfNome(x).includes(t)) add(x);
+    return out.filter((x) => cfNome(x) !== t);
+  }
+  // Linha do textarea onde está o cursor: { ini, fim, pre (reps), nome (o que está sendo digitado), resto (carga) }
+  function cfLinhaAtual(ta) {
+    const v = ta.value, pos = ta.selectionStart, ini = v.lastIndexOf("\n", pos - 1) + 1, f = v.indexOf("\n", pos), fim = f < 0 ? v.length : f;
+    const m = v.slice(ini, fim).match(/^(\s*(?:\d+(?:[.,]\d+)?\s*(?:m|km|cal|s|seg|min|x)?|max|máx)\.?\s+)?([^(@]*)(.*)$/i);
+    return { ini, fim, pre: m[1] || "", nome: m[2], resto: m[3] };
+  }
+  function cfSugMostrar(campo) {
+    const tipo = campo.dataset.cfAuto, q = tipo === "movs" ? cfLinhaAtual(campo).nome : campo.value;
+    const lista = cfSugestoes(q, tipo);
+    let box = campo.parentElement.querySelector(":scope > .cf-sug");
+    if (!lista.length) { box?.remove(); return; }
+    if (!box) { box = document.createElement("div"); box.className = "cf-sug"; box.setAttribute("role", "listbox"); box.setAttribute("aria-label", "Sugestões"); campo.insertAdjacentElement("afterend", box); }
+    box.innerHTML = lista.map((x) => `<button type="button" role="option" class="cf-sug-op" data-cf-sug="${esc(x)}">${esc(x)}${CF_BENCH.some((b) => b.titulo === x) && tipo === "titulo" ? " 🏆" : ""}</button>`).join("");
+    box.scrollLeft = 0;
+  }
+  function cfSugEscolher(campo, x) {
+    const tipo = campo.dataset.cfAuto;
+    if (tipo === "movs") {
+      const l = cfLinhaAtual(campo), novo = l.pre + x + (l.resto.trim() ? ` ${l.resto.trim()}` : "");
+      campo.value = campo.value.slice(0, l.ini) + novo + campo.value.slice(l.fim);
+      const c = l.ini + l.pre.length + x.length; campo.setSelectionRange(c, c);
+    } else campo.value = x;
+    campo.parentElement.querySelector(":scope > .cf-sug")?.remove();
+    // Escolheu um benchmark no nome do WOD e ainda não escreveu nada: preenche o treino inteiro
+    const b = tipo === "titulo" && CF_BENCH.find((y) => y.titulo === x);
+    if (b && cfEdit && ![...document.querySelectorAll("#cf-edit [name=movs]")].some((t) => t.value.trim())) {
+      cfEdit = { k: cfEdit.k, ...JSON.parse(JSON.stringify(b.wod)) }; render(); toast(`${b.titulo} preenchido ✓`); return;
+    }
+    campo.focus();
+  }
+  document.addEventListener("input", (e) => { if (e.target.matches?.("[data-cf-auto]")) cfSugMostrar(e.target); });
+  document.addEventListener("keyup", (e) => { if (e.target.matches?.("textarea[data-cf-auto]") && /Arrow|Home|End/.test(e.key)) cfSugMostrar(e.target); });
+  document.addEventListener("focusout", (e) => { if (e.target.matches?.("[data-cf-auto]")) setTimeout(() => { if (document.activeElement !== e.target) e.target.parentElement?.querySelector(":scope > .cf-sug")?.remove(); }, 200); });
+  // pointerdown com preventDefault: tocar na sugestão não tira o foco do campo (o teclado continua aberto)
+  document.addEventListener("pointerdown", (e) => { if (e.target.closest("[data-cf-sug]")) e.preventDefault(); });
+  document.addEventListener("click", (e) => {
+    const op = e.target.closest("[data-cf-sug]");
+    if (!op) return;
+    const campo = op.parentElement.parentElement.querySelector(":scope > [data-cf-auto]");
+    if (campo) cfSugEscolher(campo, op.dataset.cfSug);
+  });
 
   /* ---------- Timer avulso ---------- */
   const CF_TIMER_PADRAO = { tipo: "for_time", cap: 0, min: 12, emomMin: 10, cada: 1, rodadas: 8, trab: 20, desc: 10 };
