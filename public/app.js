@@ -375,6 +375,7 @@
   const MENU_ITENS = () => [
     { name: "Início", icon: "house", href: "#/home", tab: "home" },
     { name: "Treinos", icon: "calendar-days", href: `#/${principal()}`, tab: "plano" },
+    { name: "CrossFit", icon: "dumbbell", href: "#/cf", tab: "cf" },
     { name: "Nutrição", icon: "apple", href: "#/nutricao", tab: "nutricao" },
     { name: "Coach AI", icon: "sparkles", href: "#/coach", tab: "coach" },
     { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
@@ -1688,7 +1689,7 @@
   }
 
   telas.cf = (p1) => {
-    setToolbar("plano");
+    setToolbar("cf");
     const sub = CF_MENU.some(([r]) => r && r === p1) ? p1 : null;
     const dia = !sub && /^\d{4}-\d{2}-\d{2}$/.test(p1 || "") && p1 <= hojeKey ? p1 : null;
     const k = dia || hojeKey, l = cfLog(k), ehHoje = k === hojeKey;
