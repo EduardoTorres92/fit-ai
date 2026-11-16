@@ -632,6 +632,7 @@
         </div>
         <div class="section">
           ${grupoHome()}
+          <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
           ${IA.hiper && principal() !== "hiper" ? iaHome("hiper", false) : ""}
           ${IA.c21 && principal() !== "c21" && (S.c21.plano || S.c21.etapa) ? iaHome("c21", false) : ""}
           ${principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : IA[principal()] ? iaHome(principal(), true) : treinoHojeVideo(principal())}
@@ -985,8 +986,8 @@
     if (p.num || p.livre) inp.focus();
   }
   async function iaIniciarChat(pk, refazer = false) {
-    if (!IA[pk] || (!layer.hidden && iaChat === pk)) return;
-    if (layer.hidden) openChat();
+    if (!IA[pk] || (!layer.hidden && iaChat === pk && chatPapel === "coach")) return;
+    if (layer.hidden || chatPapel !== "coach") openChat();
     iaChat = pk;
     if (refazer) S[pk].etapa = 0;
     const I = IA[pk], et = S[pk].etapa || 0;
@@ -1337,6 +1338,222 @@
     if (!(r > 0 && r < 1000) || kg < 0 || kg > 999) { toast("Confira os números da série."); return; }
     if (iaTm?.pk === pk && iaTm.id === id && iaTm.tipo === "ex") { iaTm = null; clearInterval(iaTmId); }
     iaSalvarSerie(pk, id, { ...(kg ? { kg: Math.round(kg * 10) / 10 } : {}), r });
+  });
+
+
+  /* ==========================================================
+     Nutrição: metas estimadas (calorias, macros, água), registro de água, lembrete por notificação push
+     (/api/agua + sw.js) e a Nutri AI, que usa o mesmo chat do Coach com outro papel.
+     S.nutri = { sexo, objetivo, atividade, refeicoes, treinoHora, restricoes, preferencias }
+     S.agua = { "AAAA-MM-DD": [{ t: "HH:MM", ml }] }   S.aguaLembrete = { on, intervalo, ml, ini, fim, push }
+     ========================================================== */
+  const NUTRI_OBJ = ["Perder gordura", "Manter o peso", "Ganhar massa muscular"];
+  const NUTRI_ATIV = [["auto", "Automático (pelos meus treinos)"], ["1.2", "Pouco ativo"], ["1.375", "1 a 3 treinos por semana"], ["1.55", "3 a 5 treinos por semana"], ["1.725", "6 ou 7 treinos por semana"]];
+  const nutriSexo = () => S.nutri?.sexo || S.hiper?.perfil?.sexo || S.c21?.perfil?.sexo || "";
+  const treinos14 = () => linhasLocais().filter((r) => r.concluido && r.data > keyOf(addDays(hoje, -14))).length;
+  // Estimativas: Mifflin-St Jeor × atividade; proteína por kg; gordura 0,9 g/kg; carboidrato completa as calorias
+  function nutriMetas() {
+    const N = S.nutri || {}, peso = Number(String(S.perfil.peso).replace(",", ".")), alt = Number(S.perfil.altura), idade = Number(S.perfil.idade);
+    const treinoHoje = feito(hojeKey) || parcial(hojeKey);
+    const agua = Math.round(((peso > 0 ? peso * 35 : 2500) + (treinoHoje ? 500 : 0)) / 50) * 50;
+    if (!(peso > 0 && alt > 0 && idade > 0)) return { falta: true, agua };
+    const sx = norm(nutriSexo()), ajuste = sx.startsWith("masc") ? 5 : sx.startsWith("fem") ? -161 : -78;
+    const tmb = Math.round(10 * peso + 6.25 * alt - 5 * idade + ajuste);
+    const semana = treinos14() / 2, fator = N.atividade && N.atividade !== "auto" ? Number(N.atividade) : semana >= 6 ? 1.725 : semana >= 3 ? 1.55 : semana >= 1 ? 1.375 : 1.2;
+    const gasto = Math.round(tmb * fator), obj = N.objetivo || "Manter o peso";
+    const minimo = Math.round(Math.max(tmb * 1.1, sx.startsWith("fem") ? 1300 : 1500)); // nunca abaixo disso
+    const kcal = Math.round(Math.max(minimo, obj === "Perder gordura" ? gasto * 0.85 : obj === "Ganhar massa muscular" ? gasto * 1.1 : gasto) / 10) * 10;
+    const prot = Math.round(peso * (obj === "Perder gordura" ? 2 : 1.8)), gord = Math.round(peso * 0.9), carb = Math.max(0, Math.round((kcal - prot * 4 - gord * 9) / 4));
+    return { tmb, fator, gasto, kcal, minimo, prot, gord, carb, agua, obj };
+  }
+  const aguaHoje = () => soma((S.agua?.[hojeKey] || []).map((x) => x.ml || 0));
+  const fmtL = (ml) => `${(ml / 1000).toFixed(ml % 1000 ? 1 : 0).replace(".", ",")} L`;
+  function aguaAdd(ml) {
+    S.agua = S.agua || {};
+    const d = new Date();
+    (S.agua[hojeKey] = S.agua[hojeKey] || []).push({ t: `${pad(d.getHours())}:${pad(d.getMinutes())}`, ml });
+    for (const k of Object.keys(S.agua)) if (k < keyOf(addDays(hoje, -30))) delete S.agua[k]; // guarda só 30 dias
+    save();
+    aguaAvisarServidor("bebeu");
+    const meta = nutriMetas().agua, tot = aguaHoje();
+    toast(tot >= meta && tot - ml < meta ? `Meta de água batida! 💧 ${fmtL(tot)}` : `+${ml} ml 💧 ${fmtL(tot)} de ${fmtL(meta)}`);
+  }
+
+  /* ---------- Lembrete de água (push) ---------- */
+  const pushOk = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const b64u8 = (b) => { const s = atob((b + "=".repeat((4 - (b.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+  async function aguaAssinatura(criar) {
+    const reg = await navigator.serviceWorker.register("sw.js");
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub && criar) {
+      const { chave } = await fetch("/api/agua").then((r) => r.json());
+      try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u8(chave) }); }
+      catch { const velha = await reg.pushManager.getSubscription(); if (velha) await velha.unsubscribe(); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u8(chave) }); }
+    }
+    return sub;
+  }
+  async function aguaAvisarServidor(acao) {
+    if (!S.aguaLembrete?.on || !S.aguaLembrete.push || !pushOk()) return;
+    try { const sub = await aguaAssinatura(false); if (sub) await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao, endpoint: sub.endpoint }) }); } catch {}
+  }
+  async function aguaLigar(cfg, testar = true) {
+    const L = { intervalo: 60, ml: 300, ini: "08:00", fim: "22:00", ...(S.aguaLembrete || {}), ...cfg, on: true };
+    if (!pushOk()) {
+      L.push = false; S.aguaLembrete = L; save(); render();
+      toast(/iphone|ipad/i.test(navigator.userAgent) ? "No iPhone, adicione o FIT.AI à tela de início (Compartilhar → Adicionar à Tela de Início) para receber notificações. Por enquanto aviso só com o app aberto." : "Este navegador não recebe notificações. Vou avisar enquanto o app estiver aberto.", 6000);
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("Sem permissão de notificação. Libere nas configurações do navegador para este site.", 5000); return; }
+    try {
+      const sub = await aguaAssinatura(true);
+      const r = await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ acao: "assinar", assinatura: sub.toJSON(), intervalo: L.intervalo, ml: L.ml, ini: L.ini, fim: L.fim, tz: -new Date().getTimezoneOffset() }) });
+      if (!r.ok) throw new Error(String(r.status));
+      L.push = true; S.aguaLembrete = L; save(); render();
+      if (testar) fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: "testar", endpoint: sub.endpoint }) });
+      toast(`Lembrete ligado: ${L.ml} ml a cada ${L.intervalo} min, das ${L.ini} às ${L.fim}. 💧`, 4500);
+    } catch (e) { toast("Não consegui ligar o lembrete agora. Tente de novo."); }
+  }
+  async function aguaDesligar() {
+    try { if (pushOk()) { const sub = await aguaAssinatura(false); if (sub) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: "cancelar", endpoint: sub.endpoint }) }); await sub.unsubscribe(); } } } catch {}
+    S.aguaLembrete = { ...(S.aguaLembrete || {}), on: false }; save(); render(); toast("Lembrete de água desligado.");
+  }
+  // Sem push (iPhone fora da tela de início, navegador antigo): avisa enquanto o app está aberto
+  let aguaUltimoAviso = "";
+  setInterval(() => {
+    const L = S.aguaLembrete;
+    if (!L?.on || L.push) return;
+    const d = new Date(), agora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    if (agora < L.ini || agora >= L.fim) return;
+    const ult = (S.agua?.[hojeKey] || []).slice(-1)[0]?.t || L.ini, [h, m] = ult.split(":").map(Number);
+    if (d.getHours() * 60 + d.getMinutes() - (h * 60 + m) >= L.intervalo && aguaUltimoAviso !== agora.slice(0, 4)) {
+      aguaUltimoAviso = agora.slice(0, 4); toast(`💧 Hora de beber água: ${L.ml} ml`, 6000);
+      try { if (Notification.permission === "granted") new Notification("💧 Hora de beber água", { body: `Beba ${L.ml} ml agora.` }); } catch {}
+    }
+  }, 60000);
+  // "Bebi" na notificação com o app aberto
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.tipo !== "agua") return;
+    if (e.data.bebi) aguaAdd(Number(e.data.ml) || 300); else location.hash = "#/nutricao";
+    if (location.hash.startsWith("#/nutricao")) render();
+  });
+
+  /* ---------- Tela ---------- */
+  const NUTRI_PERGUNTAS = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?", "Lanches práticos e baratos"];
+  telas.nutricao = (p1, p2) => {
+    setToolbar("nutricao");
+    if (p1 === "bebi") { aguaAdd(Math.min(1000, Number(p2) || 300)); history.replaceState(null, "", "#/nutricao"); }
+    const M = nutriMetas(), N = S.nutri || {}, L = { intervalo: 60, ml: 300, ini: "08:00", fim: "22:00", ...(S.aguaLembrete || {}) };
+    const tot = aguaHoje(), pct = Math.min(100, Math.round((tot / M.agua) * 100)), copos = S.agua?.[hojeKey] || [];
+    const sel = (nome, ops, v) => `<select name="${nome}">${ops.map(([val, txt]) => `<option value="${esc(val)}"${String(v ?? "") === String(val) ? " selected" : ""}>${esc(txt)}</option>`).join("")}</select>`;
+    return `<section class="screen has-toolbar">
+      <header class="header"><span class="logo-txt dark">Fit.ai</span></header>
+      <div class="section nutri">
+        <div class="sec-head"><h2>Água de hoje</h2><span>${copos.length} ${copos.length === 1 ? "copo" : "copos"}</span></div>
+        <div class="agua-card">
+          <div class="agua-num"><strong>${fmtL(tot)}</strong><span>de ${fmtL(M.agua)}${feito(hojeKey) || parcial(hojeKey) ? " (dia de treino +0,5 L)" : ""}</span></div>
+          <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
+          <div class="agua-btns"><button class="btn btn-blue" data-agua="300">+ 300 ml</button><button class="btn btn-outline" data-agua="500">+ 500 ml</button>${copos.length ? `<button class="lnk-btn" data-agua-desfazer>Desfazer</button>` : ""}</div>
+          ${copos.length ? `<p class="note agua-hist">${copos.slice(-8).map((c) => `${c.t} · ${c.ml} ml`).join("  ·  ")}</p>` : ""}
+        </div>
+      </div>
+      <div class="section">
+        <div class="sec-head"><h2>Lembrete de água</h2>${L.on ? `<span class="pill blue">Ligado</span>` : ""}</div>
+        <form class="nutri-form" id="form-agua">
+          <label>Beber<input name="ml" type="number" inputmode="numeric" min="50" max="1000" step="50" value="${L.ml}"> ml</label>
+          <label>A cada ${sel("intervalo", [[30, "30 min"], [45, "45 min"], [60, "1 hora"], [90, "1h30"], [120, "2 horas"]], L.intervalo)}</label>
+          <label>Das <input name="ini" type="time" value="${esc(L.ini)}"> às <input name="fim" type="time" value="${esc(L.fim)}"></label>
+          <button class="btn btn-blue" type="submit">${L.on ? "Salvar lembrete" : "Ligar lembrete no celular"}</button>
+          ${L.on ? `<button class="btn btn-outline" type="button" data-agua-desligar>Desligar lembrete</button>` : ""}
+        </form>
+        <p class="note">${L.on && L.push ? "As notificações chegam mesmo com o app fechado. Toque em <b>Bebi</b> na notificação para anotar." : L.on ? "Este aparelho só recebe o aviso com o app aberto." : "O celular vai pedir permissão para mostrar notificações."}${/iphone|ipad/i.test(navigator.userAgent) ? " No iPhone, as notificações só funcionam com o FIT.AI adicionado à tela de início." : ""}</p>
+      </div>
+      <div class="section">
+        <div class="sec-head"><h2>Suas metas de hoje</h2><span>estimativa</span></div>
+        ${M.falta ? `<div class="note-box"><p>Preencha <b>peso, altura e idade</b> no Perfil (ou abaixo) para eu calcular calorias e macros.</p></div>` : `
+        <div class="macro-grid">
+          <div class="macro"><strong>${M.kcal}</strong><span>kcal</span></div>
+          <div class="macro"><strong>${M.prot} g</strong><span>proteína</span></div>
+          <div class="macro"><strong>${M.carb} g</strong><span>carboidrato</span></div>
+          <div class="macro"><strong>${M.gord} g</strong><span>gordura</span></div>
+        </div>
+        <p class="note">Objetivo: <b>${esc(M.obj)}</b>. Gasto estimado ${M.gasto} kcal/dia (metabolismo ${M.tmb} kcal × atividade ${String(M.fator).replace(".", ",")}). São estimativas para orientar; para um plano individual, procure um nutricionista.</p>`}
+      </div>
+      <div class="section">
+        <div class="sec-head"><h2>Nutri AI</h2></div>
+        <div class="note-box"><p><b>Sua nutricionista virtual.</b> Pergunte o que comer, quando e quanto. Ela usa suas metas, seus treinos e a água de hoje.</p>
+          <button class="btn btn-blue" data-nutri-chat>Conversar com a Nutri AI</button></div>
+        <div class="chips nutri-chips">${NUTRI_PERGUNTAS.map((q) => `<button type="button" class="chip" data-nutri-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+      </div>
+      <div class="section">
+        <div class="sec-head"><h2>Meu perfil alimentar</h2></div>
+        <form class="nutri-form" id="form-nutri">
+          <div class="row2">
+            <label>Peso (kg)<input name="peso" inputmode="decimal" value="${esc(S.perfil.peso || "")}"></label>
+            <label>Altura (cm)<input name="altura" inputmode="numeric" value="${esc(S.perfil.altura || "")}"></label>
+            <label>Idade<input name="idade" inputmode="numeric" value="${esc(S.perfil.idade || "")}"></label>
+            <label>Sexo${sel("sexo", [["", "—"], ["Masculino", "Masculino"], ["Feminino", "Feminino"], ["Prefiro não dizer", "Prefiro não dizer"]], nutriSexo())}</label>
+          </div>
+          <label>Objetivo${sel("objetivo", NUTRI_OBJ.map((o) => [o, o]), N.objetivo || "Manter o peso")}</label>
+          <label>Atividade${sel("atividade", NUTRI_ATIV, N.atividade || "auto")}</label>
+          <div class="row2">
+            <label>Refeições por dia${sel("refeicoes", [["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]], N.refeicoes || "4")}</label>
+            <label>Horário do treino<input name="treinoHora" type="time" value="${esc(N.treinoHora || "")}"></label>
+          </div>
+          <label>Restrições e alergias<input name="restricoes" maxlength="200" placeholder="Ex.: lactose, vegetariano, nenhuma" value="${esc(N.restricoes || "")}"></label>
+          <label>Preferências<input name="preferencias" maxlength="200" placeholder="Ex.: gosto de ovo, não gosto de peixe" value="${esc(N.preferencias || "")}"></label>
+          <button class="btn btn-outline" type="submit">Salvar perfil alimentar</button>
+        </form>
+      </div></section>`;
+  };
+
+  /* ---------- Contexto para a Nutri AI ---------- */
+  function nutriBase() {
+    const M = nutriMetas(), N = S.nutri || {};
+    return [`# Perfil alimentar de ${primeiroNome()}`,
+      `Peso ${S.perfil.peso || "?"} kg, altura ${S.perfil.altura || "?"} cm, idade ${S.perfil.idade || "?"}, sexo ${nutriSexo() || "não informado"}.`,
+      `Objetivo: ${N.objetivo || "Manter o peso"}. Refeições por dia: ${N.refeicoes || "4"}. Horário do treino: ${N.treinoHora || "não informado"}.`,
+      `Restrições/alergias: ${N.restricoes || "nenhuma informada"}. Preferências: ${N.preferencias || "nenhuma informada"}.`,
+      M.falta ? "Metas: faltam peso, altura ou idade para calcular calorias; peça para preencher na aba Nutrição." :
+        `Metas estimadas pelo app (Mifflin-St Jeor): metabolismo ${M.tmb} kcal, gasto ${M.gasto} kcal (atividade ${M.fator}), meta ${M.kcal} kcal/dia (mínimo seguro ${M.minimo} kcal), proteína ${M.prot} g, carboidrato ${M.carb} g, gordura ${M.gord} g.`,
+      `Meta de água: ${M.agua} ml/dia. Lembrete de água: ${S.aguaLembrete?.on ? `ligado, ${S.aguaLembrete.ml} ml a cada ${S.aguaLembrete.intervalo} min` : "desligado"}.`,
+      `Programa principal de treino: ${progDe(principal())?.nome || NOME_PROG}.${S.hiper?.perfil?.objetivo ? ` Objetivo na academia: ${S.hiper.perfil.objetivo}.` : ""}`].join("\n");
+  }
+  function nutriContexto() {
+    const d7 = keyOf(addDays(hoje, -7)), rows = linhasLocais().filter((r) => r.data >= d7).sort((a, b) => a.data.localeCompare(b.data));
+    const hojeRows = rows.filter((r) => r.data === hojeKey);
+    return [`Hoje: ${DIAS[hojeDia]}, ${hojeKey}, ${pad(new Date().getHours())}:${pad(new Date().getMinutes())}.`,
+      `Treino de hoje: ${hojeRows.length ? hojeRows.map((r) => `${r.titulo} (${r.concluido ? "feito" : "em andamento"}, ~${r.minutos} min)`).join("; ") : "nenhum registrado ainda"}.`,
+      `Água hoje: ${aguaHoje()} ml (${(S.agua?.[hojeKey] || []).map((c) => c.t).join(", ") || "nada anotado"}).`,
+      `Treinos dos últimos 7 dias:\n${rows.filter((r) => r.concluido).map((r) => `- ${r.data}: ${r.titulo}, ~${r.minutos} min`).join("\n") || "- nenhum"}`].join("\n");
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-agua],[data-agua-desfazer],[data-agua-desligar],[data-nutri-chat],[data-nutri-q]");
+    if (!t) return;
+    if (t.dataset.agua) { aguaAdd(Number(t.dataset.agua)); render(); }
+    else if (t.hasAttribute("data-agua-desfazer")) { (S.agua?.[hojeKey] || []).pop(); save(); render(); }
+    else if (t.hasAttribute("data-agua-desligar")) aguaDesligar();
+    else if (t.hasAttribute("data-nutri-chat")) openChat(null, "nutri");
+    else if (t.dataset.nutriQ) openChat(t.dataset.nutriQ, "nutri");
+  });
+  document.addEventListener("submit", (ev) => {
+    const f = ev.target;
+    if (f.id === "form-agua") {
+      ev.preventDefault();
+      const d = Object.fromEntries(new FormData(f));
+      if (!(d.ini && d.fim && d.ini !== d.fim)) { toast("Confira o horário do lembrete."); return; }
+      aguaLigar({ ml: Math.min(1000, Math.max(50, Number(d.ml) || 300)), intervalo: Number(d.intervalo) || 60, ini: d.ini, fim: d.fim }, !S.aguaLembrete?.on);
+    } else if (f.id === "form-nutri") {
+      ev.preventDefault();
+      const d = Object.fromEntries(new FormData(f)), num = (v) => String(v || "").trim().replace(",", ".").slice(0, 6);
+      S.perfil = { ...S.perfil, peso: num(d.peso), altura: num(d.altura), idade: num(d.idade) };
+      S.nutri = { ...(S.nutri || {}), sexo: d.sexo, objetivo: d.objetivo, atividade: d.atividade, refeicoes: d.refeicoes, treinoHora: d.treinoHora,
+        restricoes: String(d.restricoes || "").slice(0, 200), preferencias: String(d.preferencias || "").slice(0, 200) };
+      save(); render(); toast("Perfil alimentar salvo ✓");
+    }
   });
 
 
@@ -1757,7 +1974,7 @@
         const { error } = await sb.from("hiper").upsert({ usuario_id: uid, programa: pk, dados: dd, atualizado_em: new Date().toISOString() });
         if (!error) { enviados[`${uid}|ia|${pk}`] = JSON.stringify(dd); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -2428,6 +2645,7 @@
       for (const p of VKEYS) if (perfil.config[p] !== undefined && !Object.keys(S[p].logs).length) S[p].inicio = perfil.config[p];
       if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
       if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
+      if (perfil.config.nutri && !S.nutri) S.nutri = perfil.config.nutri;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
@@ -2597,8 +2815,19 @@
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
   const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Como funciona o programa?"];
-  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "Minha evolução"];
-  let chatLog = [];
+  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "Nutrição", "Minha evolução"];
+  const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
+  let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
+  const chatLogs = { coach: chatLog, nutri: [] };
+  function trocarPapel(papel) {
+    chatLogs[chatPapel] = chatLog; chatPapel = papel; chatLog = chatLogs[papel];
+    const nutri = papel === "nutri";
+    $("#chat-nome").textContent = nutri ? "Nutri AI" : "Coach AI";
+    $(".chat-sheet").setAttribute("aria-label", nutri ? "Nutri AI" : "Coach AI");
+    $(".chat-head .coach-avatar img").src = A(nutri ? "nutri-active.svg" : "sparkles-blue.svg");
+    chipsEl.innerHTML = "";
+    if (!nutri && iaChat) setTimeout(() => iaPergunta(iaChat, 0), 0); // volta para a entrevista que estava aberta
+  }
   let busy = false;
 
   // Texto solto (com <b>, <br>…) vai dentro de um <p>: a bolha é flex em coluna e quebraria a frase em pedaços
@@ -2620,13 +2849,16 @@
     box.scrollLeft = 0;
     box.classList.toggle("wrap", box === chipsEl && !!iaChat); // na entrevista as opções quebram linha (todas à vista)
   }
-  function openChat(pergunta) {
+  function openChat(pergunta, papel = "coach") {
+    if (papel !== chatPapel) trocarPapel(papel);
     layer.hidden = false;
     layer.classList.remove("closing");
-    if (!chatLog.length) chatLog.push({ html: `Olá, ${esc(primeiroNome())}! O que vamos fazer hoje? 💪`, me: false });
+    if (!chatLog.length) chatLog.push({ html: chatPapel === "nutri"
+      ? `Oi, ${esc(primeiroNome())}! Sou a Nutri AI 🥗 Posso te ajudar com o que comer, quando e quanto, de acordo com os seus treinos e objetivos.`
+      : `Olá, ${esc(primeiroNome())}! O que vamos fazer hoje? 💪`, me: false });
     msgsEl.innerHTML = chatLog.map(bubbleHTML).join("");
     msgsEl.scrollTop = msgsEl.scrollHeight;
-    if (!chipsEl.children.length) setChips(chipsEl, CHIPS_HOJE);
+    if (!chipsEl.children.length) setChips(chipsEl, chatPapel === "nutri" ? CHIPS_NUTRI : CHIPS_HOJE);
     if (pergunta) send(pergunta);
     else if (matchMedia("(hover: hover)").matches) $("#chat-input").focus();
   }
@@ -2639,16 +2871,17 @@
   async function send(texto) {
     texto = texto.trim();
     if (!texto || busy) return;
-    if (iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
-    if (atalhoHoje(texto)) return;
+    const coach = chatPapel === "coach";
+    if (coach && iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
+    if (coach && atalhoHoje(texto)) return;
     busy = true;
     addMsg(msgsEl, esc(texto), true, chatLog);
     chatLog[chatLog.length - 1].txt = texto;
     if (!iaOff) {
       const ok = await coachIA();
-      if (ok) { setChips(chipsEl, CHIPS_PADRAO); busy = false; return; }
+      if (ok) { setChips(chipsEl, coach ? CHIPS_PADRAO : CHIPS_NUTRI); busy = false; return; }
     }
-    const r = responder(texto);
+    const r = coach ? responder(texto) : { html: "A Nutri AI está offline agora. Enquanto isso, veja suas metas de calorias, proteína e água na aba Nutrição. 🥗", chips: CHIPS_NUTRI };
     const stop = typing(msgsEl);
     await wait(650 + Math.min(1200, r.html.length * 3));
     stop();
@@ -2660,6 +2893,7 @@
   function atalhoHoje(texto) {
     const t = norm(texto);
     const fera = norm(NOME_PROG);
+    if (t === "nutricao") { openChat(null, "nutri"); return true; }
     if (!["insanity", "calistenia", "hipertrofia", "academia", "ver meu treino", "calistenia 21 dias", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);
     const ir = async (msg, hash) => {
@@ -2769,7 +3003,8 @@
     let r;
     try {
       r = await fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ mensagens, programa: programaTexto(), contexto: contextoTexto(!!token && souDono) }) });
+        body: JSON.stringify(chatPapel === "nutri" ? { papel: "nutri", mensagens, programa: nutriBase(), contexto: nutriContexto() }
+          : { mensagens, programa: programaTexto(), contexto: contextoTexto(!!token && souDono) }) });
     } catch { stop(); return false; }
     if (!r.ok || !r.body) {
       stop();

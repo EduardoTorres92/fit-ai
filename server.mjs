@@ -1,6 +1,6 @@
 // Servidor Node.js para hospedar o FIT.AI fora da Netlify (ex.: Hostinger).
 // - Entrega os arquivos da pasta public/.
-// - /api/auth, /api/coach, /api/videos e /api/hiper: as mesmas funções da pasta netlify/functions, chamadas daqui.
+// - /api/auth, /api/coach, /api/videos, /api/hiper e /api/agua (lembrete de água por push): as mesmas funções da pasta netlify/functions, chamadas daqui.
 // - Contas, segredo de sessão e limites do Coach ficam em arquivos (ver netlify/lib/blobs.mjs).
 // Variáveis: ANTHROPIC_API_KEY (obrigatória para o Coach), ALLOWED_EMAIL, FITAI_INSANITY_VIDEOS, FITAI_VIDEOS_INSANITY, LIMITE_VISITANTE_DIA,
 // LIMITE_GERAL_DIA, DADOS_DIR, PORT. Iniciar: npm start.
@@ -16,10 +16,12 @@ const { default: auth } = await import("./netlify/functions/auth.mjs");
 const { default: coach } = await import("./netlify/functions/coach.mjs");
 const { default: videos } = await import("./netlify/functions/videos.mjs");
 const { default: hiper } = await import("./netlify/functions/hiper.mjs");
+const { default: agua } = await import("./netlify/functions/agua.mjs");
+const { iniciarAgendador } = await import("./netlify/lib/agua.mjs");
 
 const RAIZ = fileURLToPath(new URL("./public/", import.meta.url));
 const PORTA = Number(process.env.PORT) || 3000;
-const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper };
+const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua };
 const MAX_CORPO = 512 * 1024; // o Coach manda programa + contexto; 512 KB sobra
 
 const TIPOS = {
@@ -93,3 +95,4 @@ createServer(async (req, res) => {
     res.end();
   }
 }).listen(PORTA, () => console.log(`FIT.AI no ar na porta ${PORTA}`));
+iniciarAgendador(); // lembrete de água: confere a cada minuto quem precisa receber a notificação

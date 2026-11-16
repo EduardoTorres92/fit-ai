@@ -4,7 +4,8 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
-    "@netlify/blobs": "^11.1.8"
+    "@netlify/blobs": "^11.1.8",
+    "web-push": "^3.6.7"
   },
   "scripts": {
     "start": "node server.mjs"
