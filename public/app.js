@@ -737,6 +737,8 @@
             <div class="streak-num"><strong>${seq} ${seq === 1 ? "dia" : "dias"}</strong><span>Sequência Atual</span></div>
           </div>
         </div>
+        <button type="button" class="evo-card" data-evo-foto><span class="stat-ico">${icon("camera.svg", 18)}</span>
+          <span><strong>Evolução por foto</strong><span class="t">Check-in de frente e de lado a cada 15 dias. Só você vê.</span></span></button>
         <div class="section">
           <div class="sec-head"><h2>Consistência</h2></div>
           ${heatmap()}
@@ -3732,6 +3734,7 @@
       const ex = TODOS_EX.find((x) => x.id === t.dataset.ask);
       openChat(`Como executar corretamente o exercício ${ex.nome}? Quais são os erros comuns?`);
     } else if (t.hasAttribute("data-open-chat")) openChat();
+    else if (t.hasAttribute("data-evo-foto")) openChat("Evolução por foto");
     else if (t.hasAttribute("data-close-chat")) closeChat();
   });
   document.addEventListener("change", async (e) => {
@@ -3754,8 +3757,8 @@
 
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
-  const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Como funciona o programa?"];
-  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "CrossFit", "Nutrição", "Minha evolução"];
+  const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
+  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "CrossFit", "Nutrição", "Minha evolução", "Evolução por foto"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
   const chatLogs = { coach: chatLog, nutri: [] };
@@ -3834,6 +3837,7 @@
     const t = norm(texto);
     const fera = norm(NOME_PROG);
     if (t === "nutricao") { openChat(null, "nutri"); return true; }
+    if (t === "evolucao por foto" || t === "ver ultima analise" || t === "apagar minhas fotos") { evoChip(t, texto); return true; }
     if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);
     const ir = async (msg, hash) => {
@@ -3870,6 +3874,171 @@
     } else if (t === "ver meu treino") irIA(iaUltimo || "hiper");
     else irIA("hiper");
     return true;
+  }
+
+  /* ---------- Evolução por foto (check-in de frente e de lado a cada 15 dias, só a pessoa vê) ---------- */
+  // Fotos no bucket privado "evolucao" (<uid>/<data>-frente.jpg); a tabela "evolucao" guarda data, peso e a análise.
+  // As regras do Supabase só deixam a própria pessoa ler, enviar e apagar. Nada disso aparece no grupo.
+  const EVO_DIAS = 15;
+  let evoRows = null, evoArq = {}, evoOcupado = false;
+  const evoData = (k) => parseKey(k).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const evoDias = (a, b) => Math.round((parseKey(b) - parseKey(a)) / 864e5);
+  async function evoCarregar() {
+    const { data, error } = await sb.from("evolucao").select("data,frente,lado,peso,analise").order("data");
+    if (error) throw error;
+    return (evoRows = data || []);
+  }
+  async function evoUrls(rows) {
+    const caminhos = rows.flatMap((r) => [r.frente, r.lado]).filter(Boolean);
+    if (!caminhos.length) return {};
+    const { data } = await sb.storage.from("evolucao").createSignedUrls(caminhos, 3600);
+    return Object.fromEntries((data || []).filter((x) => x.signedUrl).map((x) => [x.path, x.signedUrl]));
+  }
+  const evoFotosHtml = (rows, urls) => `<div class="evo-cks">${rows.map((r) => `<figure class="evo-ck">
+      <div class="evo-par">${["frente", "lado"].map((k) => r[k] && urls[r[k]] ? `<img src="${esc(urls[r[k]])}" alt="Foto de ${k} de ${evoData(r.data)}" loading="lazy">` : "").join("")}</div>
+      <figcaption>${evoData(r.data)}${r.peso ? ` · ${String(r.peso).replace(".", ",")} kg` : ""}</figcaption></figure>`).join("")}</div>`;
+  const evoFormHtml = () => `<form class="evo-form" data-evo-form>
+      <div class="evo-slots">${["frente", "lado"].map((k) => `<label class="evo-slot"><input type="file" accept="image/*" name="${k}" hidden>
+        <span class="evo-ph">${icon("camera.svg", 22)}<b>${k === "frente" ? "De frente" : "De lado"}</b></span></label>`).join("")}</div>
+      <p class="evo-dica">Pode mandar só uma. Para comparar melhor: mesma luz, mesma distância, roupa de treino e corpo relaxado.</p>
+      <button class="btn btn-blue" type="submit" disabled>Analisar evolução</button></form>`;
+  async function evoBolha(html, chips) {
+    const stop = typing(msgsEl); await wait(350); stop();
+    addMsg(msgsEl, html, false, chatLog);
+    if (chips) setChips(chipsEl, chips);
+  }
+  async function evoChip(t, texto) {
+    addMsg(msgsEl, esc(texto), true, chatLog);
+    if (!uid || !sb) { evoBolha(`<p>A análise de evolução por foto precisa de uma conta, para guardar suas fotos com segurança. 🔒</p><p>Entre no <b>Perfil</b> e volte aqui.</p>`, CHIPS_PADRAO); return; }
+    if (Number(S.perfil.idade) > 0 && Number(S.perfil.idade) < 18) { evoBolha("A análise de evolução por foto é só para maiores de 18 anos. Sigo te ajudando com os treinos! 💪", CHIPS_PADRAO); return; }
+    const stop = typing(msgsEl);
+    let rows;
+    try { rows = await evoCarregar(); } catch (e) { console.error("evolucao", e); stop(); addMsg(msgsEl, "Não consegui abrir suas fotos agora. Tente de novo em instantes.", false, chatLog); return; }
+    stop();
+    if (t === "apagar minhas fotos") return evoApagar(rows);
+    if (t === "ver ultima analise") {
+      const r = [...rows].reverse().find((x) => x.analise);
+      if (!r) { evoBolha("Ainda não há análise salva.", ["Evolução por foto"]); return; }
+      const urls = await evoUrls([r]).catch(() => ({}));
+      addMsg(msgsEl, `<p><b>Check-in de ${evoData(r.data)}</b></p>${evoFotosHtml([r], urls)}${md(r.analise)}`, false, chatLog);
+      setChips(chipsEl, ["Evolução por foto", "Apagar minhas fotos", "Treino de hoje"]);
+      return;
+    }
+    const ult = rows[rows.length - 1];
+    const falta = ult ? EVO_DIAS - evoDias(ult.data, hojeKey) : 0;
+    const pode = !ult || falta <= 0 || (ult.data === hojeKey && !ult.analise);
+    const urls = rows.length ? await evoUrls(rows.slice(-3)).catch(() => ({})) : {};
+    const intro = !rows.length
+      ? `<p>Vamos acompanhar sua evolução por foto! 📸 Mande uma foto <b>de frente</b> e uma <b>de lado</b>; a cada ${EVO_DIAS} dias você manda outras e eu comparo.</p><p>🔒 As fotos são <b>só suas</b>: ficam guardadas na sua conta e <b>não aparecem no grupo</b>. Você pode apagar quando quiser.</p>`
+      : `<p>Seus check-ins (${rows.length}):</p>${evoFotosHtml(rows.slice(-3), urls)}`;
+    const chips = rows.some((r) => r.analise) ? ["Ver última análise", "Apagar minhas fotos"] : rows.length ? ["Apagar minhas fotos"] : CHIPS_PADRAO;
+    if (pode) {
+      evoArq = {};
+      msgsEl.querySelectorAll("[data-evo-form]").forEach((f) => f.closest(".msg")?.remove()); // um formulário por vez
+      for (const m of chatLog) if (m.evoForm) { m.html = m.html.replace(/<form class="evo-form"[\s\S]*<\/form>/, ""); m.evoForm = false; }
+      await evoBolha(`${intro}${evoFormHtml()}`, chips);
+      chatLog[chatLog.length - 1].evoForm = true;
+    } else {
+      const prox = new Date(parseKey(ult.data).getTime() + EVO_DIAS * 864e5);
+      evoBolha(`${intro}<p>Próximo check-in liberado em <b>${prox.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</b> (${falta === 1 ? "falta 1 dia" : `faltam ${falta} dias`}). Intervalo de ${EVO_DIAS} dias deixa a mudança aparecer na foto. 😉</p>`, chips);
+    }
+  }
+  async function evoBlob(arquivo) {
+    let b64 = await cfReduzir(arquivo, 1280, 0.8);
+    if (b64.length > 1_300_000) b64 = await cfReduzir(arquivo, 960, 0.7);
+    const bin = atob(b64), u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u], { type: "image/jpeg" });
+  }
+  msgsEl.addEventListener("change", async (e) => {
+    const inp = e.target.closest("[data-evo-form] input[type=file]");
+    if (!inp || !inp.files[0]) return;
+    if (!/^image\//.test(inp.files[0].type)) { toast("Escolha uma imagem."); return; }
+    try { evoArq[inp.name] = await evoBlob(inp.files[0]); } catch { toast("Não consegui abrir essa imagem."); return; }
+    const ph = inp.parentElement.querySelector(".evo-ph");
+    ph.innerHTML = `<img src="${URL.createObjectURL(evoArq[inp.name])}" alt=""><b>${inp.name === "frente" ? "De frente" : "De lado"} ✓</b>`;
+    inp.form.querySelector("button[type=submit]").disabled = false;
+  });
+  msgsEl.addEventListener("submit", (e) => { if (e.target.matches("[data-evo-form]")) { e.preventDefault(); evoEnviar(e.target); } });
+  async function evoEnviar(form) {
+    if (evoOcupado || busy || !(evoArq.frente || evoArq.lado)) return;
+    evoOcupado = busy = true;
+    const btn = form.querySelector("button[type=submit]");
+    btn.disabled = true; btn.textContent = "Enviando fotos…";
+    const data = hojeKey, rows = evoRows || [];
+    const reg = { usuario_id: uid, data, frente: null, lado: null, peso: Number(S.perfil.peso) || null, analise: null };
+    try {
+      for (const k of ["frente", "lado"]) {
+        const caminho = `${uid}/${data}-${k}.jpg`;
+        if (evoArq[k]) {
+          const up = await sb.storage.from("evolucao").upload(caminho, evoArq[k], { upsert: true, contentType: "image/jpeg", cacheControl: "60" });
+          if (up.error) throw up.error;
+          reg[k] = caminho;
+        } else if (rows.some((r) => r.data === data && r[k])) await sb.storage.from("evolucao").remove([caminho]); // refez hoje sem esse ângulo
+      }
+      const { error } = await sb.from("evolucao").upsert(reg, { onConflict: "usuario_id,data" });
+      if (error) throw error;
+    } catch (e) {
+      console.error("evolucao envio", e); toast("Não consegui enviar as fotos. Tente de novo.");
+      btn.disabled = false; btn.textContent = "Analisar evolução"; evoOcupado = busy = false; return;
+    }
+    // O formulário vira as miniaturas do que foi enviado
+    const m = chatLog.find((x) => x.evoForm);
+    if (m) { m.evoForm = false; m.html = m.html.replace(/<form class="evo-form"[\s\S]*<\/form>/, `<p>Fotos de ${evoData(data)} enviadas ✓</p>`); }
+    form.outerHTML = `<p>Fotos de ${evoData(data)} enviadas ✓</p>`;
+    evoArq = {};
+    const ant = rows.filter((r) => r.data < data);
+    const anteriores = [ant[0], ant[ant.length - 1]].filter((x, i, a) => x && a.indexOf(x) === i).map(({ data, frente, lado, peso }) => ({ data, frente, lado, peso }));
+    const token = await tokenSB(), stop = typing(msgsEl);
+    let r;
+    try {
+      r = await fetch("/api/evolucao", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ atual: reg, anteriores, idade: S.perfil.idade || null, contexto: contextoTexto(false).slice(0, 3000) }) });
+    } catch { r = null; }
+    if (!r || !r.ok || !r.body) {
+      stop();
+      const e = r ? await r.json().catch(() => ({})) : {};
+      addMsg(msgsEl, e.erro === "limite" ? "Você chegou ao limite de análises de hoje. Suas fotos ficaram salvas: volte amanhã e toque em <b>Evolução por foto</b> para analisar." : "Suas fotos ficaram salvas, mas não consegui analisar agora. Toque em <b>Evolução por foto</b> para tentar de novo.", false, chatLog);
+      setChips(chipsEl, ["Evolução por foto"]); evoOcupado = busy = false; return;
+    }
+    stop();
+    const msg = { html: "", me: false, txt: "" };
+    chatLog.push(msg);
+    msgsEl.insertAdjacentHTML("beforeend", bubbleHTML(msg));
+    const bolha = msgsEl.lastElementChild.querySelector(".bubble");
+    const leitor = r.body.getReader(), dec = new TextDecoder();
+    for (;;) {
+      const { value, done } = await leitor.read();
+      if (done) break;
+      msg.txt += dec.decode(value, { stream: true });
+      if (!msg.txt.trim()) continue;
+      msg.html = md(msg.txt); bolha.innerHTML = msg.html;
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+    msg.txt = msg.txt.trim();
+    const falhou = !msg.txt || /^\[Falha|\[Muitos pedidos/.test(msg.txt);
+    if (!msg.txt) { msg.txt = "Não consegui analisar agora. Toque em Evolução por foto para tentar de novo."; msg.html = md(msg.txt); bolha.innerHTML = msg.html; }
+    if (!falhou) {
+      const { error } = await sb.from("evolucao").update({ analise: msg.txt.slice(0, 8000) }).eq("usuario_id", uid).eq("data", data);
+      if (error) console.error("evolucao analise", error);
+      else { const i = rows.findIndex((x) => x.data === data); const novo = { ...reg, analise: msg.txt }; if (i >= 0) rows[i] = novo; else rows.push(novo); }
+    }
+    setChips(chipsEl, ["Evolução por foto", "Treino de hoje", "Minha evolução"]);
+    evoOcupado = busy = false;
+  }
+  async function evoApagar(rows) {
+    if (!rows.length) { evoBolha("Você não tem fotos de evolução salvas.", CHIPS_PADRAO); return; }
+    if (!confirm(`Apagar suas ${rows.length === 1 ? "fotos do check-in" : `fotos dos ${rows.length} check-ins`} e as análises? Não dá para desfazer.`)) { evoBolha("Tudo certo, nada foi apagado.", ["Evolução por foto"]); return; }
+    try {
+      const caminhos = rows.flatMap((r) => [r.frente, r.lado]).filter(Boolean);
+      if (caminhos.length) { const { error } = await sb.storage.from("evolucao").remove(caminhos); if (error) throw error; }
+      const { error } = await sb.from("evolucao").delete().eq("usuario_id", uid);
+      if (error) throw error;
+      evoRows = [];
+      for (const m of chatLog) if (/class="evo-cks"/.test(m.html)) m.html = m.html.replace(/<div class="evo-cks">[\s\S]*?<\/figure><\/div>/, "<p><i>Fotos apagadas.</i></p>");
+      msgsEl.querySelectorAll(".evo-cks").forEach((el) => { el.outerHTML = "<p><i>Fotos apagadas.</i></p>"; });
+      evoBolha("Pronto: suas fotos e análises de evolução foram apagadas. 🗑️", CHIPS_PADRAO);
+    } catch (e) { console.error("evolucao apagar", e); evoBolha("Não consegui apagar agora. Tente de novo.", ["Apagar minhas fotos"]); }
   }
   $("#chat-form").addEventListener("submit", (e) => { e.preventDefault(); const i = $("#chat-input"); send(i.value); i.value = ""; });
   chipsEl.addEventListener("click", (e) => { const c = e.target.closest("[data-chip]"); if (c) send(c.dataset.chip); });

@@ -890,3 +890,23 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .post-quem { display: flex; align-items: center; gap: 8px; }
 .post-quem small { font-size: 12px; color: var(--muted); }
 .post-quem .ag-group { --ag-ring: #fff; }
+
+/* Evolução por foto (chat) */
+.evo-cks { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.evo-ck { margin: 0; flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; }
+.evo-par { display: flex; gap: 3px; }
+.evo-par img { width: 58px; height: 78px; object-fit: cover; border-radius: 8px; background: #e6e6e6; }
+.evo-ck figcaption { font-size: 11px; color: var(--muted); }
+.evo-form { display: flex; flex-direction: column; gap: 10px; }
+.evo-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.evo-slot { cursor: pointer; }
+.evo-ph { aspect-ratio: 3 / 4; border: 1.5px dashed rgba(43, 84, 255, .45); border-radius: 12px; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px; color: var(--blue); overflow: hidden; position: relative; }
+.evo-ph img:not([width]) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.evo-ph img:not([width]) + b { position: absolute; bottom: 6px; left: 6px; right: 6px; background: rgba(0, 0, 0, .6); color: #fff; border-radius: 8px; padding: 3px 6px; font-size: 12px; text-align: center; }
+.evo-slot:focus-within .evo-ph { outline: 2px solid var(--blue); outline-offset: 2px; }
+.evo-dica { font-size: 12px; color: var(--muted); }
+.evo-form .btn:disabled { opacity: .5; }
+.evo-card { margin: 16px 20px 0; display: flex; align-items: center; gap: 12px; width: calc(100% - 40px); padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.evo-card .stat-ico { flex: 0 0 auto; }
+.evo-card strong { display: block; font-size: 15px; font-weight: 600; }
+.evo-card span.t { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
