@@ -772,10 +772,10 @@
             <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
           ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
-            ${stat("weight.svg", P.peso || "—", "Kg", { up: true, edit: "peso" })}
-            ${stat("ruler.svg", P.altura || "—", "Cm", { up: true, edit: "altura" })}
-            ${stat("user-small.svg", P.idade || "—", "Anos", { up: true, edit: "idade" })}
-            ${stat("circle-check.svg", treinosFeitos(), "Treinos", { up: true })}
+            ${stat("weight.svg", P.peso || "—", "Peso (kg)", { edit: "peso" })}
+            ${stat("ruler.svg", P.altura || "—", "Altura (cm)", { edit: "altura" })}
+            ${stat("user-small.svg", P.idade || "—", "Idade (anos)", { edit: "idade" })}
+            ${stat("circle-check.svg", treinosFeitos(), "Treinos feitos")}
           </div>
           <div class="field">
             <span class="field-lbl">Seu programa principal · caminho: ${esc(caminhoTxt())}</span>
