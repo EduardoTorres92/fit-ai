@@ -696,9 +696,9 @@
         <div class="section">
           ${grupoHome()}
           <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
-          ${IA.hiper && principal() !== "hiper" ? iaHome("hiper", false) : ""}
-          ${IA.c21 && principal() !== "c21" && (S.c21.plano || S.c21.etapa) ? iaHome("c21", false) : ""}
-          ${principal() !== "cf" && Object.keys(S.cf.logs).length ? cfHome(false) : ""}
+          ${IA.hiper && principal() !== "hiper" && liberado("hiper") ? iaHome("hiper", false) : ""}
+          ${IA.c21 && principal() !== "c21" && liberado("c21") && (S.c21.plano || S.c21.etapa) ? iaHome("c21", false) : ""}
+          ${principal() !== "cf" && liberado("cf") && Object.keys(S.cf.logs).length ? cfHome(false) : ""}
           ${principal() === "cf" ? cfHome(true) : principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : IA[principal()] ? iaHome(principal(), true) : treinoHojeVideo(principal())}
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
@@ -2314,8 +2314,8 @@
   const proximoDe = (k) => { const i = TRILHA.findIndex((x) => x.k === k); return i >= 0 ? TRILHA[i + 1] || null : null; };
   // Tela inicial: o treino de hoje dos outros programas em vídeo em andamento (ou atalhos, se nenhum começou)
   function videoHome(excluir = null) {
-    const ativos = VPROGS.filter((P) => S[P.k].inicio && P.k !== excluir);
-    if (!ativos.length) return excluir ? "" : VPROGS.map((P) => `<a class="emerg" href="#/${P.k}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)}</strong><small>${esc(P.resumo || "Programa em vídeo · toque para começar")}</small></div></a>`).join("");
+    const ativos = VPROGS.filter((P) => S[P.k].inicio && P.k !== excluir && liberado(P.k));
+    if (!ativos.length) return excluir ? "" : VPROGS.filter((P) => liberado(P.k)).map((P) => `<a class="emerg" href="#/${P.k}"><span>${icon("flame.svg", 20)}</span><div><strong>${esc(P.nome)}</strong><small>${esc(P.resumo || "Programa em vídeo · toque para começar")}</small></div></a>`).join("");
     return ativos.map((P) => {
       const h = insHoje(P.k);
       return h ? `<div class="sec-head" style="margin-top:8px"><h2>${esc(P.nome)}</h2><a href="#/${P.k}/${h.w}">Semana ${h.w + 1} · ${P.semanas[h.w].nome.split(" · ")[0]}</a></div>${insCard(P.k, h.w, h.d)}` : "";
