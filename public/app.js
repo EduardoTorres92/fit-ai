@@ -3035,7 +3035,7 @@
     insanos: { nome: "Insanos", ic: "🔥", desc: "MAX:30 e depois o Insanity: treinos em vídeo, em casa" },
     academia: { nome: "Academia", ic: "🏋️", desc: "Hipertrofia: o Coach monta a ficha (adaptação e depois hipertrofia)" },
     calistenia: { nome: "Calistenia", ic: "🤸", desc: "Calistenia 21 dias no seu nível e depois o Treino da Fera" },
-    cross: { nome: "Cross", ic: "⏱️", desc: "WOD do box (foto do quadro) ou montado pelo Coach" },
+    cross: { nome: "Cross", ic: "⏱️", desc: "O WOD do seu box: tire uma foto do quadro e eu lanço o treino" },
     hibrido: { nome: "Híbridos", ic: "⚡", desc: "Vídeos do Insanos + academia ou calistenia (3 + 2 dias)" },
   };
   const trilha = () => (TRILHAS[S.trilha] ? S.trilha : "insanos");
@@ -3074,11 +3074,6 @@
     }
     return { feitas, precisa, total, final, teste: testeTxt, ok: total > 0 && feitas >= precisa && final };
   }
-  // Cross: 12 WODs concluídos + um PR (recorde de carga ou WOD repetido mais rápido)
-  function progCF() {
-    const feitas = Object.values(S.cf?.logs || {}).filter((l) => l.done).length, final = (S.cf?.prs || []).length > 0;
-    return { feitas: Math.min(12, feitas), precisa: 12, total: 12, final, teste: "um PR registrado (carga ou WOD repetido)", ok: feitas >= 12 && final };
-  }
   // Etapas de cada trilha: { k (chave da formatura), prog (programa), nome, p (progresso; null = etapa contínua) }
   function etapasDe(t = trilha()) {
     const max30 = { k: "max30", prog: "insanity", nome: "MAX:30", p: () => progVideo("insanity") };
@@ -3086,7 +3081,7 @@
     if (t === "academia") return [{ k: "adaptacao", prog: "hiper", nome: "Adaptação", p: () => progIA("hiper", 4) }, { k: "hipertrofia", prog: "hiper", nome: "Hipertrofia", p: null }];
     if (t === "calistenia" && IA.c21) return [{ k: "c21", prog: "c21", nome: "Calistenia 21 dias", p: () => progIA("c21", 3) }, { k: "fera", prog: "plano", nome: "Treino da Fera", p: null }];
     if (t === "calistenia") return [{ k: "fera", prog: "plano", nome: "Treino da Fera", p: null }];
-    if (t === "cross") return [{ k: "fundamentos", prog: "cf", nome: "Fundamentos", p: progCF }, { k: "rx", prog: "cf", nome: "Rumo ao RX", p: null }];
+    if (t === "cross") return [{ k: "box", prog: "cf", nome: "WOD do box", p: null }]; // o WOD vem do box: sem etapas, XP por sessão
     return [max30, ...ins, { k: "ciclos", prog: VP.insanity60 ? "insanity60" : "insanity", nome: "Novos ciclos", p: null }]; // insanos e híbridos
   }
   function etapaAtual(t = trilha()) {
@@ -3176,11 +3171,12 @@
         <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
         <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
       ${S.dono ? `<button class="btn btn-outline ver-membro" id="ver-membro">${S.verComoMembro ? "👁️ Vendo como usuário comum · voltar à visão de dono" : "👁️ Ver como usuário comum"}</button>` : ""}
-      <div class="grad-box"><div class="sec-head"><h2>Etapa ${at.i + 1} de ${at.n} · ${esc(at.nome)}</h2>${g && !g.semPlano ? `<span>${g.feitas}/${g.precisa} sessões</span>` : ""}</div>
+      ${at.n === 1 && !g ? `<div class="grad-box"><div class="sec-head"><h2>${esc(at.nome)}</h2></div>
+        <p class="note small">Cada WOD concluído vale ${XP.cf} XP, e cada PR (carga ou WOD repetido mais rápido) +${XP.recorde}. Bata a meta de ${metaSemana()} treinos na semana para ganhar +${XP.semana}.</p></div>` : `<div class="grad-box"><div class="sec-head"><h2>Etapa ${at.i + 1} de ${at.n} · ${esc(at.nome)}</h2>${g && !g.semPlano ? `<span>${g.feitas}/${g.precisa} sessões</span>` : ""}</div>
         <ol class="etapas">${etapas.map((e, i) => `<li class="${f[e.k] ? "ok" : i === at.i ? "on" : ""}">${f[e.k] ? "✓ " : ""}${esc(e.nome)}</li>`).join("")}</ol>
         ${g ? `<span class="xp-bar"><i style="width:${Math.min(100, Math.round((g.feitas / Math.max(1, g.precisa)) * 100))}%"></i></span>
         <p class="note small">${g.semPlano ? `Monte seu treino com o Coach (tela inicial) para começar a contar. ` : ""}Formatura: ${g.precisa ? `${g.precisa} de ${g.total} sessões` : "80% das sessões"} e <b>${esc(g.teste)}</b>${g.final ? " ✓" : ""}. Vale +${XP.formatura} XP${etapas[at.i + 1] ? ` e libera <b>${esc(etapas[at.i + 1].nome)}</b>` : ""}.</p>` : `<p class="note small">Etapa contínua: o Coach renova o plano em ciclos. Bata a meta da semana e os seus recordes para subir de nível.</p>`}
-        <p class="note small">O Treino da Fera fica sempre liberado como apoio para as barras.</p></div>
+        <p class="note small">O Treino da Fera fica sempre liberado como apoio para as barras.</p></div>`}
       <details class="xp-regras"><summary>Como ganhar XP</summary><ul class="note small">
         <li>Vídeo principal: ${XP.video} · Pulse: ${XP.pulse} · Abdômen: ${XP.abs}</li>
         <li>Treino concluído (academia, calistenia): ${XP.sessao} + até ${XP.volumeMax} pelo volume · WOD do Cross: ${XP.cf}</li>
@@ -4853,7 +4849,8 @@
 
     async function iniciarTrilha() {
       const at = etapaAtual(), T = TRILHAS[trilha()];
-      await falar(`Trilha <b>${T.ic} ${esc(T.nome)}</b>! Etapa 1: <b>${esc(at.nome)}</b>. Para se formar: 80% das sessões e um teste de saída. Isso vale +${XP.formatura} XP e libera a próxima etapa. O <b>Treino da Fera</b> fica sempre aberto como apoio para as barras.`, 1000);
+      await falar(at.p ? `Trilha <b>${T.ic} ${esc(T.nome)}</b>! Etapa 1: <b>${esc(at.nome)}</b>. Para se formar: 80% das sessões e um teste de saída. Isso vale +${XP.formatura} XP e libera a próxima etapa. O <b>Treino da Fera</b> fica sempre aberto como apoio para as barras.`
+        : `Trilha <b>${T.ic} ${esc(T.nome)}</b>! Cada WOD concluído vale <b>${XP.cf} XP</b>, cada PR +${XP.recorde}, e bater ${metaSemana()} treinos na semana dá +${XP.semana}. O <b>Treino da Fera</b> fica aberto se quiser treinar barras.`, 1000);
       if (trilha() === "hibrido") await falar(`Nos dias de vídeo, você segue o <b>MAX:30</b>; nos de força, a <b>${esc(progDe(forcaHibrido())?.nome || "")}</b>, que eu monto depois de umas perguntas (o card fica na tela inicial).`);
       await escolhido(progDe(at.prog));
     }
