@@ -89,17 +89,21 @@ const diaLocal = (tz, agora = Date.now()) => new Date(agora + tz * 60000).toISOS
 const minLocal = (tz, agora = Date.now()) => (((Math.floor(agora / 60000) + tz) % 1440) + 1440) % 1440;
 const linkOk = (u) => { try { const x = new URL(String(u)); return x.origin === SITE ? x.href.slice(0, 300) : null; } catch { return null; } };
 
+const driveOk = (u) => { try { const x = new URL(String(u)); return x.protocol === "https:" && x.hostname === "drive.google.com" ? x.href.slice(0, 400) : null; } catch { return null; } };
+const ID_EX = /^[\w-]{1,60}$/;
 function limparAgenda(lista) {
   return (Array.isArray(lista) ? lista : []).slice(0, 10).filter((a) => a && DATA.test(a.data)).map((a) => ({
-    data: a.data, prog: txt(a.prog, 60), titulo: txt(a.titulo, 100), descanso: !!a.descanso,
+    data: a.data, prog: txt(a.prog, 60), titulo: txt(a.titulo, 100), descanso: !!a.descanso, obs: txt(a.obs, 200),
     itens: (Array.isArray(a.itens) ? a.itens : []).slice(0, 15).map((i) => txt(i, 120)).filter(Boolean), link: linkOk(a.link),
+    ex: (Array.isArray(a.ex) ? a.ex : []).slice(0, 20).filter((e) => e && ID_EX.test(String(e.id))).map((e) => ({ id: String(e.id), nome: txt(e.nome, 80), un: txt(e.un, 10), ...(e.maxOut ? { maxOut: true } : {}), ...(e.carga ? { carga: true } : {}) })),
+    videos: (Array.isArray(a.videos) ? a.videos : []).slice(0, 4).map((v) => ({ nome: txt(v?.nome, 40), url: driveOk(v?.url) })).filter((v) => v.url),
   }));
 }
 
 export async function estado(email) {
   const c = (await todos()).contas[email];
   return { ligado: !!c?.chat, hora: c ? minStr(c.hora) : "07:00", noite: c?.noite == null ? (c ? null : "20:00") : minStr(c.noite), marcar: c?.marcar || [],
-    agua: c?.agua?.on ? { on: true, ml: c.agua.ml, intervalo: c.agua.intervalo, ini: minStr(c.agua.ini), fim: minStr(c.agua.fim) } : { on: false }, aguaPend: c?.aguaPend || [], bot: botNome };
+    agua: c?.agua?.on ? { on: true, ml: c.agua.ml, intervalo: c.agua.intervalo, ini: minStr(c.agua.ini), fim: minStr(c.agua.fim) } : { on: false }, aguaPend: c?.aguaPend || [], regPend: c?.regPend || [], bot: botNome };
 }
 export async function codigoVincular(email) {
   const d = await todos();
@@ -149,6 +153,11 @@ export async function configurarAgua(email, c) {
   if (conta.agua && c.testar) await enviar(conta.chat, { text: `💧 Lembrete de água ligado! Vou te lembrar de beber <b>${conta.agua.ml} ml</b> a cada ${conta.agua.intervalo} min, das ${minStr(conta.agua.ini)} às ${minStr(conta.agua.fim)}.` }).catch(() => {});
   return { ok: true, ...(await estado(email)) };
 }
+export async function confirmarRegistros(email, ids) {
+  const conta = (await todos()).contas[email];
+  if (conta) { conta.regPend = (conta.regPend || []).filter((x) => !(ids || []).includes(x.id)); salvar(); }
+  return { ok: true };
+}
 export async function confirmarAgua(email, ids) {
   const conta = (await todos()).contas[email];
   if (conta) { conta.aguaPend = (conta.aguaPend || []).filter((x) => !(ids || []).includes(x.id)); salvar(); }
@@ -178,10 +187,12 @@ function mensagemDia(conta, k, { cabeca, botoes = true } = {}) {
   const topo = `<b>${esc(cabeca || `Treino de ${dataBR(k)}`)}</b>`;
   if (!a) return { text: `${topo}\nNão tenho o treino desse dia. Abra o FIT.AI para eu atualizar a agenda.`, reply_markup: { inline_keyboard: [[{ text: "▶️ Abrir o FIT.AI", url: `${SITE}/` }]] } };
   if (a.descanso) return { text: `${topo}\n😴 Descanso${a.prog ? ` no ${esc(a.prog)}` : ""}. Recupere bem!` };
-  const linhas = [topo, `<b>${esc([a.prog, a.titulo].filter(Boolean).join(" · "))}</b>`, ...a.itens.map((i) => `• ${esc(i)}`)];
+  const linhas = [topo, `<b>${esc([a.prog, a.titulo].filter(Boolean).join(" · "))}</b>`, ...a.itens.map((i) => `• ${esc(i)}`), ...(a.obs ? [`<i>${esc(a.obs)}</i>`] : [])];
+  if (!feito && (a.ex || []).some((e) => e.un !== "video" || e.maxOut)) linhas.push("", (a.ex || []).some((e) => e.maxOut) ? "Depois me conta o seu Max Out (ex.: “Max Out 12:30”)." : "Me conta as séries que eu anoto (ex.: “flexão 12, 10, 9”).");
   if (feito) linhas.push("", "✅ Já está feito. Mandou bem!");
   const kb = [];
   if (botoes && !feito) kb.push([{ text: "✅ Feito", callback_data: `feito:${k}` }]);
+  for (const v of a.videos || []) kb.push([{ text: `🎬 ${v.nome}`, url: v.url }]);
   if (a.link) kb.push([{ text: "▶️ Abrir treino", url: a.link }]);
   return { text: linhas.join("\n"), ...(kb.length ? { reply_markup: { inline_keyboard: kb } } : {}) };
 }
@@ -315,6 +326,17 @@ const FERRAMENTAS = [
     input_schema: { type: "object", properties: { data: { type: "string", description: "Data no formato AAAA-MM-DD. Padrão: hoje." } } } },
   { name: "anotar_agua", description: "Anota água que a pessoa disse que bebeu agora (em ml; um copo comum tem cerca de 250 ml, uma garrafinha 500 ml).",
     input_schema: { type: "object", properties: { ml: { type: "integer", description: "Quantidade em ml, de 50 a 2000." } }, required: ["ml"] } },
+  { name: "anotar_series", description: "Anota as séries que a pessoa fez de um exercício do treino (repetições, ou segundos/minutos quando a unidade do exercício for s/min). Use o id do exercício que aparece na agenda daquele dia. Os valores são somados às séries já anotadas no dia.",
+    input_schema: { type: "object", properties: {
+      exercicio_id: { type: "string", description: "id do exercício, como aparece na agenda (ex.: flexao-comum)" },
+      valores: { type: "array", items: { type: "number" }, description: "Um valor por série, na ordem (ex.: [12, 10, 9])" },
+      cargas_kg: { type: "array", items: { type: "number" }, description: "Carga de cada série em kg, só em exercícios com carga (opcional)" },
+      data: { type: "string", description: "AAAA-MM-DD. Padrão: hoje." } }, required: ["exercicio_id", "valores"] } },
+  { name: "anotar_max_out", description: "Anota o Max Out de um vídeo do MAX:30: o tempo do vídeo em que a pessoa precisou parar pela primeira vez. Converta mm:ss para segundos (12:30 → 750). Também marca o vídeo como feito.",
+    input_schema: { type: "object", properties: {
+      video_id: { type: "string", description: "id do vídeo, como aparece na agenda (ex.: cardio-challenge)" },
+      segundos: { type: "integer", description: "Tempo do Max Out em segundos" },
+      data: { type: "string", description: "AAAA-MM-DD. Padrão: hoje." } }, required: ["video_id", "segundos"] } },
   { name: "ver_agenda", description: "Mostra os treinos dos próximos 7 dias do programa principal e quais dias já estão feitos.", input_schema: { type: "object", properties: {} } },
 ];
 function usarFerramenta(c, nome, entrada) {
@@ -336,6 +358,27 @@ function usarFerramenta(c, nome, entrada) {
     salvar();
     return `Anotado: ${ml} ml. ${aguaProgresso(c)}`;
   }
+  if (nome === "anotar_series" || nome === "anotar_max_out") {
+    const k = DATA.test(String(entrada?.data || "")) ? entrada.data : hojeK;
+    if (k > hojeK || k < somarDia(hojeK, -7)) return "Só dá para anotar treinos de hoje ou dos últimos 7 dias.";
+    const a = (c.agenda || []).find((x) => x.data === k), lista = a?.ex || [];
+    const id = String(entrada?.[nome === "anotar_series" ? "exercicio_id" : "video_id"] || "");
+    const e = lista.find((x) => x.id === id);
+    if (!e) return `Não achei esse id no treino de ${dataBR(k)}. Ids válidos: ${lista.map((x) => `${x.id} (${x.nome})`).join(", ") || "nenhum (abra o app para atualizar a agenda)"}.`;
+    if (nome === "anotar_max_out") {
+      const seg = Math.round(Number(entrada?.segundos));
+      if (!e.maxOut) return `${e.nome} não tem Max Out.`;
+      if (!(seg > 0 && seg <= 3600)) return "Tempo inválido.";
+      (c.regPend = c.regPend || []).push({ id: randomBytes(6).toString("hex"), tipo: "max", data: k, ex: id, seg }); salvar();
+      return `Anotado: Max Out de ${e.nome} em ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")} (${dataBR(k)}). Entra no app e nos recordes quando a pessoa abrir o FIT.AI.`;
+    }
+    if (e.un === "video") return `${e.nome} é um vídeo: para ele só existe Max Out ou marcar o treino como feito.`;
+    const valores = (Array.isArray(entrada?.valores) ? entrada.valores : []).map(Number).filter((n) => Number.isFinite(n) && n > 0 && n < 10000).slice(0, 20);
+    if (!valores.length) return "Nenhum valor válido.";
+    const kg = e.carga && Array.isArray(entrada?.cargas_kg) ? entrada.cargas_kg.map(Number).slice(0, 20) : [];
+    (c.regPend = c.regPend || []).push({ id: randomBytes(6).toString("hex"), tipo: "series", data: k, ex: id, valores, ...(kg.length ? { kg } : {}) }); salvar();
+    return `Anotado: ${e.nome} — ${valores.map((v, i) => (kg[i] > 0 ? `${kg[i]}kg×${v}` : v)).join(", ")}${e.un && e.un !== "reps" ? ` (${e.un})` : ""} em ${dataBR(k)}. Entra no app quando a pessoa abrir o FIT.AI.`;
+  }
   if (nome === "ver_agenda") return agendaTexto(c);
   return "Ferramenta desconhecida.";
 }
@@ -343,7 +386,8 @@ function agendaTexto(c) {
   const hojeK = diaLocal(c.tz ?? -180);
   return [...Array(7)].map((_, i) => { const k = somarDia(hojeK, i), a = (c.agenda || []).find((x) => x.data === k);
     const ok = (c.feitos || []).includes(k) || (c.marcar || []).includes(k);
-    return `${k} (${dataBR(k)}): ${a ? (a.descanso ? "descanso" : `${a.prog} · ${a.titulo} — ${a.itens.join("; ")}`) : "sem dados"}${ok ? " [FEITO]" : ""}`; }).join("\n");
+    const ids = (a?.ex || []).length ? ` | ids: ${a.ex.map((e) => `${e.id}=${e.nome}${e.maxOut ? " [Max Out]" : e.un && e.un !== "video" ? ` [${e.un}${e.carga ? ", kg" : ""}]` : ""}`).join("; ")}` : "";
+    return `${k} (${dataBR(k)}): ${a ? (a.descanso ? "descanso" : `${a.prog} · ${a.titulo} — ${a.itens.join("; ")}${ids}`) : "sem dados"}${ok ? " [FEITO]" : ""}`; }).join("\n");
 }
 async function responderCoach(c, chat, msg) {
   if (!process.env.ANTHROPIC_API_KEY) { await enviar(chat, { text: "O Coach está sem a chave da IA no servidor agora." }); return; }
@@ -362,7 +406,7 @@ async function responderCoach(c, chat, msg) {
 ${atualizado ? `O contexto acima veio do app em ${atualizado}; o que a pessoa fez depois disso pode não aparecer.` : "A pessoa ainda não abriu o app depois de ligar o Coach no Telegram, então não há histórico detalhado: diga que, abrindo o app uma vez, você passa a ver o programa e o histórico."}
 Agenda dos próximos dias:\n${agendaTexto(c)}
 Água de hoje: ${aguaProgresso(c) || "nada anotado"}.
-Ferramentas: quando a pessoa disser que já treinou, use marcar_treino_feito; quando disser que bebeu água, use anotar_agua. Confirme em uma frase o que anotou.
+Ferramentas: quando a pessoa disser que já treinou, use marcar_treino_feito; quando contar as séries de um exercício, use anotar_series (uma chamada por exercício); quando disser o Max Out de um vídeo, use anotar_max_out; quando disser que bebeu água, use anotar_agua. Confirme em uma frase o que anotou e, se fizer sentido, compare com o histórico.
 Escreva para o Telegram: frases curtas, **negrito** e listas com "- ". Sem tabelas e sem títulos.`;
     const historico = [...(c.conversa || []).slice(-16), { role: "user", content: conteudo }];
     while (historico.length && historico[0].role !== "user") historico.shift();

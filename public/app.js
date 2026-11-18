@@ -2468,6 +2468,7 @@
       const dados = await r.json();
       Object.assign(INS_VID, dados.videos || {});
       souDono = !!dados.dono;
+      tgSincronizar(); // os links dos vídeos entram na agenda do Telegram
       if (VP[location.hash.split("/")[1]]) render();
       videoRetomar();
       if (idVideo && !INS_VID[idVideo]) {
@@ -3719,7 +3720,9 @@
       const w = insSemanaDe(pk, dt), t = w >= 0 && w < VP[pk].semanas.length ? insDia(pk, w, d) : null;
       if (!t) return null;
       if (!t.ids.length) return { data: k, prog: VP[pk].nome, titulo: "Descanso", descanso: true };
-      return { data: k, prog: VP[pk].nome, titulo: t.titulo || INSV[t.ids[0]]?.nome || "", itens: t.ids.map((id) => `${INSV[id]?.nome || id}${INSV[id]?.min ? ` · ${INSV[id].min} min` : ""}`), link: `${base}#/${pk}/${w}/${d}` };
+      return { data: k, prog: VP[pk].nome, titulo: t.titulo || INSV[t.ids[0]]?.nome || "", itens: t.ids.map((id) => `${INSV[id]?.nome || id}${INSV[id]?.min ? ` · ${INSV[id].min} min` : ""}`), link: `${base}#/${pk}/${w}/${d}`,
+        ex: t.ids.map((id) => ({ id, nome: INSV[id]?.nome || id, un: "video", maxOut: !!VP[pk].maxOut })),
+        videos: t.ids.filter((id) => INS_VID[id]).map((id) => ({ nome: INSV[id]?.nome || id, url: insLink(id) })) };
     }
     if (IA[pk]) {
       if (!S[pk].plano) return null;
@@ -3727,14 +3730,16 @@
       if (w < 0 || (IA[pk].semanas > 0 && w >= IA[pk].semanas)) return null;
       const t = iaSessao(pk, d, w);
       if (!t) return { data: k, prog: IA[pk].nome, titulo: "Descanso", descanso: true };
-      return { data: k, prog: IA[pk].nome, titulo: t.titulo, itens: t.exercicios.map((e) => `${exDe(pk, e.id)?.nome || e.id}: ${e.series} × ${e.reps}`), link: `${base}${iaLink(pk, d, w)}` };
+      return { data: k, prog: IA[pk].nome, titulo: t.titulo, itens: t.exercicios.map((e) => `${exDe(pk, e.id)?.nome || e.id}: ${e.series} × ${e.reps}`), link: `${base}${iaLink(pk, d, w)}`,
+        ex: t.exercicios.map((e) => ({ id: e.id, nome: exDe(pk, e.id)?.nome || e.id, un: unDe(pk, e), carga: !!IA[pk].carga })) };
     }
     if (pk === "cf") return { data: k, prog: "CrossFit", titulo: "WOD do box", itens: ["Tire uma foto do quadro e o app lança o WOD."], link: `${base}#/cf` };
     if (semanasDesde(dt) < 0) return null;
     const w = semanaDe(dt), t = treino(w, d);
     if (!t) return null;
     return { data: k, prog: NOME_PROG, titulo: t.titulo, descanso: t.foco === "Opcional" && /descanso/i.test(t.titulo),
-      itens: (t.ex || []).map((e) => `${e.nome}: ${e.s} × ${e.r}${UN[e.un]}${e.lado ? " cada lado" : ""}`), link: `${base}#/treino/${w}/${d}` };
+      itens: (t.ex || []).map((e) => `${e.nome}: ${e.s} × ${e.r}${UN[e.un]}${e.lado ? " cada lado" : ""}`), link: `${base}#/treino/${w}/${d}`, obs: t.obs || "",
+      ex: (t.ex || []).map((e) => ({ id: e.id, nome: e.nome, un: e.un === "tiro" ? "s" : e.un })) };
   }
   // O "Feito" do Telegram vira o treino do programa principal naquele dia
   function tgMarcar(k) {
@@ -3750,6 +3755,31 @@
       S[pk].logs[k] = { d, w, sets: {}, ...(S[pk].logs[k] || {}), done: true };
     } else if (pk === "cf") S.cf.logs[k] = { res: {}, ...(S.cf.logs[k] || {}), done: true };
     else S.logs[k] = { w: Math.max(0, semanaDe(dt)), d, sets: {}, dur: 0, ...(S.logs[k] || {}), done: true };
+    return true;
+  }
+  function tgRegistrar(x) {
+    const k = x.data, dt = parseKey(k), d = (dt.getDay() + 6) % 7, pk = principal();
+    const nums = (Array.isArray(x.valores) ? x.valores : []).map(Number).filter((n) => Number.isFinite(n) && n > 0 && n < 10000).slice(0, 20);
+    if (x.tipo === "max" && VP[pk]) {
+      const seg = Math.round(Number(x.seg));
+      if (!(seg > 0 && seg <= 3600) || !INSV[x.ex]) return false;
+      const l = insLogDe(pk, k);
+      l.max = l.max || {}; l.max[x.ex] = seg;
+      marcarVideo(pk, l, x.ex);
+      return true;
+    }
+    if (x.tipo !== "series" || !nums.length) return false;
+    if (IA[pk]) {
+      if (!S[pk].plano || !exDe(pk, x.ex)) return false;
+      const w = S[pk].inicio ? Math.max(0, Math.floor(diffDays(mondayOf(parseKey(S[pk].inicio)), dt) / 7)) : 0;
+      const l = (S[pk].logs[k] = S[pk].logs[k] || { d, w, sets: {}, done: false });
+      const kg = Array.isArray(x.kg) ? x.kg.map(Number) : [];
+      (l.sets[x.ex] = l.sets[x.ex] || []).push(...nums.map((r, i) => (kg[i] > 0 && kg[i] < 1000 ? { kg: kg[i], r } : { r })));
+      return true;
+    }
+    if (VP[pk] || pk === "cf" || !EXI[x.ex]) return false;
+    const l = (S.logs[k] = S.logs[k] || { w: Math.max(0, semanaDe(dt)), d, sets: {}, dur: 0, done: false });
+    (l.sets[x.ex] = l.sets[x.ex] || []).push(...nums);
     return true;
   }
   async function tgSincronizar(forcar = false) {
@@ -3787,6 +3817,14 @@
         const tot = pend.reduce((a, x) => a + x.ml, 0);
         toast(`+${tot} ml de água anotados pelo Telegram 💧`);
         if (location.hash.startsWith("#/nutricao") || location.hash.startsWith("#/home") || !location.hash) render();
+      }
+      // Séries e Max Out anotados pelo Coach no Telegram
+      const regs = (r.regPend || []).filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.data) && x.data <= keyOf(new Date()));
+      if (regs.length) {
+        const feitosReg = regs.filter(tgRegistrar);
+        save();
+        await tgApi("regok", { ids: regs.map((x) => x.id) });
+        if (feitosReg.length) { toast(`${feitosReg.length} ${feitosReg.length === 1 ? "registro anotado" : "registros anotados"} pelo Telegram ✓`); render(); }
       }
       const marcar = (r.marcar || []).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k) && k <= keyOf(new Date()));
       if (marcar.length) {

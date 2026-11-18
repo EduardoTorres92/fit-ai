@@ -35,6 +35,7 @@ export default async (req) => {
     else if (c.acao === "agenda") r = await tg.receberAgenda(email, c);
     else if (c.acao === "ok") r = await tg.confirmarMarcados(email, c.datas);
     else if (c.acao === "agua") r = await tg.configurarAgua(email, c);
+    else if (c.acao === "regok") r = await tg.confirmarRegistros(email, c.ids);
     else if (c.acao === "aguaok") r = await tg.confirmarAgua(email, c.ids);
     else if (c.acao === "testar") r = await tg.testar(email);
     else if (c.acao === "desligar") r = await tg.desligar(email);
