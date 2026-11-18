@@ -166,7 +166,7 @@
     ["Intermediário", "Já treino com regularidade"],
     ["Avançado", "Treino pesado há tempo (faço barra)"],
   ];
-  const recomendado = (nivel) => (!S.dono && VP.insanity ? VP.insanity : TRILHA.find((x) => x.nivel === nivel) || TRILHA[0]);
+  const recomendado = (nivel) => (!donoAtivo() && VP.insanity ? VP.insanity : TRILHA.find((x) => x.nivel === nivel) || TRILHA[0]);
   const caminhoTxt = () => TRILHA.map((x) => x.nome).join(" → ");
   // Programa de vídeo começa na segunda desta semana; de sexta em diante, na próxima segunda
   const inicioNovo = () => keyOf(hojeDia >= 4 ? addDays(mondayOf(hoje), 7) : mondayOf(hoje));
@@ -3001,10 +3001,12 @@
   }
   const graduado = () => !!S.graduadoMax30 || max30Progresso().ok;
   // Quem não é o dono começa pelo MAX:30 e libera o resto ao se formar. O Treino da Fera ("plano") fica sempre como apoio (barras).
-  const liberado = (k) => k === "insanity" || k === "plano" || !!S.dono || graduado();
+  // O dono pode ver o app como um usuário comum (Perfil → "Ver como usuário comum")
+  function donoAtivo() { return !!S.dono && !S.verComoMembro; }
+  const liberado = (k) => k === "insanity" || k === "plano" || donoAtivo() || graduado();
   const travado = (k) => !liberado(k);
   function aplicarTrava() {
-    if (S.dono || graduado() || principal() === "insanity") return;
+    if (donoAtivo() || graduado() || principal() === "insanity") return;
     escolherPrograma("insanity"); // MAX:30 é o principal de todo mundo; a Fera fica como apoio
   }
   // Depois de salvar: XP ganho, subida de nível/classe e formatura
@@ -3049,7 +3051,8 @@
       <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""}</span><strong>${esc(n.classe)}</strong>
         <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
         <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
-      ${S.dono || S.graduadoMax30 ? "" : `<div class="grad-box"><div class="sec-head"><h2>Formatura MAX:30</h2><span>${g.feitas}/${g.precisa} sessões</span></div>
+      ${S.dono ? `<button class="btn btn-outline ver-membro" id="ver-membro">${S.verComoMembro ? "👁️ Vendo como usuário comum · voltar à visão de dono" : "👁️ Ver como usuário comum"}</button>` : ""}
+      ${donoAtivo() || S.graduadoMax30 ? "" : `<div class="grad-box"><div class="sec-head"><h2>Formatura MAX:30</h2><span>${g.feitas}/${g.precisa} sessões</span></div>
         <span class="xp-bar"><i style="width:${Math.min(100, Math.round((g.feitas / Math.max(1, g.precisa)) * 100))}%"></i></span>
         <p class="note small">Feche ${g.precisa} das ${g.total} sessões do calendário e o <b>Cardio Challenge final</b> (sábado da semana 8)${g.final ? " ✓" : ""} para liberar os outros programas. O Treino da Fera fica sempre liberado como apoio para as barras.</p></div>`}
       <details class="xp-regras"><summary>Como ganhar XP</summary><ul class="note small">
@@ -3960,7 +3963,7 @@
     const agenda = [...Array(8)].map((_, i) => tgDia(addDays(new Date(), i))).filter(Boolean);
     const feitos = [...Array(14)].map((_, i) => keyOf(addDays(new Date(), -i))).filter(feito);
     const kHoje = keyOf(new Date());
-    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, ini: n.ini, fim: n.fim, grad: graduado() || !!S.dono, feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
+    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, ini: n.ini, fim: n.fim, grad: graduado() || donoAtivo(), feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
     const assinatura = JSON.stringify(corpo);
     const coachVelho = Date.now() - tgCoachEm > 10 * 60000;
     if (!forcar && assinatura === tgUltimo && !coachVelho) return;
@@ -4134,6 +4137,13 @@
     else if (t.dataset.gPeriodo) { G.periodo = t.dataset.gPeriodo; render(); }
     else if (t.dataset.gRank) { G.rank = t.dataset.gRank; render(); }
     else if (t.dataset.membro) location.hash = `#/grupo/membro/${t.dataset.membro}`;
+    else if (t.id === "ver-membro") {
+      S.verComoMembro = !S.verComoMembro;
+      if (S.verComoMembro) { S.principalDono = principal(); aplicarTrava(); }
+      else if (S.principalDono) { escolherPrograma(S.principalDono); S.principalDono = null; }
+      save(); render();
+      toast(S.verComoMembro ? "Visão de usuário comum: só MAX:30 e Treino da Fera. 👁️" : "De volta à visão de dono: tudo liberado.", 3500);
+    }
     else if (t.dataset.principal) {
       const x = progDe(t.dataset.principal);
       if (x && travado(x.k)) { const g = max30Progresso(); toast(`🔒 ${x.nome} libera quando você se formar no MAX:30 (${g.feitas}/${g.precisa} sessões${g.final ? "" : " + Cardio Challenge final"}).`, 4500); return; }
@@ -4585,7 +4595,7 @@
     out.push(`Perfil: ${P.peso || "?"} kg, ${P.altura || "?"} cm, ${P.idade || "?"} anos. Sequência atual: ${sequencia()} dias. Treinos concluídos: ${treinosFeitos()}.`);
     out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
     { const n = meuNivel(), g = max30Progresso();
-      out.push(`Gamificação: nível ${n.nivel} (${n.classe}), ${n.xp} XP, faltam ${Math.max(0, n.fim - n.xp)} XP para o próximo nível. ${S.dono ? "Conta do dono: todos os programas liberados." : graduado() ? "Formado no MAX:30: todos os programas liberados." : `Ainda não se formou no MAX:30 (${g.feitas}/${g.precisa} sessões${g.final ? "" : ", falta o Cardio Challenge final"}); só MAX:30 e Treino da Fera (apoio para barras) estão liberados. Não recomende outros programas antes da formatura.`}`); }
+      out.push(`Gamificação: nível ${n.nivel} (${n.classe}), ${n.xp} XP, faltam ${Math.max(0, n.fim - n.xp)} XP para o próximo nível. ${donoAtivo() ? "Conta do dono: todos os programas liberados." : graduado() ? "Formado no MAX:30: todos os programas liberados." : `Ainda não se formou no MAX:30 (${g.feitas}/${g.precisa} sessões${g.final ? "" : ", falta o Cardio Challenge final"}); só MAX:30 e Treino da Fera (apoio para barras) estão liberados. Não recomende outros programas antes da formatura.`}`); }
     const lh = logHoje();
     if (lh) out.push(`Registrado hoje (${lh.done ? "concluído" : "em andamento"}): ${Object.entries(lh.sets || {}).filter(([, v]) => v.length).map(([id, v]) => `${EXI[id]?.nome || id} ${v.join("+")}`).join("; ") || "nada ainda"}.`);
     const dias = Object.keys(S.logs).sort().filter((k) => k < hojeKey).slice(-21);
@@ -4741,7 +4751,7 @@
         const r = recomendado(n[0]);
         etapa = "programa"; chips.innerHTML = "";
         await falar(`Pelo que você disse, comece pelo <b>${esc(r.nome)}</b>: ${esc(r.sobre)}`, 1100);
-        if (!S.dono) await falar(`Aqui funciona como um jogo: cada vídeo dá <b>XP</b>, você sobe de nível e de classe (Recruta → Escudeiro → Guerreiro…). Ao se formar no MAX:30 (80% das sessões + o Cardio Challenge final), os outros programas são liberados. O <b>Treino da Fera</b> fica sempre aberto como apoio para as barras. 🛡️`);
+        if (!donoAtivo()) await falar(`Aqui funciona como um jogo: cada vídeo dá <b>XP</b>, você sobe de nível e de classe (Recruta → Escudeiro → Guerreiro…). Ao se formar no MAX:30 (80% das sessões + o Cardio Challenge final), os outros programas são liberados. O <b>Treino da Fera</b> fica sempre aberto como apoio para as barras. 🛡️`);
         else if (r !== TRILHA[0]) await falar(`Se preferir ir com calma, o caminho natural começa pelo <b>${esc(TRILHA[0].nome)}</b>.`);
         setChips(chips, [`Começar o ${r.nome}`, ...CATALOGO.filter((x) => x !== r && liberado(x.k) && x.k !== "plano").map((x) => `Prefiro o ${x.nome}`)]);
       } else if (etapa === "programa") {
