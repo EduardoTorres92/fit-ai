@@ -2439,6 +2439,7 @@
       Object.assign(INS_VID, dados.videos || {});
       souDono = !!dados.dono;
       if (VP[location.hash.split("/")[1]]) render();
+      videoRetomar();
       if (idVideo && !INS_VID[idVideo]) {
         // O vídeo pedido não veio: diz o que o servidor encontrou, para achar o erro na configuração
         const P = VPROGS.find((x) => x.videos.some((v) => v.id === idVideo));
@@ -2454,6 +2455,22 @@
 
   /* Player dos vídeos dentro do app (pré-visualização do Google Drive; o arquivo precisa estar
      compartilhado como "qualquer pessoa com o link") */
+  // O player só fecha pelo ✕ (ou pelo voltar do celular, com confirmação): tocar na área escura em volta do vídeo
+  // fechava o player no meio do treino. Enquanto ele está aberto, a tela não apaga (Wake Lock); se o navegador
+  // recarregar a página (celular bloqueou, pouca memória), o vídeo reabre sozinho.
+  let videoWake = null;
+  async function videoManterTela() {
+    if (videoWake || document.visibilityState !== "visible" || !document.getElementById("video-dlg")?.open) return;
+    try { videoWake = await navigator.wakeLock?.request("screen"); videoWake?.addEventListener("release", () => { videoWake = null; }); } catch { videoWake = null; }
+  }
+  document.addEventListener("visibilitychange", videoManterTela); // o Wake Lock cai quando a tela sai do app; pede de novo na volta
+  function videoRetomar() {
+    const a = S.videoAberto;
+    if (!a || document.getElementById("video-dlg")?.open) return;
+    if (Date.now() - a.em > 90 * 60 * 1000 || !INS_VID[a.id]) { delete S.videoAberto; save(); return; }
+    abrirVideo(a.id);
+    toast("Reabri o vídeo que estava tocando. Avance até onde você parou. ▶️", 5000);
+  }
   function abrirVideo(id) {
     const v = INSV[id], drive = INS_VID[id];
     if (!v || !drive) return;
@@ -2461,8 +2478,12 @@
     if (!dlg) {
       dlg = document.createElement("dialog");
       dlg.id = "video-dlg"; dlg.className = "video-dlg";
-      dlg.addEventListener("close", () => { dlg.innerHTML = ""; }); // para o vídeo ao fechar
-      dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-video-fechar]")) dlg.close(); });
+      dlg.addEventListener("close", () => { // para o vídeo ao fechar
+        dlg.innerHTML = ""; delete S.videoAberto; save();
+        videoWake?.release().catch(() => {}); videoWake = null;
+      });
+      dlg.addEventListener("click", (e) => { if (e.target.closest("[data-video-fechar]")) dlg.close(); });
+      dlg.addEventListener("cancel", (e) => { e.preventDefault(); if (confirm("Fechar o vídeo?")) dlg.close(); }); // voltar do celular / Esc
       $(".device").appendChild(dlg);
     }
     dlg.setAttribute("aria-label", v.nome);
@@ -2471,7 +2492,9 @@
         <div class="video-frame"><iframe src="${driveUrl(id, "preview")}" title="${esc(v.nome)}" allow="autoplay; fullscreen"></iframe></div>
         <a class="video-alt" href="${driveUrl(id, "view")}" target="_blank" rel="noopener">Não carregou? Abrir no Google Drive</a>
       </div>`;
-    dlg.showModal();
+    if (!dlg.open) dlg.showModal();
+    S.videoAberto = { id, em: Date.now() }; save();
+    videoManterTela();
   }
 
   /* ---------- Cronômetro dos treinos em vídeo ----------
