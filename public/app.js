@@ -2931,7 +2931,7 @@
   const NIVEL_MAX = 50;
   const xpPara = (n) => 40 * n * (n - 1); // XP total para chegar ao nível n
   // Calibrado para o MAX:30 inteiro levar ao nível 10 (fim de Escudeiro) e a formatura empurrar para Guerreiro (nível 11)
-  const XP = { video: 50, pulse: 30, abs: 20, recorde: 25, teste: 25, serie: 3, metaEx: 10, completo: 30, cf: 50, seqDia: 5, seqMax: 30, semana: 75, agua: 5, desafio: 25, formatura: 500 };
+  const XP = { video: 50, pulse: 30, abs: 20, recorde: 25, teste: 25, serie: 3, metaEx: 10, completo: 30, cf: 50, seqDia: 5, seqMax: 30, semana: 75, agua: 5, desafio: 50, formatura: 500 };
   const EX_META = Object.fromEntries(TODOS_EX.map((e) => [e.id, e]));
   // XP de cada linha de treino (sem os bônus de sequência e semana)
   function xpLinha(r) {
