@@ -154,7 +154,7 @@ function limparPlano(p, P) {
 }
 
 const ROTULOS = { objetivo: "Objetivo", experiencia: "Experiência", nivel: "Nível", equipamento: "Equipamento", dias: "Dias por semana", diasSemana: "Dias preferidos",
-  tempo: "Tempo por treino", local: "Onde treina", foco: "Prioridade", sexo: "Sexo", idade: "Idade", peso: "Peso (kg)", altura: "Altura (cm)", limitacoes: "Limitações/dores", extra: "Outras informações" };
+  tempo: "Tempo por treino", local: "Onde treina", foco: "Prioridade", sexo: "Sexo", idade: "Idade", peso: "Peso (kg)", altura: "Altura (cm)", limitacoes: "Limitações/dores", extra: "Outras informações", etapa: "Etapa da trilha" };
 const linhaPerfil = (p = {}) => Object.entries(ROTULOS).filter(([k]) => p[k] !== undefined && p[k] !== "").map(([k, r]) =>
   `${r}: ${k === "diasSemana" ? (Array.isArray(p[k]) && p[k].length ? p[k].map((d) => DIAS[d] || "").join(", ") : "sem preferência") : txt(p[k], 400)}`).join("\n");
 

@@ -132,8 +132,9 @@ function textoNivel(c) {
   if (!g) return "Abra o FIT.AI uma vez para eu receber o seu nível. 🛡️";
   const barra = (pct) => "▰".repeat(Math.round(pct / 10)) + "▱".repeat(10 - Math.round(pct / 10));
   const ini = g.ini ?? 40 * g.nivel * (g.nivel - 1), pct = g.fim > ini ? Math.min(100, Math.round(((g.xp - ini) / (g.fim - ini)) * 100)) : 100;
-  const grad = g.grad ? "🎓 Formado no MAX:30: todos os programas liberados." : `🎓 Formatura do MAX:30: <b>${g.feitas}/${g.precisa}</b> sessões${g.final ? " ✓" : " + o Cardio Challenge final"}.`;
-  return `🛡️ <b>Nível ${g.nivel} · ${esc(g.classe || "Recruta")}</b>\n${barra(pct)} ${pct}%\n<b>${g.xp.toLocaleString("pt-BR")} XP</b>${g.nivel < 50 ? ` · faltam ${Math.max(0, g.fim - g.xp).toLocaleString("pt-BR")} para o nível ${g.nivel + 1}` : ""}\n\n${grad}`;
+  const etapa = g.etapa ? `🧭 Trilha <b>${esc(g.trilha || "")}</b> · etapa ${esc(g.etapaN || "")}: <b>${esc(g.etapa)}</b>` : "";
+  const grad = g.grad ? (g.etapa ? "Etapa contínua: bata a meta da semana e os seus recordes." : "") : `🎓 Formatura: <b>${g.feitas}/${g.precisa}</b> sessões${g.final ? " ✓" : ` + ${esc(g.teste || "o teste final")}`}.`;
+  return `🛡️ <b>Nível ${g.nivel} · ${esc(g.classe || "Recruta")}</b>\n${barra(pct)} ${pct}%\n<b>${g.xp.toLocaleString("pt-BR")} XP</b>${g.nivel < 50 ? ` · faltam ${Math.max(0, g.fim - g.xp).toLocaleString("pt-BR")} para o nível ${g.nivel + 1}` : ""}\n\n${[etapa, grad].filter(Boolean).join("\n")}`;
 }
 export async function receberAgenda(email, c) {
   const conta = (await todos()).contas[email];
@@ -152,7 +153,8 @@ export async function receberAgenda(email, c) {
   if (c.gami && typeof c.gami === "object") {
     const n = (v, max) => Math.min(max, Math.max(0, Math.round(Number(v) || 0)));
     conta.gami = { xp: n(c.gami.xp, 1e7), nivel: n(c.gami.nivel, 50) || 1, classe: txt(c.gami.classe, 30), ini: n(c.gami.ini, 1e7), fim: n(c.gami.fim, 1e7), grad: !!c.gami.grad,
-      feitas: n(c.gami.feitas, 99), precisa: n(c.gami.precisa, 99), final: !!c.gami.final };
+      feitas: n(c.gami.feitas, 99), precisa: n(c.gami.precisa, 99), final: !!c.gami.final,
+      trilha: txt(c.gami.trilha, 30), etapa: txt(c.gami.etapa, 40), etapaN: txt(c.gami.etapaN, 8), teste: txt(c.gami.teste, 80) };
   }
   if (typeof c.coachProg === "string") {
     const t = (v, n) => String(v ?? "").slice(0, n);
