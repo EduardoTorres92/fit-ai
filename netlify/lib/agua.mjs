@@ -86,3 +86,16 @@ export function iniciarAgendador() {
   chavesVapid().catch((e) => console.error("agua: chaves", e?.message));
   setInterval(() => rodada().catch((e) => console.error("agua: rodada", e?.message)), 60000).unref?.();
 }
+
+// Aviso do dono para todos os aparelhos com notificação ligada (painel no Telegram)
+export async function avisoTodos(titulo, corpo) {
+  await chavesVapid();
+  const lista = await todas();
+  let ok = 0;
+  const msg = JSON.stringify({ tipo: "aviso", titulo: String(titulo).slice(0, 80), corpo: String(corpo).slice(0, 300) });
+  for (const [id, r] of Object.entries(lista)) {
+    try { await webpush.sendNotification(r.sub, msg, { TTL: 86400, urgency: "normal" }); ok++; }
+    catch (e) { if (e?.statusCode === 404 || e?.statusCode === 410) { delete subs[id]; salvar(); } }
+  }
+  return { ok, total: Object.keys(lista).length };
+}

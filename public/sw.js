@@ -6,6 +6,10 @@ self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch {}
+  if (d.tipo === "aviso") { // aviso do FIT.AI para todos
+    e.waitUntil(self.registration.showNotification(d.titulo || "FIT.AI", { body: d.corpo || "", icon: "assets/agua-192.png", badge: "assets/agua-96.png", tag: "fitai-aviso", data: { aviso: true } }));
+    return;
+  }
   const ml = d.ml || 300;
   e.waitUntil(self.registration.showNotification(d.titulo || "💧 Hora de beber água", {
     body: d.corpo || `Beba ${ml} ml agora.`,
@@ -18,6 +22,10 @@ self.addEventListener("push", (e) => {
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   if (e.action === "depois") return;
+  if (e.notification.data?.aviso) {
+    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => (abas[0] && "focus" in abas[0] ? abas[0].focus() : self.clients.openWindow("./"))));
+    return;
+  }
   const ml = e.notification.data?.ml || 300, bebi = e.action === "bebi";
   e.waitUntil((async () => {
     if (bebi) { // recomeça a contagem do servidor já, mesmo antes de o app abrir

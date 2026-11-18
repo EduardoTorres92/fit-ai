@@ -12,6 +12,10 @@ import { join } from "node:path";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { paramsCoach } from "../functions/coach.mjs";
+import { cabeNoLimite, LIMITE_MEMBRO_DIA } from "./limite.mjs";
+import { ehEmailDono } from "./sessao.mjs";
+import { rpc } from "./admin.mjs";
+import { avisoTodos } from "./agua.mjs";
 
 const PASTA = join(process.env.DADOS_DIR || join(homedir(), "fitai-dados"), "telegram");
 const ARQ = join(PASTA, "dados.json"), CFG = join(PASTA, "config.json");
@@ -218,6 +222,7 @@ export async function testar(email) {
 // Atualização vinda do Telegram (webhook)
 const vistos = new Set(); // update_id já tratados: o Telegram reenvia se a resposta demora
 export async function processar(u, permitido) {
+  const ehDono = (email) => !!email && ehEmailDono(email);
   if (u.update_id != null) {
     if (vistos.has(u.update_id)) return;
     vistos.add(u.update_id);
@@ -227,6 +232,11 @@ export async function processar(u, permitido) {
   const contaDoChat = (chat) => Object.entries(d.contas).find(([, c]) => c.chat === chat) || [];
   if (u.callback_query) {
     const q = u.callback_query, chat = q.message?.chat?.id, [email, c] = contaDoChat(chat);
+    if (String(q.data || "").startsWith("adm:")) {
+      await api("answerCallbackQuery", { callback_query_id: q.id }).catch(() => {});
+      if (c && ehDono(email)) await adminBotao(c, chat, q.data, q.message?.message_id);
+      return;
+    }
     const ag = String(q.data || "").match(/^agua:(\d{2,4})$/);
     if (c && ag) {
       const ml = Math.min(1000, Math.max(50, Number(ag[1]))), tz = c.tz ?? -180, k = diaLocal(tz), mm = minLocal(tz);
@@ -267,12 +277,21 @@ export async function processar(u, permitido) {
     d.contas[v.email] = { hora: 7 * 60, noite: 20 * 60, tz: -180, agenda: [], feitos: [], marcar: [], ...antiga, chat, desde: antiga.desde || Date.now() };
     salvar();
     const conta = d.contas[v.email];
-    await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nMe escreva ou mande foto quando quiser: quem responde é o Coach AI, com o seu programa e o seu histórico.\n\nComandos: /hoje /amanha /semana /nutri /novo /parar` });
+    if (ehDono(v.email)) await api("setMyCommands", { scope: { type: "chat", chat_id: chat }, commands: [
+      { command: "admin", description: "Painel do dono" }, { command: "hoje", description: "Treino de hoje" }, { command: "semana", description: "Próximos 7 dias" },
+      { command: "nutri", description: "Falar com a Nutri AI" }, { command: "coach", description: "Falar com o Coach AI" }, { command: "novo", description: "Conversa nova" }, { command: "parar", description: "Desligar os avisos" },
+    ] }).catch(() => {});
+    await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nMe escreva ou mande foto quando quiser: quem responde é o Coach AI, com o seu programa e o seu histórico.\n\nComandos: /hoje /amanha /semana /nutri /novo /parar${ehDono(v.email) ? "\n\n🛠️ Você é o dono: /admin abre o painel." : ""}` });
     return;
   }
   if (!c) { await enviar(chat, { text: "Oi! Eu sou o bot do <b>FIT.AI</b>. Para receber seus treinos aqui, abra o perfil no app e toque em <b>Conectar Telegram</b>." }); return; }
   const cmd = (texto.match(/^\/(\w+)/) || [])[1]?.toLowerCase();
   const hojeK = diaLocal(c.tz ?? -180);
+  if (ehDono(email)) {
+    if (cmd === "admin") { c.esperando = null; salvar(); await adminMenu(chat); return; }
+    if (cmd === "cancelar" && c.esperando) { c.esperando = null; c.rascunho = null; salvar(); await enviar(chat, { text: "Cancelado." }); return; }
+    if (c.esperando === "aviso" && !cmd && texto) { await adminRascunho(c, chat, texto); return; }
+  }
   if (cmd === "novo") { c.conversa = []; salvar(); await enviar(chat, { text: "Conversa nova 🧹 Pode mandar." }); return; }
   if (cmd === "nutri" || cmd === "coach") {
     c.papel = cmd; c.conversa = []; salvar();
@@ -281,7 +300,7 @@ export async function processar(u, permitido) {
   }
   if (!cmd && (texto || msg.photo || msg.voice || msg.audio || msg.video_note) && !/^(hoje|treino)$/i.test(texto)) {
     if (msg.voice || msg.audio || msg.video_note) { await enviar(chat, { text: "Ainda não entendo áudio 🙉 Manda por texto que eu respondo." }); return; }
-    naFila(chat, () => responderCoach(c, chat, msg));
+    naFila(chat, () => responderCoach(c, chat, msg, email, ehDono(email)));
     return;
   }
   if (cmd === "hoje" || cmd === "start" || /^(treino|hoje)$/i.test(texto)) await enviar(chat, mensagemDia(c, hojeK, { cabeca: `Treino de hoje · ${dataBR(hojeK)}` }));
@@ -389,8 +408,13 @@ function agendaTexto(c) {
     const ids = (a?.ex || []).length ? ` | ids: ${a.ex.map((e) => `${e.id}=${e.nome}${e.maxOut ? " [Max Out]" : e.un && e.un !== "video" ? ` [${e.un}${e.carga ? ", kg" : ""}]` : ""}`).join("; ")}` : "";
     return `${k} (${dataBR(k)}): ${a ? (a.descanso ? "descanso" : `${a.prog} · ${a.titulo} — ${a.itens.join("; ")}${ids}`) : "sem dados"}${ok ? " [FEITO]" : ""}`; }).join("\n");
 }
-async function responderCoach(c, chat, msg) {
+async function responderCoach(c, chat, msg, email, dono) {
   if (!process.env.ANTHROPIC_API_KEY) { await enviar(chat, { text: "O Coach está sem a chave da IA no servidor agora." }); return; }
+  if (!dono) {
+    // Quem não é o dono divide o limite diário de perguntas com o Coach do app (foto pesa 2)
+    const cabe = await cabeNoLimite(`conta:${email}`, LIMITE_MEMBRO_DIA, msg.photo ? 2 : 1).catch(() => false);
+    if (!cabe) { await enviar(chat, { text: "Você chegou no limite de perguntas ao Coach por hoje. Amanhã tem mais! 💪" }); return; }
+  }
   const digitando = () => api("sendChatAction", { chat_id: chat, action: "typing" }).catch(() => {});
   digitando();
   const tm = setInterval(digitando, 4500);
@@ -410,18 +434,22 @@ Ferramentas: quando a pessoa disser que já treinou, use marcar_treino_feito; qu
 Escreva para o Telegram: frases curtas, **negrito** e listas com "- ". Sem tabelas e sem títulos.`;
     const historico = [...(c.conversa || []).slice(-16), { role: "user", content: conteudo }];
     while (historico.length && historico[0].role !== "user") historico.shift();
-    const params = paramsCoach("dono", { papel: nutri ? "nutri" : "coach", programa: nutri ? K.nutriProg : K.prog, contexto: `${(nutri ? K.nutriCtx : K.ctx) || ""}${extra}` }, historico);
-    params.tools = FERRAMENTAS;
+    const params = paramsCoach(dono ? "dono" : "membro", { papel: nutri ? "nutri" : "coach", programa: nutri ? K.nutriProg : K.prog, contexto: `${(nutri ? K.nutriCtx : K.ctx) || ""}${extra}` }, historico);
+    params.tools = dono ? [...FERRAMENTAS, ...FERRAMENTAS_ADMIN] : FERRAMENTAS;
+    if (dono) params.system[1].text += "\nVocê também é o assistente do painel do dono do app: com admin_resumo, admin_usuarios e admin_usuario você vê as estatísticas do app e de cada usuário. Para mandar avisos ou apagar posts, indique o /admin.";
     const cliente = new Anthropic();
     let resposta = "", msgs = historico;
     for (let volta = 0; volta < 4; volta++) {
-      const r = await cliente.beta.messages.create({ ...params, messages: msgs, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
+      const r = dono ? await cliente.beta.messages.create({ ...params, messages: msgs, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" })
+        : await cliente.messages.create({ ...params, messages: msgs });
       const txt = r.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
       if (txt) resposta = resposta ? `${resposta}\n\n${txt}` : txt;
       const usos = r.content.filter((b) => b.type === "tool_use");
       if (r.stop_reason === "refusal") { resposta = "Não consigo responder isso. Tenta perguntar de outro jeito."; break; }
       if (r.stop_reason !== "tool_use" || !usos.length) break;
-      msgs = [...msgs, { role: "assistant", content: r.content }, { role: "user", content: usos.map((u) => ({ type: "tool_result", tool_use_id: u.id, content: usarFerramenta(c, u.name, u.input) })) }];
+      const resultados = [];
+      for (const u of usos) resultados.push({ type: "tool_result", tool_use_id: u.id, content: u.name.startsWith("admin_") ? (dono ? await ferramentaAdmin(u.name, u.input) : "Sem permissão.") : usarFerramenta(c, u.name, u.input) });
+      msgs = [...msgs, { role: "assistant", content: r.content }, { role: "user", content: resultados }];
     }
     if (!resposta) resposta = "Feito ✅";
     c.conversa = [...(c.conversa || []), { role: "user", content: `${msg.photo ? "[foto] " : ""}${texto}`.trim() || "[foto]" }, { role: "assistant", content: resposta.slice(0, 4000) }].slice(-16);
@@ -431,6 +459,119 @@ Escreva para o Telegram: frases curtas, **negrito** e listas com "- ". Sem tabel
     console.error("telegram: coach falhou", e?.status, e?.message);
     await enviar(chat, { text: e?.status === 429 ? "Muitas mensagens seguidas. Espera um minutinho 🙏" : "Falhei ao falar com o Coach agora. Tenta de novo?" }).catch(() => {});
   } finally { clearInterval(tm); }
+}
+
+
+/* ---------- Painel do dono (/admin) ---------- */
+const FERRAMENTAS_ADMIN = [
+  { name: "admin_resumo", description: "Estatísticas gerais do app: usuários, novos, ativos (hoje/7/30 dias), treinos, minutos, programas, grupos, posts e água.", input_schema: { type: "object", properties: {} } },
+  { name: "admin_usuarios", description: "Lista todos os usuários com id, nome, e-mail, programa principal, data do último treino, total de treinos e treinos nos últimos 7 dias.", input_schema: { type: "object", properties: {} } },
+  { name: "admin_usuario", description: "Detalhe de um usuário pelo id (da lista de admin_usuarios): últimos treinos, água, grupos, posts e conquistas.", input_schema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+async function ferramentaAdmin(nome, entrada) {
+  try {
+    if (nome === "admin_usuario") { if (!UUID.test(String(entrada?.id))) return "id inválido"; return JSON.stringify(await rpc("admin_usuario", { p_id: entrada.id })); }
+    if (nome === "admin_resumo" || nome === "admin_usuarios") return JSON.stringify(await rpc(nome));
+    return "Ferramenta desconhecida.";
+  } catch (e) { return e.codigo === "sem_chave" ? "O painel ainda não está liberado: o dono precisa abrir o app uma vez." : `Erro ao consultar: ${e.message}`; }
+}
+const NOME_PROG = { insanity: "MAX:30", insanity60: "Insanity", calistenia: "Calistenia", plano: "Calistenia", hiper: "Hipertrofia", c21: "Calistenia 21", cf: "CrossFit" };
+const quando = (iso) => (iso ? `${String(iso).slice(8, 10)}/${String(iso).slice(5, 7)}` : "—");
+async function editarOuEnviar(chat, id, m) {
+  if (id) { try { await api("editMessageText", { chat_id: chat, message_id: id, parse_mode: "HTML", disable_web_page_preview: true, ...m }); return; } catch {} }
+  await enviar(chat, m);
+}
+const MENU = { inline_keyboard: [[{ text: "📊 Resumo", callback_data: "adm:resumo" }, { text: "👥 Usuários", callback_data: "adm:us:0" }],
+  [{ text: "🛡️ Moderação", callback_data: "adm:mod" }, { text: "📣 Enviar aviso", callback_data: "adm:aviso" }]] };
+const voltar = [{ text: "⬅️ Menu", callback_data: "adm:menu" }];
+async function adminMenu(chat, id) {
+  const contas = Object.keys((await todos()).contas).length;
+  await editarOuEnviar(chat, id, { text: `<b>Painel do FIT.AI</b>\n${contas} ${contas === 1 ? "pessoa conectada" : "pessoas conectadas"} ao bot.\nVocê também pode perguntar em texto, tipo “quem não treina há 5 dias?”.`, reply_markup: MENU });
+}
+async function adminBotao(c, chat, dado, msgId) {
+  try {
+    if (dado === "adm:menu") return adminMenu(chat, msgId);
+    if (dado === "adm:resumo") {
+      const r = await rpc("admin_resumo");
+      const progs = Object.entries(r.programas_30d || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${NOME_PROG[k] || k} ${n}`).join(" · ") || "—";
+      return editarOuEnviar(chat, msgId, { text: [`<b>📊 Resumo</b>`, `👥 ${r.usuarios} usuários (+${r.novos_7d} na semana) · ${r.grupos} ${r.grupos === 1 ? "grupo" : "grupos"}`,
+        `🔥 Treinaram hoje: <b>${r.ativos_hoje}</b> · 7 dias: <b>${r.ativos_7d}</b> · 30 dias: <b>${r.ativos_30d}</b>`,
+        `💪 Treinos: hoje ${r.treinos_hoje} · 7 dias ${r.treinos_7d} · 30 dias ${r.treinos_30d}`, `⏱️ ${Math.round((r.minutos_7d || 0) / 60)} h de treino na semana`,
+        `📚 Programas (30 dias): ${esc(progs)}`, `💧 Água média (7 dias): ${fmtL(r.agua_media_7d || 0)} por dia`, `💬 Mural (7 dias): ${r.posts_7d} posts · ${r.comentarios_7d} comentários`].join("\n"),
+        reply_markup: { inline_keyboard: [[{ text: "🔄 Atualizar", callback_data: "adm:resumo" }], voltar] } });
+    }
+    const pg = dado.match(/^adm:us:(\d+)$/);
+    if (pg) {
+      const lista = await rpc("admin_usuarios"), ini = Number(pg[1]) * 8, pag = lista.slice(ini, ini + 8);
+      const linhas = pag.map((u, i) => `${ini + i + 1}. <b>${esc(u.nome || "Sem nome")}</b> — ${u.semana} na semana · último ${quando(u.ultimo)} · ${esc(NOME_PROG[u.principal] || u.principal || "—")}`);
+      const nav = [...(ini > 0 ? [{ text: "◀️", callback_data: `adm:us:${Number(pg[1]) - 1}` }] : []), ...(ini + 8 < lista.length ? [{ text: "▶️", callback_data: `adm:us:${Number(pg[1]) + 1}` }] : [])];
+      const botoes = [];
+      for (let i = 0; i < pag.length; i += 2) botoes.push(pag.slice(i, i + 2).map((u, j) => ({ text: `${ini + i + j + 1}. ${String(u.nome || "Sem nome").split(" ")[0]}`, callback_data: `adm:u:${u.id}` })));
+      return editarOuEnviar(chat, msgId, { text: `<b>👥 Usuários (${lista.length})</b>\n${linhas.join("\n") || "Ninguém ainda."}`, reply_markup: { inline_keyboard: [...botoes, ...(nav.length ? [nav] : []), voltar] } });
+    }
+    const um = dado.match(/^adm:u:([0-9a-f-]{36})$/);
+    if (um) {
+      const u = await rpc("admin_usuario", { p_id: um[1] });
+      if (!u) return enviar(chat, { text: "Usuário não encontrado." });
+      const tr = (u.treinos || []).slice(0, 10).map((t) => `${t.concluido ? "✅" : "▫️"} ${quando(t.data)} ${esc(NOME_PROG[t.programa] || t.programa)}${t.titulo ? ` · ${esc(t.titulo)}` : ""}${t.minutos ? ` · ${t.minutos} min` : ""}`);
+      const ag = (u.agua || []).slice(0, 5).map((a) => `${quando(a.data)} ${fmtL(a.ml)}`).join(" · ");
+      return editarOuEnviar(chat, msgId, { text: [`<b>${esc(u.nome || "Sem nome")}</b>`, esc(u.email || ""), `Desde ${quando(u.criado_em)} · último login ${quando(u.ultimo_login)}`,
+        `Programa: ${esc(NOME_PROG[u.principal] || u.principal || "—")}${u.nivel ? ` · ${esc(u.nivel)}` : ""}`, `💪 ${u.total} treinos · 🏅 ${u.conquistas} conquistas · 💬 ${u.posts} posts`,
+        `Grupos: ${esc((u.grupos || []).join(", ") || "nenhum")}`, "", "<b>Últimos treinos</b>", ...(tr.length ? tr : ["nenhum"]), ...(ag ? ["", `💧 ${ag}`] : [])].join("\n"),
+        reply_markup: { inline_keyboard: [[{ text: "⬅️ Usuários", callback_data: "adm:us:0" }], voltar] } });
+    }
+    if (dado === "adm:mod") {
+      const itens = (await rpc("admin_conteudos", { p_limite: 8 })).slice(0, 10);
+      c.mod = itens.map((x) => ({ t: x.tipo === "post" ? "p" : "c", id: x.id })); salvar();
+      const linhas = itens.map((x, i) => `${i + 1}. ${x.tipo === "post" ? "📝" : "💬"} <b>${esc(x.autor || "?")}</b> em ${esc(x.grupo || "?")} · ${quando(x.criado_em)}\n${esc(String(x.texto || "").slice(0, 160)) || "<i>(sem texto)</i>"}${x.tem_foto ? " 📷" : ""}`);
+      const botoes = [];
+      for (let i = 0; i < itens.length; i += 5) botoes.push(itens.slice(i, i + 5).map((_, j) => ({ text: `🗑 ${i + j + 1}`, callback_data: `adm:del:${i + j}` })));
+      return editarOuEnviar(chat, msgId, { text: `<b>🛡️ Últimos posts e comentários</b>\n\n${linhas.join("\n\n") || "Nada no mural ainda."}`, reply_markup: { inline_keyboard: [...botoes, [{ text: "🔄 Atualizar", callback_data: "adm:mod" }], voltar] } });
+    }
+    const del = dado.match(/^adm:del(ok)?:(\d+)$/);
+    if (del) {
+      const x = (c.mod || [])[Number(del[2])];
+      if (!x) return enviar(chat, { text: "A lista mudou. Abra a moderação de novo." });
+      if (!del[1]) return enviar(chat, { text: `Apagar o ${x.t === "p" ? "post" : "comentário"} nº ${Number(del[2]) + 1}${x.t === "p" ? " (com os comentários e reações dele)" : ""}? Não dá para desfazer.`,
+        reply_markup: { inline_keyboard: [[{ text: "🗑 Apagar", callback_data: `adm:delok:${del[2]}` }, { text: "Cancelar", callback_data: "adm:mod" }]] } });
+      const ok = await rpc("admin_apagar", { p_tipo: x.t === "p" ? "post" : "comentario", p_id: x.id });
+      await editarOuEnviar(chat, msgId, { text: ok ? "Apagado ✓" : "Já tinha sido apagado." });
+      return adminBotao(c, chat, "adm:mod");
+    }
+    if (dado === "adm:aviso") {
+      c.esperando = "aviso"; salvar();
+      return enviar(chat, { text: "📣 Escreva o aviso. A <b>primeira linha</b> vira o título e o resto, o texto.\n/cancelar para desistir." });
+    }
+    const av = dado.match(/^adm:av:(todos|app|tg|x)$/);
+    if (av) {
+      const r = c.rascunho;
+      c.esperando = null; c.rascunho = null; salvar();
+      if (av[1] === "x" || !r) return editarOuEnviar(chat, msgId, { text: "Aviso cancelado." });
+      const feitos = [];
+      if (av[1] !== "tg") { await rpc("admin_aviso", { p_titulo: r.titulo, p_texto: r.texto }); feitos.push("📱 no app (aparece ao abrir)"); }
+      if (av[1] === "todos") { const p = await avisoTodos(r.titulo, r.texto).catch(() => ({ ok: 0, total: 0 })); feitos.push(`🔔 notificação em ${p.ok} de ${p.total} aparelhos`); }
+      if (av[1] !== "app") {
+        let n = 0;
+        for (const x of Object.values((await todos()).contas)) {
+          if (!x.chat || x.chat === chat) continue;
+          try { await enviar(x.chat, { text: `📣 <b>${esc(r.titulo)}</b>\n${esc(r.texto)}` }); n++; } catch {}
+        }
+        feitos.push(`✈️ Telegram para ${n} ${n === 1 ? "pessoa" : "pessoas"}`);
+      }
+      return editarOuEnviar(chat, msgId, { text: `Aviso enviado ✓\n${feitos.join("\n")}` });
+    }
+  } catch (e) {
+    console.error("admin:", e?.codigo, e?.message);
+    await enviar(chat, { text: e?.codigo === "sem_chave" ? "O painel ainda não está liberado. Abra o FIT.AI uma vez com a sua conta e tente de novo." : "Não consegui consultar agora. Tenta de novo?" });
+  }
+}
+async function adminRascunho(c, chat, texto) {
+  const [titulo, ...resto] = texto.trim().split("\n");
+  const corpo = resto.join("\n").trim() || titulo;
+  c.rascunho = { titulo: titulo.slice(0, 120), texto: corpo.slice(0, 2000) }; c.esperando = null; salvar();
+  await enviar(chat, { text: `<b>Prévia do aviso</b>\n\n📣 <b>${esc(c.rascunho.titulo)}</b>\n${esc(c.rascunho.texto)}\n\nPara onde?`,
+    reply_markup: { inline_keyboard: [[{ text: "📣 Todos os canais", callback_data: "adm:av:todos" }], [{ text: "📱 Só no app", callback_data: "adm:av:app" }, { text: "✈️ Só no Telegram", callback_data: "adm:av:tg" }], [{ text: "❌ Cancelar", callback_data: "adm:av:x" }]] } });
 }
 
 /* ---------- Agendador: treino do dia e lembrete da noite ---------- */

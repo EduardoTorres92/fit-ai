@@ -3686,7 +3686,7 @@
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
     else { S.user = user; save(); }
-    if (novo) { await puxarTreinos(); tgCarregar().then(() => tgSincronizar(true)); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
+    if (novo) { await puxarTreinos(); tgCarregar().then(() => tgSincronizar(true)); setTimeout(conferirAvisos, 1500); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
     render();
   }
   if (sb) {
@@ -3703,7 +3703,7 @@
   /* ---------- Bot do Telegram (@treinosfit_bot) ----------
      O app manda ao servidor a agenda dos próximos 8 dias do programa principal e os dias já feitos; o servidor manda o
      treino do dia, lembra à noite e recebe "✅ Feito". O Feito tocado no Telegram volta para cá e vira o treino registrado.
-     Fase de teste: o servidor só aceita a conta do dono. */
+     Qualquer pessoa com conta pode conectar; o token do bot e o painel (/admin) são só do dono. */
   let tgInfo, tgUltimo = "", tgEspera = null, tgCoachEm = 0;
   async function tgApi(acao, extra = {}) {
     const token = await tokenSB();
@@ -3845,10 +3845,11 @@
     if (!uid) return "";
     if (tgInfo === undefined) { setTimeout(tgCarregar, 0); return ""; }
     if (!tgInfo) return "";
-    const topo = `<span class="field-lbl">Avisos no Telegram · teste</span>`;
+    const topo = `<span class="field-lbl">Treinos e Coach AI no Telegram</span>`;
+    if (!tgInfo.token && !tgInfo.dono) return "";
     if (!tgInfo.token) return `<div class="field tg-card">${topo}<p class="tg-txt">Cole o token que o @BotFather mandou. Ele fica só no servidor.</p>
       <form id="tg-token" class="tg-linha"><input name="token" type="password" autocomplete="off" placeholder="123456:ABC…" required><button class="btn btn-blue">Salvar</button></form></div>`;
-    if (!tgInfo.ligado) return `<div class="field tg-card">${topo}<p class="tg-txt">Receba o treino do dia no Telegram e marque como feito por lá.</p>
+    if (!tgInfo.ligado) return `<div class="field tg-card">${topo}<p class="tg-txt">Receba o treino do dia, lembretes de água e converse com o Coach AI pelo Telegram.</p>
       <button class="btn btn-blue" id="tg-ligar">${tgEspera ? "Esperando você tocar em Iniciar no Telegram…" : "Conectar Telegram"}</button></div>`;
     return `<div class="field tg-card">${topo}<p class="tg-txt">Conectado ao <b>@${esc(tgInfo.bot || "treinosfit_bot")}</b> ✓</p>
       <div class="tg-horas"><label>Treino do dia<input type="time" id="tg-hora" value="${esc(tgInfo.hora || "07:00")}"></label>
@@ -3902,6 +3903,32 @@
         if (S.aguaLembrete?.canal === "telegram") S.aguaLembrete = { ...S.aguaLembrete, on: false, canal: "push" }; save(); render(); } catch { toast("Não consegui desconectar."); }
     }
   });
+
+  /* ---------- Avisos do dono (tabela "avisos"): aparecem uma vez, ao abrir o app ---------- */
+  let avisoBuscadoEm = 0;
+  async function conferirAvisos() {
+    if (!uid || !sb || Date.now() - avisoBuscadoEm < 5 * 60000) return;
+    avisoBuscadoEm = Date.now();
+    let data, error;
+    try { ({ data, error } = await sb.from("avisos").select("id, titulo, texto, criado_em").gte("criado_em", new Date(Date.now() - 14 * 864e5).toISOString()).order("id", { ascending: true }).limit(10)); } catch { return; }
+    if (error || !data) return;
+    if (S.avisoVisto == null) { S.avisoVisto = data.length ? data[data.length - 1].id - 1 : 0; save(); } // conta nova: só o último
+    const novos = data.filter((a) => a.id > S.avisoVisto);
+    if (!novos.length || document.querySelector("dialog[open]")) return;
+    let dlg = $("#aviso-dlg");
+    if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "aviso-dlg"; dlg.className = "post-dlg aviso-dlg"; ($(".device") || document.body).appendChild(dlg); }
+    dlg.innerHTML = `<div class="post-form">${novos.map((a) => `<div class="aviso-item"><strong>📣 ${esc(a.titulo)}</strong><p>${esc(a.texto).replace(/\n/g, "<br>")}</p><span class="aviso-data">${ddmm(keyOf(new Date(a.criado_em)))}</span></div>`).join("")}
+      <button type="button" class="btn btn-blue" data-aviso-ok>Entendi</button></div>`;
+    dlg._ultimo = novos[novos.length - 1].id;
+    dlg.showModal();
+  }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-aviso-ok]")) return;
+    const dlg = $("#aviso-dlg");
+    S.avisoVisto = Math.max(S.avisoVisto || 0, dlg?._ultimo || 0); save();
+    dlg?.close();
+  });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") conferirAvisos(); });
 
   /* ---------- Cliques ---------- */
   document.addEventListener("click", (e) => {

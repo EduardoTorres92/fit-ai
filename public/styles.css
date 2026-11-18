@@ -990,3 +990,8 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .tg-horas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tg-horas label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
 .tg-horas input { height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--fg); background: var(--secondary); width: 100%; }
+.aviso-dlg .post-form { gap: 16px; }
+.aviso-item { display: flex; flex-direction: column; gap: 6px; }
+.aviso-item strong { font-size: 17px; }
+.aviso-item p { font-size: 15px; line-height: 1.5; }
+.aviso-data { font-size: 12px; color: var(--muted); }
