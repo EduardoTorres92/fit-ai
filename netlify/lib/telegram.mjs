@@ -196,7 +196,13 @@ export async function testar(email) {
 }
 
 // Atualização vinda do Telegram (webhook)
+const vistos = new Set(); // update_id já tratados: o Telegram reenvia se a resposta demora
 export async function processar(u, permitido) {
+  if (u.update_id != null) {
+    if (vistos.has(u.update_id)) return;
+    vistos.add(u.update_id);
+    if (vistos.size > 500) vistos.delete(vistos.values().next().value);
+  }
   const d = await todos();
   const contaDoChat = (chat) => Object.entries(d.contas).find(([, c]) => c.chat === chat) || [];
   if (u.callback_query) {
@@ -233,6 +239,8 @@ export async function processar(u, permitido) {
   if (ini) {
     const v = d.codigos[ini[1]];
     delete d.codigos[ini[1]];
+    // Link já usado (o mesmo /start de novo) e este chat já está conectado: só confirma
+    if (c && (!v || v.email === email)) { salvar(); await enviar(chat, { text: "Você já está conectado ✓ Use /hoje para ver o treino de hoje." }); return; }
     if (!v || v.exp < Date.now() || !permitido(v.email)) { salvar(); await enviar(chat, { text: "Esse link expirou. Abra o perfil no FIT.AI e toque em <b>Conectar Telegram</b> de novo." }); return; }
     for (const [e, x] of Object.entries(d.contas)) if (x.chat === chat && e !== v.email) delete d.contas[e];
     const antiga = d.contas[v.email] || {};
