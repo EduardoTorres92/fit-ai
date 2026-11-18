@@ -245,6 +245,16 @@
     return f ? `https://drive.google.com/file/d/${encodeURIComponent(f)}/${modo}${rk ? `?resourcekey=${encodeURIComponent(rk)}` : ""}` : "";
   };
   const insLink = (id) => driveUrl(id, "view");
+  // Estrutura dos vídeos do MAX:30 (exercícios, rodadas e tempos aproximados), de insanity-estrutura.js
+  const EST = window.FITAI_MAX30_ESTRUTURA || {};
+  const estHtml = (id) => { const e = EST[id]; if (!e) return "";
+    return `<details class="ins-est"><summary>Ver exercícios e tempos</summary>
+      <p class="ex-obs">${esc(e.formato)}${e.obs ? ` ${esc(e.obs)}` : ""}</p>
+      <ol class="est-lista">${e.blocos.map(([t, b]) => `<li>${t ? `<span class="est-t">${esc(t)}</span>` : ""}<span>${esc(b)}</span></li>`).join("")}</ol>
+      <p class="ex-obs">Tempos com "~" são aproximados.</p></details>`; };
+  const estTexto = (P) => { const vs = P.videos.filter((v) => EST[v.id]); if (!vs.length) return "";
+    return [`## Estrutura dos vídeos do ${P.nome} (tempos aproximados desde o início do vídeo; use para saber em que exercício a pessoa estava no Max Out)`,
+      ...vs.map((v) => { const e = EST[v.id]; return `### ${v.nome} (${e.duracao})\n${e.formato}${e.obs ? ` ${e.obs}` : ""}\n${e.blocos.map(([t, b]) => `- ${t ? `${t} ` : ""}${b}`).join("\n")}`; })].join("\n"); };
   const insSemanaDe = (p, d) => (S[p].inicio ? Math.floor(diffDays(parseKey(S[p].inicio), d) / 7) : -1);
   const insDia = (p, w, d) => (VP[p].semanas[w] ? VP[p].semanas[w].dias[d] : null);
   const insData = (p, w, d) => keyOf(addDays(parseKey(S[p].inicio), w * 7 + d));
@@ -594,6 +604,7 @@
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
       ${muscHtml(v.musculos, v.mapa, v.nome)}
+      ${estHtml(id)}
       ${link ? `<button class="btn btn-blue ins-play" data-ins-play="${id}">▶ Assistir</button>`
         : uid ? `<button class="btn btn-blue ins-play" data-ins-carregar>▶ Carregar vídeos</button>` : `<p class="ex-obs">Entre com sua conta para assistir aos vídeos.</p>`}
       ${fit ? `<form class="fit-test" data-fit="${id}" data-p="${p}" data-k="${kk}">
@@ -4391,7 +4402,8 @@
     const ins = VPROGS.map((P) => [`# Programa paralelo: ${P.nome} (vídeos, ${P.semanas.length} semanas${P.selo ? `, ${P.selo}` : ""})`,
       P.coach || "",
       ...P.semanas.map((s, w) => `## Semana ${w + 1} (${s.nome}): ${s.dias.map((t, d) => `${DIAS[d]}: ${t.titulo}`).join(" | ")}`),
-      `Vídeos: ${P.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}${v.musculos ? ` Músculos: ${v.musculos}.` : ""}`).join("; ")}`].filter(Boolean).join("\n")).join("\n\n");
+      `Vídeos: ${P.videos.map((v) => `${v.nome}${v.min ? ` (${v.min} min)` : ""} — ${v.desc}${v.musculos ? ` Músculos: ${v.musculos}.` : ""}`).join("; ")}`,
+      estTexto(P)].filter(Boolean).join("\n")).join("\n\n");
     const caminho = [`# Programas do app e caminho recomendado (do mais acessível ao mais avançado)`,
       ...TRILHA.map((x, i) => `${i + 1}. ${x.nome} — nível ${x.nivel}. ${x.sobre}`),
       `Caminho natural: ${caminhoTxt()}. Quem está começando ou voltando começa pelo ${TRILHA[0].nome}.`,

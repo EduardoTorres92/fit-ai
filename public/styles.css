@@ -995,3 +995,14 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .aviso-item strong { font-size: 17px; }
 .aviso-item p { font-size: 15px; line-height: 1.5; }
 .aviso-data { font-size: 12px; color: var(--muted); }
+
+/* Estrutura do vídeo (MAX:30): exercícios e tempos */
+.ins-est { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.ins-est summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--blue); list-style: none; }
+.ins-est summary::-webkit-details-marker { display: none; }
+.ins-est summary::after { content: " ▾"; }
+.ins-est[open] summary::after { content: " ▴"; }
+.ins-est[open] summary { margin-bottom: 8px; }
+.est-lista { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.est-lista li { display: flex; gap: 10px; font-size: 14px; line-height: 1.45; }
+.est-t { flex: none; min-width: 48px; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--muted); }

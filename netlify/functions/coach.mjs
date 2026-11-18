@@ -13,9 +13,9 @@ import { emailDoToken } from "../lib/dono.mjs";
 import { ehEmailDono } from "../lib/sessao.mjs";
 
 const MODO = {
-  dono: { model: "claude-opus-5-5", max_tokens: 16000, mensagens: 24, porMensagem: 4000, contexto: 40000, programa: 40000 },
-  membro: { model: "claude-haiku-5-5", max_tokens: 3000, mensagens: 16, porMensagem: 1500, contexto: 16000, programa: 40000 },
-  visitante: { model: "claude-haiku-5-5", max_tokens: 2000, mensagens: 10, porMensagem: 800, contexto: 8000, programa: 40000 },
+  dono: { model: "claude-opus-5-5", max_tokens: 16000, mensagens: 24, porMensagem: 4000, contexto: 40000, programa: 60000 },
+  membro: { model: "claude-haiku-5-5", max_tokens: 3000, mensagens: 16, porMensagem: 1500, contexto: 16000, programa: 60000 },
+  visitante: { model: "claude-haiku-5-5", max_tokens: 2000, mensagens: 10, porMensagem: 800, contexto: 8000, programa: 60000 },
 };
 const COMO_RESPONDER = `Como responder:
 - Português do Brasil, tom de parceiro de treino: direto, animado sem exagero.

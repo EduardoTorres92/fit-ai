@@ -141,7 +141,7 @@ export async function receberAgenda(email, c) {
   conta.aguaDia = { data: hojeK, ml, meta: meta || conta.aguaDia?.meta || 0 };
   if (typeof c.coachProg === "string") {
     const t = (v, n) => String(v ?? "").slice(0, n);
-    conta.coach = { prog: t(c.coachProg, 40000), ctx: t(c.coachCtx, 40000), nutriProg: t(c.nutriProg, 40000), nutriCtx: t(c.nutriCtx, 20000), em: Date.now() };
+    conta.coach = { prog: t(c.coachProg, 60000), ctx: t(c.coachCtx, 40000), nutriProg: t(c.nutriProg, 60000), nutriCtx: t(c.nutriCtx, 20000), em: Date.now() };
   }
   salvar();
   return { ok: true, ...(await estado(email)) };
