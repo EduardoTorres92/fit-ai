@@ -2050,6 +2050,17 @@
   }
   async function aguaLigar(cfg, testar = true) {
     const L = { intervalo: 60, ml: 300, ini: "08:00", fim: "22:00", ...(S.aguaLembrete || {}), ...cfg, on: true };
+    if (L.canal === "telegram") {
+      try {
+        const r = await tgApi("agua", { on: true, ml: L.ml, intervalo: L.intervalo, ini: L.ini, fim: L.fim, testar });
+        if (!r) throw new Error("tg");
+        if (S.aguaLembrete?.push) await aguaPushCancelar(); // não recebe os dois avisos
+        L.push = false; S.aguaLembrete = L; save(); render(); tgSincronizar(true);
+        toast(`Lembrete no Telegram: ${L.ml} ml a cada ${L.intervalo} min, das ${L.ini} às ${L.fim}. 💧`, 4500);
+      } catch { toast("Não consegui ligar o lembrete no Telegram agora."); }
+      return;
+    }
+    if (S.aguaLembrete?.canal === "telegram" && S.aguaLembrete.on) tgApi("agua", { on: false }).catch(() => {});
     if (!pushOk()) {
       L.push = false; S.aguaLembrete = L; save(); render();
       toast(/iphone|ipad/i.test(navigator.userAgent) ? "No iPhone, adicione o FIT.AI à tela de início (Compartilhar → Adicionar à Tela de Início) para receber notificações. Por enquanto aviso só com o app aberto." : "Este navegador não recebe notificações. Vou avisar enquanto o app estiver aberto.", 6000);
@@ -2067,15 +2078,19 @@
       toast(`Lembrete ligado: ${L.ml} ml a cada ${L.intervalo} min, das ${L.ini} às ${L.fim}. 💧`, 4500);
     } catch (e) { toast("Não consegui ligar o lembrete agora. Tente de novo."); }
   }
-  async function aguaDesligar() {
+  async function aguaPushCancelar() {
     try { if (pushOk()) { const sub = await aguaAssinatura(false); if (sub) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: "cancelar", endpoint: sub.endpoint }) }); await sub.unsubscribe(); } } } catch {}
+  }
+  async function aguaDesligar() {
+    if (S.aguaLembrete?.canal === "telegram") await tgApi("agua", { on: false }).catch(() => {});
+    await aguaPushCancelar();
     S.aguaLembrete = { ...(S.aguaLembrete || {}), on: false }; save(); render(); toast("Lembrete de água desligado.");
   }
   // Sem push (iPhone fora da tela de início, navegador antigo): avisa enquanto o app está aberto
   let aguaUltimoAviso = "";
   setInterval(() => {
     const L = S.aguaLembrete;
-    if (!L?.on || L.push) return;
+    if (!L?.on || L.push || L.canal === "telegram") return;
     const d = new Date(), agora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     if (agora < L.ini || agora >= L.fim) return;
     const ult = (S.agua?.[hojeKey] || []).slice(-1)[0]?.t || L.ini, [h, m] = ult.split(":").map(Number);
@@ -2116,10 +2131,11 @@
           <label>Beber<input name="ml" type="number" inputmode="numeric" min="50" max="1000" step="50" value="${L.ml}"> ml</label>
           <label>A cada ${sel("intervalo", [[30, "30 min"], [45, "45 min"], [60, "1 hora"], [90, "1h30"], [120, "2 horas"]], L.intervalo)}</label>
           <label>Das <input name="ini" type="time" value="${esc(L.ini)}"> às <input name="fim" type="time" value="${esc(L.fim)}"></label>
-          <button class="btn btn-blue" type="submit">${L.on ? "Salvar lembrete" : "Ligar lembrete no celular"}</button>
+          ${S.tg?.ligado ? `<label>Avisar por ${sel("canal", [["push", "Notificação"], ["telegram", "Telegram"]], L.canal || "push")}</label>` : ""}
+          <button class="btn btn-blue" type="submit">${L.on ? "Salvar lembrete" : L.canal === "telegram" && S.tg?.ligado ? "Ligar lembrete no Telegram" : "Ligar lembrete no celular"}</button>
           ${L.on ? `<button class="btn btn-outline" type="button" data-agua-desligar>Desligar lembrete</button>` : ""}
         </form>
-        <p class="note">${L.on && L.push ? "As notificações chegam mesmo com o app fechado. Toque em <b>Bebi</b> na notificação para anotar." : L.on ? "Este aparelho só recebe o aviso com o app aberto." : "O celular vai pedir permissão para mostrar notificações."}${/iphone|ipad/i.test(navigator.userAgent) ? " No iPhone, as notificações só funcionam com o FIT.AI adicionado à tela de início." : ""}</p>
+        <p class="note">${L.on && L.canal === "telegram" ? "Os lembretes chegam no Telegram. Toque em <b>Bebi</b> na mensagem para anotar; a água entra aqui quando você abrir o app." : L.on && L.push ? "As notificações chegam mesmo com o app fechado. Toque em <b>Bebi</b> na notificação para anotar." : L.on ? "Este aparelho só recebe o aviso com o app aberto." : "O celular vai pedir permissão para mostrar notificações."}${/iphone|ipad/i.test(navigator.userAgent) ? " No iPhone, as notificações só funcionam com o FIT.AI adicionado à tela de início." : ""}</p>
       </div>
       <div class="section">
         <div class="sec-head"><h2>Suas metas de hoje</h2><span>estimativa</span></div>
@@ -2212,7 +2228,7 @@
       ev.preventDefault();
       const d = Object.fromEntries(new FormData(f));
       if (!(d.ini && d.fim && d.ini !== d.fim)) { toast("Confira o horário do lembrete."); return; }
-      aguaLigar({ ml: Math.min(1000, Math.max(50, Number(d.ml) || 300)), intervalo: Number(d.intervalo) || 60, ini: d.ini, fim: d.fim }, !S.aguaLembrete?.on);
+      aguaLigar({ ml: Math.min(1000, Math.max(50, Number(d.ml) || 300)), intervalo: Number(d.intervalo) || 60, ini: d.ini, fim: d.fim, canal: d.canal === "telegram" && S.tg?.ligado ? "telegram" : "push" }, !S.aguaLembrete?.on || S.aguaLembrete.canal !== d.canal);
     } else if (f.id === "form-nutri") {
       ev.preventDefault();
       const d = Object.fromEntries(new FormData(f)), num = (v) => String(v || "").trim().replace(",", ".").slice(0, 6);
@@ -3740,7 +3756,8 @@
     if (!uid || !S.tg?.ligado) return;
     const agenda = [...Array(8)].map((_, i) => tgDia(addDays(new Date(), i))).filter(Boolean);
     const feitos = [...Array(14)].map((_, i) => keyOf(addDays(new Date(), -i))).filter(feito);
-    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "" };
+    const kHoje = keyOf(new Date());
+    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua };
     const assinatura = JSON.stringify(corpo);
     if (!forcar && assinatura === tgUltimo) return;
     try {
@@ -3749,6 +3766,22 @@
       tgUltimo = assinatura;
       if (r.ligado === false) { S.tg.ligado = false; save(); return; }
       tgInfo = { ...tgInfo, ...r };
+      if (r.agua && !r.agua.on && S.aguaLembrete?.on && S.aguaLembrete.canal === "telegram") { S.aguaLembrete = { ...S.aguaLembrete, on: false }; save(); }
+      // Água anotada pelo botão "Bebi" do Telegram
+      const pend = (r.aguaPend || []).filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.data) && x.ml > 0 && x.ml <= 1000);
+      if (pend.length) {
+        S.agua = S.agua || {};
+        for (const x of pend) {
+          (S.agua[x.data] = S.agua[x.data] || []).push({ t: /^\d{2}:\d{2}$/.test(x.t) ? x.t : "--:--", ml: x.ml });
+          S.agua[x.data].sort((a, b) => String(a.t).localeCompare(String(b.t)));
+          S.aguaMeta = { ...(S.aguaMeta || {}), [x.data]: S.aguaMeta?.[x.data] || nutriMetas().agua };
+        }
+        save();
+        await tgApi("aguaok", { ids: pend.map((x) => x.id) });
+        const tot = pend.reduce((a, x) => a + x.ml, 0);
+        toast(`+${tot} ml de água anotados pelo Telegram 💧`);
+        if (location.hash.startsWith("#/nutricao") || location.hash.startsWith("#/home") || !location.hash) render();
+      }
       const marcar = (r.marcar || []).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k) && k <= keyOf(new Date()));
       if (marcar.length) {
         const ok = marcar.filter(tgMarcar);
@@ -3777,6 +3810,7 @@
       <div class="tg-horas"><label>Treino do dia<input type="time" id="tg-hora" value="${esc(tgInfo.hora || "07:00")}"></label>
       <label>Lembrete da noite<input type="time" id="tg-noite" value="${esc(tgInfo.noite || "")}"></label></div>
       <p class="tg-txt">O lembrete da noite só vai se o treino ainda não estiver feito. Apague o horário para desligar.</p>
+      <p class="tg-txt">💧 Água: ${S.aguaLembrete?.on && S.aguaLembrete.canal === "telegram" ? `<b>${S.aguaLembrete.ml} ml a cada ${S.aguaLembrete.intervalo} min</b> no Telegram` : "escolha <b>Telegram</b> no lembrete de água, na aba Nutrição"}.</p>
       <div class="row2"><button class="btn btn-outline" id="tg-testar">Enviar teste</button><button class="btn btn-outline" id="tg-desligar">Desconectar</button></div></div>`;
   }
   async function tgLigar() {
@@ -3820,7 +3854,8 @@
     else if (t.id === "tg-testar") { await tgSincronizar(true); tgApi("testar").then(() => toast("Mensagem enviada no Telegram ✓")).catch(() => toast("Não consegui enviar.")); }
     else if (t.id === "tg-desligar") {
       if (!confirm("Parar de receber os treinos no Telegram?")) return;
-      try { await tgApi("desligar"); tgInfo = { ...tgInfo, ligado: false }; S.tg = { ...(S.tg || {}), ligado: false }; save(); render(); } catch { toast("Não consegui desconectar."); }
+      try { await tgApi("desligar"); tgInfo = { ...tgInfo, ligado: false }; S.tg = { ...(S.tg || {}), ligado: false };
+        if (S.aguaLembrete?.canal === "telegram") S.aguaLembrete = { ...S.aguaLembrete, on: false, canal: "push" }; save(); render(); } catch { toast("Não consegui desconectar."); }
     }
   });
 

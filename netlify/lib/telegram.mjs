@@ -93,7 +93,8 @@ function limparAgenda(lista) {
 
 export async function estado(email) {
   const c = (await todos()).contas[email];
-  return { ligado: !!c?.chat, hora: c ? minStr(c.hora) : "07:00", noite: c?.noite == null ? (c ? null : "20:00") : minStr(c.noite), marcar: c?.marcar || [], bot: botNome };
+  return { ligado: !!c?.chat, hora: c ? minStr(c.hora) : "07:00", noite: c?.noite == null ? (c ? null : "20:00") : minStr(c.noite), marcar: c?.marcar || [],
+    agua: c?.agua?.on ? { on: true, ml: c.agua.ml, intervalo: c.agua.intervalo, ini: minStr(c.agua.ini), fim: minStr(c.agua.fim) } : { on: false }, aguaPend: c?.aguaPend || [], bot: botNome };
 }
 export async function codigoVincular(email) {
   const d = await todos();
@@ -120,8 +121,29 @@ export async function receberAgenda(email, c) {
   conta.tz = Math.min(840, Math.max(-720, Math.round(Number(c.tz) || -180)));
   conta.nome = txt(c.nome, 40) || conta.nome;
   conta.marcar = (conta.marcar || []).filter((k) => !conta.feitos.includes(k));
+  const ml = Math.min(20000, Math.max(0, Math.round(Number(c.aguaHoje) || 0))), meta = Math.min(10000, Math.max(0, Math.round(Number(c.aguaMeta) || 0)));
+  const hojeK = diaLocal(conta.tz);
+  const antes = conta.aguaDia?.data === hojeK ? conta.aguaDia.ml : 0;
+  if (ml > antes && conta.agua) conta.agua.ultimo = Date.now(); // bebeu pelo app: o próximo aviso conta a partir de agora
+  conta.aguaDia = { data: hojeK, ml, meta: meta || conta.aguaDia?.meta || 0 };
   salvar();
   return { ok: true, ...(await estado(email)) };
+}
+// Lembrete de água pelo Telegram (no lugar da notificação do celular)
+export async function configurarAgua(email, c) {
+  const conta = (await todos()).contas[email];
+  if (!conta) return { erro: "nao_ligado" };
+  if (!c.on) delete conta.agua;
+  else conta.agua = { on: true, ml: Math.min(1000, Math.max(50, Math.round(Number(c.ml) || 300))), intervalo: Math.min(240, Math.max(15, Math.round(Number(c.intervalo) || 60))),
+    ini: hhmm(c.ini) ?? 8 * 60, fim: hhmm(c.fim) ?? 22 * 60, ultimo: Date.now() };
+  salvar();
+  if (conta.agua && c.testar) await enviar(conta.chat, { text: `💧 Lembrete de água ligado! Vou te lembrar de beber <b>${conta.agua.ml} ml</b> a cada ${conta.agua.intervalo} min, das ${minStr(conta.agua.ini)} às ${minStr(conta.agua.fim)}.` }).catch(() => {});
+  return { ok: true, ...(await estado(email)) };
+}
+export async function confirmarAgua(email, ids) {
+  const conta = (await todos()).contas[email];
+  if (conta) { conta.aguaPend = (conta.aguaPend || []).filter((x) => !(ids || []).includes(x.id)); salvar(); }
+  return { ok: true };
 }
 export async function confirmarMarcados(email, datas) {
   const conta = (await todos()).contas[email];
@@ -154,6 +176,16 @@ function mensagemDia(conta, k, { cabeca, botoes = true } = {}) {
   if (a.link) kb.push([{ text: "▶️ Abrir treino", url: a.link }]);
   return { text: linhas.join("\n"), ...(kb.length ? { reply_markup: { inline_keyboard: kb } } : {}) };
 }
+const fmtL = (ml) => `${(ml / 1000).toFixed(ml % 1000 ? 1 : 0).replace(".", ",")} L`;
+function aguaTotal(c, k = diaLocal(c.tz ?? -180)) {
+  return (c.aguaDia?.data === k ? c.aguaDia.ml : 0) + (c.aguaPend || []).filter((x) => x.data === k).reduce((a, x) => a + x.ml, 0);
+}
+const aguaProgresso = (c) => { const t = aguaTotal(c), m = c.aguaDia?.meta; return m ? `Hoje: ${fmtL(t)} de ${fmtL(m)}` : t ? `Hoje: ${fmtL(t)}` : ""; };
+function mensagemAgua(c) {
+  const ml = c.agua.ml, outro = ml >= 500 ? 300 : 500, p = aguaProgresso(c);
+  return { text: `💧 <b>Hora de beber água: ${ml} ml</b>${p ? `\n${p}` : ""}`,
+    reply_markup: { inline_keyboard: [[{ text: `✅ Bebi ${ml} ml`, callback_data: `agua:${ml}` }, { text: `${outro} ml`, callback_data: `agua:${outro}` }]] } };
+}
 const enviar = (chat, m) => api("sendMessage", { chat_id: chat, parse_mode: "HTML", disable_web_page_preview: true, ...m });
 
 export async function testar(email) {
@@ -169,6 +201,19 @@ export async function processar(u, permitido) {
   const contaDoChat = (chat) => Object.entries(d.contas).find(([, c]) => c.chat === chat) || [];
   if (u.callback_query) {
     const q = u.callback_query, chat = q.message?.chat?.id, [email, c] = contaDoChat(chat);
+    const ag = String(q.data || "").match(/^agua:(\d{2,4})$/);
+    if (c && ag) {
+      const ml = Math.min(1000, Math.max(50, Number(ag[1]))), tz = c.tz ?? -180, k = diaLocal(tz), mm = minLocal(tz);
+      const metaAntes = c.aguaDia?.meta && aguaTotal(c) < c.aguaDia.meta;
+      (c.aguaPend = c.aguaPend || []).push({ id: randomBytes(6).toString("hex"), data: k, ml, t: minStr(mm) });
+      if (c.agua) c.agua.ultimo = Date.now();
+      salvar();
+      const bateu = metaAntes && aguaTotal(c) >= c.aguaDia.meta;
+      await api("answerCallbackQuery", { callback_query_id: q.id, text: `+${ml} ml 💧` }).catch(() => {});
+      await api("editMessageText", { chat_id: chat, message_id: q.message.message_id, parse_mode: "HTML",
+        text: `✅ Bebi <b>${ml} ml</b> às ${minStr(mm)}\n${aguaProgresso(c)}${bateu ? "\n🎉 Meta de água batida!" : ""}` }).catch(() => {});
+      return;
+    }
     const m = String(q.data || "").match(/^feito:(\d{4}-\d{2}-\d{2})$/);
     if (!c || !m) { await api("answerCallbackQuery", { callback_query_id: q.id, text: "Conecte o bot pelo perfil do FIT.AI." }).catch(() => {}); return; }
     const k = m[1];
@@ -230,6 +275,14 @@ export async function rodada(agora = Date.now()) {
     if (c.noite != null && c.env.noite !== k && m >= c.noite && m < c.noite + 120) {
       c.env.noite = k; salvar();
       if (a && !a.descanso && !feito) { try { await enviar(c.chat, { ...mensagemDia(c, k, { cabeca: "Ainda dá tempo! ⏰ Seu treino de hoje" }) }); n++; } catch (e) { erroEnvio(d, c, e); } }
+    }
+    if (c.agua?.on) {
+      const A = c.agua, dentro = A.ini <= A.fim ? m >= A.ini && m < A.fim : m >= A.ini || m < A.fim;
+      const meta = c.aguaDia?.data === k && c.aguaDia.meta, bateu = meta && aguaTotal(c, k) >= meta;
+      if (dentro && !bateu && agora - (A.ultimo || 0) >= A.intervalo * 60000 - 20000) {
+        A.ultimo = agora; salvar();
+        try { await enviar(c.chat, mensagemAgua(c)); n++; } catch (e) { erroEnvio(d, c, e); }
+      }
     }
   }
   return n;
