@@ -910,3 +910,72 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .evo-card .stat-ico { flex: 0 0 auto; }
 .evo-card strong { display: block; font-size: 15px; font-weight: 600; }
 .evo-card span.t { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* ==========================================================
+   Tablet e computador (≥ 768 px): sem moldura de celular, com barra lateral
+   ========================================================== */
+.sidebar { display: none; }
+@media (min-width: 768px) {
+  :root { --sb-w: 88px; --conteudo: 760px; }
+  body { background: var(--bg); display: block; min-height: 0; padding: 0; }
+  .device { width: 100%; height: 100dvh; border-radius: 0; box-shadow: none; }
+  .credit { display: none !important; }
+  .toolbar { display: none !important; }
+  .screen.has-toolbar { padding-bottom: 40px; }
+
+  body.com-menu .sidebar {
+    display: flex; flex-direction: column; gap: 6px;
+    position: absolute; inset: 0 auto 0 0; width: var(--sb-w); z-index: 30;
+    padding: 24px 12px; border-right: 1px solid var(--line); background: #fff;
+  }
+  body.com-menu .app { left: var(--sb-w); }
+  .sb-logo { display: flex; align-items: center; justify-content: center; height: 40px; margin-bottom: 18px; }
+  .sb-logo .logo-txt { font-size: 20px; }
+  .sb-links { display: flex; flex-direction: column; gap: 4px; }
+  .sb-link {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px; border-radius: 14px; font-size: 11px; font-weight: 600; color: var(--muted);
+    transition: background-color .15s, color .15s;
+  }
+  .sb-ic { width: 22px; height: 22px; flex: none; }
+  .sb-link.on { background: #0a0a0b; color: #fff; }
+  .sb-coach {
+    margin-top: auto; display: grid; place-items: center; width: 56px; height: 56px; align-self: center;
+    border-radius: 9999px; background: var(--blue); color: #fff; font-size: 14px; font-weight: 600;
+    transition: scale 160ms var(--ease-out);
+  }
+  .sb-coach span, .sb-credit { display: none; }
+  .sb-coach:active { scale: .96; }
+
+  /* Conteúdo: coluna central com largura de leitura (o padding é relativo à largura da área do app) */
+  .screen { padding-inline: max(0px, calc((100% - var(--conteudo)) / 2)); }
+  .screen > .banner:first-child { margin: 16px 20px 0; border-radius: 24px; }
+  .heat { grid-template-columns: repeat(15, minmax(0, 30px)); justify-content: space-between; }
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+
+  /* Chat do Coach: painel à direita */
+  .chat-backdrop { background: rgba(0, 0, 0, 0.18); }
+  .chat-sheet { left: auto; right: 20px; top: 20px; bottom: 20px; width: min(440px, calc(100% - 40px)); }
+}
+@media (hover: hover) and (min-width: 768px) {
+  .sb-link:not(.on):hover { background: var(--secondary); color: var(--fg); }
+}
+@media (min-width: 1100px) {
+  :root { --sb-w: 240px; --conteudo: 880px; }
+  body.com-menu .sidebar { padding: 28px 16px; }
+  .sb-logo { justify-content: flex-start; padding-left: 12px; }
+  .sb-logo .logo-txt { font-size: 26px; }
+  .sb-link { flex-direction: row; gap: 12px; padding: 12px 14px; font-size: 15px; }
+  .sb-coach { width: 100%; height: 52px; display: flex; justify-content: center; gap: 10px; }
+  .sb-coach span { display: inline; }
+  .sb-credit { display: block; font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
+}
+/* Login no computador e no tablet deitado: foto à esquerda, painel azul à direita */
+@media (min-width: 900px) {
+  .login-photo { right: 50%; }
+  .login-photo img { top: 0; }
+  .login-logo { left: 25%; }
+  .login-panel { left: 50%; top: 0; border-radius: 0; justify-content: center; padding: 48px 40px; animation: none; }
+  .login-panel .top { max-width: 380px; }
+  .login-panel h1 { font-size: 40px; max-width: 400px; }
+}

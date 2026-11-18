@@ -129,6 +129,16 @@
   const hoje = new Date();
   const hojeKey = keyOf(hoje);
   const hojeDia = (hoje.getDay() + 6) % 7;
+  // "Hoje" é calculado ao abrir o app. Aba ou app aberto desde ontem (comum no tablet e no app instalado):
+  // o treino de hoje seria anotado no dia errado. Quando a data muda, recarrega (o vídeo aberto reabre sozinho).
+  function conferirDia() {
+    if (document.visibilityState !== "visible" || keyOf(new Date()) === hojeKey) return;
+    if (document.querySelector("dialog[open]:not(#video-dlg)") || cfTm) return; // com o timer do CrossFit rodando, espera ele parar (o intervalo confere de novo)
+    location.reload();
+  }
+  document.addEventListener("visibilitychange", conferirDia);
+  window.addEventListener("focus", conferirDia);
+  setInterval(conferirDia, 60000);
 
   /* ---------- Programas em vídeo (public/insanity.js = MAX:30, public/insanity60.js = Insanity) ----------
      Cada um tem uma chave (k) que também é a chave do estado (S[k]), da rota (#/k/semana/dia) e do campo
@@ -384,12 +394,15 @@
   ];
   let tabAtual = "home", menuNav = null;
   function setToolbar(tab) {
-    const tb = $("#toolbar");
-    tb.hidden = !tab;
+    const tb = $("#toolbar"), sb = $("#sidebar");
+    tb.hidden = !tab; sb.hidden = !tab;
+    document.body.classList.toggle("com-menu", !!tab); // no tablet e no computador, o menu vira barra lateral
     if (!tab) return;
     tabAtual = tab === "evolucao" && location.hash.startsWith("#/grupo") ? "grupo" : tab;
-    const it = MENU_ITENS().find((x) => x.tab === tabAtual);
+    const itens = MENU_ITENS(), it = itens.find((x) => x.tab === tabAtual);
     $("#tb-atual").textContent = it ? it.name : "Menu";
+    if (window.CircularNav) $("#sb-links").innerHTML = itens.filter((x) => x.tab !== "coach").map((x) =>
+      `<a href="${x.href}" class="sb-link${x.tab === tabAtual ? " on" : ""}"${x.tab === tabAtual ? ' aria-current="page"' : ""}>${window.CircularNav.icone(x.icon, "sb-ic")}<span>${x.name}</span></a>`).join("");
   }
   function abrirMenu() {
     if (!window.CircularNav) return;
@@ -2678,14 +2691,41 @@
     }
   }
   // Ao entrar: traz os treinos da conta que ainda não estão neste aparelho
+  // Treinos feitos em outro aparelho (celular e tablet, por exemplo): busca de novo quando o app volta para a tela
+  let puxadoEm = 0;
+  async function atualizarDaConta() {
+    if (!uid || !sb || document.visibilityState !== "visible" || Date.now() - puxadoEm < 60000) return;
+    const antes = JSON.stringify([S.logs, S.cf.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]);
+    await puxarTreinos();
+    if (JSON.stringify([S.logs, S.cf.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]) !== antes) { G.carregadoEm = 0; render(); }
+  }
+  document.addEventListener("visibilitychange", atualizarDaConta);
+  window.addEventListener("focus", atualizarDaConta);
+  setInterval(atualizarDaConta, 5 * 60 * 1000);
   async function puxarTreinos() {
     if (!uid || !sb) return;
     const { data, error } = await sb.from("treinos").select("data, programa, detalhes").eq("usuario_id", uid);
     if (error || !data) return;
+    puxadoEm = Date.now();
     let mudou = false;
+    const localMaior = new Set(); // dias em que este aparelho tem mais que a conta: continuam na fila de envio
     for (const r of data) {
       const d = r.detalhes || {};
       if (!/^\d{4}-\d{2}-\d{2}$/.test(r.data)) continue;
+      // Concluído em outro aparelho: o registro da conta substitui o deste aparelho, que estava incompleto
+      if (d.done) {
+        if (r.programa === "calistenia" && S.logs[r.data] && !S.logs[r.data].done) delete S.logs[r.data];
+        if (r.programa === "cf" && S.cf.logs[r.data] && !S.cf.logs[r.data].done) delete S.cf.logs[r.data];
+        if (IA[r.programa] && S[r.programa].logs[r.data] && !S[r.programa].logs[r.data].done) delete S[r.programa].logs[r.data];
+      }
+      if (VP[r.programa] && S[r.programa].logs[r.data]) { // vídeos: junta o que foi marcado nos dois aparelhos
+        const l = S[r.programa].logs[r.data], antes = vidsDe(l).length;
+        const fe = (Array.isArray(d.feitos) ? d.feitos : []).filter((x) => INSV[x] && !l.feitos.includes(x));
+        const av = (Array.isArray(d.avulso) ? d.avulso : []).filter((x) => INSV[x] && !(l.avulso || []).includes(x));
+        if (fe.length || av.length) { l.feitos.push(...fe); if (av.length) l.avulso = [...(l.avulso || []), ...av]; mudou = true; }
+        if (!l.dur && Number(d.dur) > 0) { l.dur = Number(d.dur); mudou = true; }
+        if (antes > (d.feitos || []).length + (d.avulso || []).length) localMaior.add(`${r.data}|${r.programa}`);
+      }
       if (r.programa === "calistenia" && !S.logs[r.data]) {
         S.logs[r.data] = { w: d.w === "E" ? "E" : Number(d.w) || 0, d: Number(d.d) || 0, sets: d.sets && typeof d.sets === "object" ? d.sets : {}, dur: Number(d.dur) || 0, done: !!d.done }; mudou = true;
       }
@@ -2729,7 +2769,7 @@
       }
     } catch {}
     if (mudou) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
-    const naConta = new Set(data.map((r) => `${r.data}|${r.programa}`));
+    const naConta = new Set(data.map((r) => `${r.data}|${r.programa}`).filter((x) => !localMaior.has(x)));
     linhasLocais().filter((r) => naConta.has(`${r.data}|${r.programa}`)).forEach((r) => (enviados[`${uid}|${r.data}|${r.programa}`] = JSON.stringify(r)));
     guardarEnviados();
   }
