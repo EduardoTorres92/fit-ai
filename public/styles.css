@@ -979,3 +979,14 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
   .login-panel .top { max-width: 380px; }
   .login-panel h1 { font-size: 40px; max-width: 400px; }
 }
+
+/* Avisos no Telegram (perfil) */
+.tg-card { border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+.tg-txt { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.tg-txt b { color: var(--fg); }
+.tg-linha { display: flex; gap: 8px; }
+.tg-linha input { flex: 1; min-width: 0; height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; font: inherit; font-size: 16px; background: var(--secondary); }
+.tg-linha .btn { width: auto; padding: 0 18px; }
+.tg-horas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tg-horas label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.tg-horas input { height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--fg); background: var(--secondary); width: 100%; }

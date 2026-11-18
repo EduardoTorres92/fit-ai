@@ -1,9 +1,9 @@
 // Servidor Node.js para hospedar o FIT.AI fora da Netlify (ex.: Hostinger).
 // - Entrega os arquivos da pasta public/.
-// - /api/auth, /api/coach, /api/videos, /api/hiper, /api/agua (lembrete de água por push) e /api/wod (CrossFit: foto do quadro), /api/evolucao (evolução por foto): as mesmas funções da pasta netlify/functions, chamadas daqui.
+// - /api/auth, /api/coach, /api/videos, /api/hiper, /api/agua (lembrete de água por push) e /api/wod (CrossFit: foto do quadro), /api/evolucao (evolução por foto), /api/telegram (bot do Telegram): as mesmas funções da pasta netlify/functions, chamadas daqui.
 // - Contas, segredo de sessão e limites do Coach ficam em arquivos (ver netlify/lib/blobs.mjs).
 // Variáveis: ANTHROPIC_API_KEY (obrigatória para o Coach), ALLOWED_EMAIL, FITAI_INSANITY_VIDEOS, FITAI_VIDEOS_INSANITY, LIMITE_VISITANTE_DIA,
-// LIMITE_GERAL_DIA, DADOS_DIR, PORT. Iniciar: npm start.
+// LIMITE_GERAL_DIA, DADOS_DIR, PORT, TELEGRAM_TOKEN (opcional: o dono também pode colar no app), FITAI_URL. Iniciar: npm start.
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -19,11 +19,13 @@ const { default: hiper } = await import("./netlify/functions/hiper.mjs");
 const { default: agua } = await import("./netlify/functions/agua.mjs");
 const { default: wod } = await import("./netlify/functions/wod.mjs");
 const { default: evolucao } = await import("./netlify/functions/evolucao.mjs");
+const { default: telegram } = await import("./netlify/functions/telegram.mjs");
+const { iniciarTelegram } = await import("./netlify/lib/telegram.mjs");
 const { iniciarAgendador } = await import("./netlify/lib/agua.mjs");
 
 const RAIZ = fileURLToPath(new URL("./public/", import.meta.url));
 const PORTA = Number(process.env.PORT) || 3000;
-const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua, "/api/wod": wod, "/api/evolucao": evolucao };
+const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua, "/api/wod": wod, "/api/evolucao": evolucao, "/api/telegram": telegram };
 const MAX_CORPO = 1600 * 1024; // o Coach manda programa + contexto; a foto do WOD vai em base64 (até ~1,4 MB)
 
 const TIPOS = {
@@ -97,4 +99,5 @@ createServer(async (req, res) => {
     res.end();
   }
 }).listen(PORTA, () => console.log(`FIT.AI no ar na porta ${PORTA}`));
+iniciarTelegram(); // bot do Telegram: webhook + treino do dia e lembrete da noite
 iniciarAgendador(); // lembrete de água: confere a cada minuto quem precisa receber a notificação

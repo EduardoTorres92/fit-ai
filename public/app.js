@@ -805,6 +805,7 @@
             <span class="field-lbl">Em qual semana do programa você está?</span>
             <div class="seg">${PROGRAMA.map((s, i) => `<button class="${i === w ? "on" : ""}" data-semana="${i}">${i + 1}</button>`).join("")}</div>
           </div>
+          ${tgCard()}
           <div class="field">
             <span class="field-lbl">${uid ? "Seus treinos ficam salvos na sua conta e neste aparelho." : "Seus dados ficam salvos neste aparelho. Faça backup de vez em quando."}</span>
             <div class="row2">
@@ -2685,6 +2686,7 @@
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
       }
+      tgSincronizar();
     } catch {} finally {
       sincronizando = false;
       if (deNovo) { deNovo = false; sincronizar(); }
@@ -2697,6 +2699,7 @@
     if (!uid || !sb || document.visibilityState !== "visible" || Date.now() - puxadoEm < 60000) return;
     const antes = JSON.stringify([S.logs, S.cf.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]);
     await puxarTreinos();
+    await tgSincronizar(true);
     if (JSON.stringify([S.logs, S.cf.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]) !== antes) { G.carregadoEm = 0; render(); }
   }
   document.addEventListener("visibilitychange", atualizarDaConta);
@@ -3666,7 +3669,7 @@
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
     else { S.user = user; save(); }
-    if (novo) { await puxarTreinos(); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
+    if (novo) { await puxarTreinos(); tgCarregar().then(() => tgSincronizar(true)); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
     render();
   }
   if (sb) {
@@ -3679,6 +3682,147 @@
       if (evento === "SIGNED_OUT") uid = null;
     });
   }
+
+  /* ---------- Bot do Telegram (@treinosfit_bot) ----------
+     O app manda ao servidor a agenda dos próximos 8 dias do programa principal e os dias já feitos; o servidor manda o
+     treino do dia, lembra à noite e recebe "✅ Feito". O Feito tocado no Telegram volta para cá e vira o treino registrado.
+     Fase de teste: o servidor só aceita a conta do dono. */
+  let tgInfo, tgUltimo = "", tgEspera = null;
+  async function tgApi(acao, extra = {}) {
+    const token = await tokenSB();
+    if (!token) return null;
+    const r = await fetch("/api/telegram", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ acao, ...extra }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 403 || r.status === 401) { tgInfo = null; return null; }
+    if (!r.ok) throw Object.assign(new Error(j.erro || r.status), { j });
+    return j;
+  }
+  function tgDia(dt) {
+    const k = keyOf(dt), d = (dt.getDay() + 6) % 7, pk = principal(), base = `${location.origin}/`;
+    if (VP[pk]) {
+      const w = insSemanaDe(pk, dt), t = w >= 0 && w < VP[pk].semanas.length ? insDia(pk, w, d) : null;
+      if (!t) return null;
+      if (!t.ids.length) return { data: k, prog: VP[pk].nome, titulo: "Descanso", descanso: true };
+      return { data: k, prog: VP[pk].nome, titulo: t.titulo || INSV[t.ids[0]]?.nome || "", itens: t.ids.map((id) => `${INSV[id]?.nome || id}${INSV[id]?.min ? ` · ${INSV[id].min} min` : ""}`), link: `${base}#/${pk}/${w}/${d}` };
+    }
+    if (IA[pk]) {
+      if (!S[pk].plano) return null;
+      const w = S[pk].inicio ? Math.floor(diffDays(mondayOf(parseKey(S[pk].inicio)), dt) / 7) : 0;
+      if (w < 0 || (IA[pk].semanas > 0 && w >= IA[pk].semanas)) return null;
+      const t = iaSessao(pk, d, w);
+      if (!t) return { data: k, prog: IA[pk].nome, titulo: "Descanso", descanso: true };
+      return { data: k, prog: IA[pk].nome, titulo: t.titulo, itens: t.exercicios.map((e) => `${exDe(pk, e.id)?.nome || e.id}: ${e.series} × ${e.reps}`), link: `${base}${iaLink(pk, d, w)}` };
+    }
+    if (pk === "cf") return { data: k, prog: "CrossFit", titulo: "WOD do box", itens: ["Tire uma foto do quadro e o app lança o WOD."], link: `${base}#/cf` };
+    if (semanasDesde(dt) < 0) return null;
+    const w = semanaDe(dt), t = treino(w, d);
+    if (!t) return null;
+    return { data: k, prog: NOME_PROG, titulo: t.titulo, descanso: t.foco === "Opcional" && /descanso/i.test(t.titulo),
+      itens: (t.ex || []).map((e) => `${e.nome}: ${e.s} × ${e.r}${UN[e.un]}${e.lado ? " cada lado" : ""}`), link: `${base}#/treino/${w}/${d}` };
+  }
+  // O "Feito" do Telegram vira o treino do programa principal naquele dia
+  function tgMarcar(k) {
+    if (feito(k)) return true;
+    const dt = parseKey(k), d = (dt.getDay() + 6) % 7, pk = principal();
+    if (VP[pk]) {
+      const l = insLogDe(pk, k), t = insDia(pk, l.w, l.d);
+      if (!t || !t.ids.length) { delete S[pk].logs[k]; return false; }
+      t.ids.forEach((id) => marcarVideo(pk, l, id));
+    } else if (IA[pk]) {
+      if (!S[pk].plano) return false;
+      const w = S[pk].inicio ? Math.max(0, Math.floor(diffDays(mondayOf(parseKey(S[pk].inicio)), dt) / 7)) : 0;
+      S[pk].logs[k] = { d, w, sets: {}, ...(S[pk].logs[k] || {}), done: true };
+    } else if (pk === "cf") S.cf.logs[k] = { res: {}, ...(S.cf.logs[k] || {}), done: true };
+    else S.logs[k] = { w: Math.max(0, semanaDe(dt)), d, sets: {}, dur: 0, ...(S.logs[k] || {}), done: true };
+    return true;
+  }
+  async function tgSincronizar(forcar = false) {
+    if (!uid || !S.tg?.ligado) return;
+    const agenda = [...Array(8)].map((_, i) => tgDia(addDays(new Date(), i))).filter(Boolean);
+    const feitos = [...Array(14)].map((_, i) => keyOf(addDays(new Date(), -i))).filter(feito);
+    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "" };
+    const assinatura = JSON.stringify(corpo);
+    if (!forcar && assinatura === tgUltimo) return;
+    try {
+      const r = await tgApi("agenda", corpo);
+      if (!r) return;
+      tgUltimo = assinatura;
+      if (r.ligado === false) { S.tg.ligado = false; save(); return; }
+      tgInfo = { ...tgInfo, ...r };
+      const marcar = (r.marcar || []).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k) && k <= keyOf(new Date()));
+      if (marcar.length) {
+        const ok = marcar.filter(tgMarcar);
+        save();
+        await tgApi("ok", { datas: marcar });
+        if (ok.length) { toast(ok.length === 1 ? `Treino de ${ddmm(ok[0])} marcado pelo Telegram ✓` : `${ok.length} treinos marcados pelo Telegram ✓`); G.carregadoEm = 0; render(); }
+      }
+    } catch {}
+  }
+  async function tgCarregar() {
+    if (!uid || tgInfo !== undefined) return;
+    tgInfo = false; // carregando
+    try { const r = await tgApi("estado"); tgInfo = r; if (r) { S.tg = { ...(S.tg || {}), ligado: !!r.ligado }; save(); } } catch { tgInfo = null; }
+    if (location.hash.startsWith("#/perfil")) render();
+  }
+  function tgCard() {
+    if (!uid) return "";
+    if (tgInfo === undefined) { setTimeout(tgCarregar, 0); return ""; }
+    if (!tgInfo) return "";
+    const topo = `<span class="field-lbl">Avisos no Telegram · teste</span>`;
+    if (!tgInfo.token) return `<div class="field tg-card">${topo}<p class="tg-txt">Cole o token que o @BotFather mandou. Ele fica só no servidor.</p>
+      <form id="tg-token" class="tg-linha"><input name="token" type="password" autocomplete="off" placeholder="123456:ABC…" required><button class="btn btn-blue">Salvar</button></form></div>`;
+    if (!tgInfo.ligado) return `<div class="field tg-card">${topo}<p class="tg-txt">Receba o treino do dia no Telegram e marque como feito por lá.</p>
+      <button class="btn btn-blue" id="tg-ligar">${tgEspera ? "Esperando você tocar em Iniciar no Telegram…" : "Conectar Telegram"}</button></div>`;
+    return `<div class="field tg-card">${topo}<p class="tg-txt">Conectado ao <b>@${esc(tgInfo.bot || "treinosfit_bot")}</b> ✓</p>
+      <div class="tg-horas"><label>Treino do dia<input type="time" id="tg-hora" value="${esc(tgInfo.hora || "07:00")}"></label>
+      <label>Lembrete da noite<input type="time" id="tg-noite" value="${esc(tgInfo.noite || "")}"></label></div>
+      <p class="tg-txt">O lembrete da noite só vai se o treino ainda não estiver feito. Apague o horário para desligar.</p>
+      <div class="row2"><button class="btn btn-outline" id="tg-testar">Enviar teste</button><button class="btn btn-outline" id="tg-desligar">Desconectar</button></div></div>`;
+  }
+  async function tgLigar() {
+    let janela = null;
+    try {
+      janela = window.open("", "_blank");
+      const r = await tgApi("vincular");
+      if (!r?.link) { janela?.close(); toast("Não consegui gerar o link agora."); return; }
+      if (janela) janela.location.href = r.link; else location.href = r.link;
+    } catch { janela?.close(); toast("Não consegui gerar o link agora."); return; }
+    clearInterval(tgEspera);
+    const ate = Date.now() + 3 * 60000;
+    tgEspera = setInterval(async () => {
+      const r = await tgApi("estado").catch(() => null);
+      if (r?.ligado || Date.now() > ate) {
+        clearInterval(tgEspera); tgEspera = null;
+        if (r?.ligado) { tgInfo = r; S.tg = { ...(S.tg || {}), ligado: true }; save(); tgSincronizar(true); toast("Telegram conectado ✓"); }
+        if (location.hash.startsWith("#/perfil")) render();
+      }
+    }, 3000);
+    render();
+  }
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id !== "tg-token") return;
+    e.preventDefault();
+    const b = e.target.querySelector("button"); b.disabled = true;
+    try { await tgApi("token", { token: e.target.elements.token.value.trim() }); tgInfo = undefined; toast("Bot configurado ✓"); render(); }
+    catch (x) { b.disabled = false; toast(x.j?.erro === "token_recusado" ? "O Telegram recusou esse token." : x.j?.erro === "ja_configurado" ? "O bot já está configurado." : "Token inválido."); }
+  });
+  document.addEventListener("change", async (e) => {
+    if (e.target.id !== "tg-hora" && e.target.id !== "tg-noite") return;
+    try {
+      const r = await tgApi("config", e.target.id === "tg-hora" ? { hora: e.target.value || "07:00" } : { noite: e.target.value || null });
+      if (r) { tgInfo = { ...tgInfo, ...r }; toast(e.target.id === "tg-noite" && !e.target.value ? "Lembrete da noite desligado." : "Horário salvo ✓"); }
+    } catch { toast("Não consegui salvar o horário."); }
+  });
+  document.addEventListener("click", async (e) => {
+    const t = e.target.closest("#tg-ligar, #tg-testar, #tg-desligar");
+    if (!t) return;
+    if (t.id === "tg-ligar") tgLigar();
+    else if (t.id === "tg-testar") { await tgSincronizar(true); tgApi("testar").then(() => toast("Mensagem enviada no Telegram ✓")).catch(() => toast("Não consegui enviar.")); }
+    else if (t.id === "tg-desligar") {
+      if (!confirm("Parar de receber os treinos no Telegram?")) return;
+      try { await tgApi("desligar"); tgInfo = { ...tgInfo, ligado: false }; S.tg = { ...(S.tg || {}), ligado: false }; save(); render(); } catch { toast("Não consegui desconectar."); }
+    }
+  });
 
   /* ---------- Cliques ---------- */
   document.addEventListener("click", (e) => {
