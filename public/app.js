@@ -2768,6 +2768,17 @@
         enviados[`${uid}|ia|${pk}`] = JSON.stringify(iaDados(pk));
       }
     } catch {}
+    // Registro que este aparelho já tinha enviado e que não está mais na conta: foi apagado ou mudado de data
+    // (em outro aparelho ou pelo suporte). Apaga aqui também, senão ele contaria em dobro neste aparelho.
+    const naContaTodos = new Set(data.map((r) => `${r.data}|${r.programa}`));
+    for (const ch of Object.keys(enviados)) {
+      const m = ch.match(/^([^|]+)\|(\d{4}-\d{2}-\d{2})\|(.+)$/);
+      if (!m || m[1] !== uid || naContaTodos.has(`${m[2]}|${m[3]}`)) continue;
+      const [, , dia, prog] = m;
+      const logs = prog === "calistenia" ? S.logs : prog === "cf" ? S.cf.logs : IA[prog] || VP[prog] ? S[prog].logs : null;
+      if (logs && logs[dia] && JSON.stringify(linhasLocais().find((r) => r.data === dia && r.programa === prog)) === enviados[ch]) { delete logs[dia]; mudou = true; }
+      delete enviados[ch];
+    }
     if (mudou) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
     const naConta = new Set(data.map((r) => `${r.data}|${r.programa}`).filter((x) => !localMaior.has(x)));
     linhasLocais().filter((r) => naConta.has(`${r.data}|${r.programa}`)).forEach((r) => (enviados[`${uid}|${r.data}|${r.programa}`] = JSON.stringify(r)));
