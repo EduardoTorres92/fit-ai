@@ -4,7 +4,7 @@
 // Ler a foto ou montar um WOD conta como 2 perguntas do limite diário do Coach.
 import Anthropic from "@anthropic-ai/sdk";
 import { emailDoToken } from "../lib/dono.mjs";
-import { ehEmailDono } from "../lib/sessao.mjs";
+import { ehEmailDono, donoNaReq } from "../lib/sessao.mjs";
 import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/limite.mjs";
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -100,7 +100,7 @@ export default async (req, context) => {
 
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const email = await emailDoToken(token).catch(() => null);
-  const dono = ehEmailDono(email);
+  const dono = donoNaReq(email, req);
   if (!dono) {
     try {
       const quem = email ? `conta:${email}` : context?.ip || "sem-ip";

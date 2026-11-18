@@ -176,6 +176,17 @@
     save();
   }
 
+  /* Visão de usuário comum (só o dono liga, no Perfil): as funções do servidor tratam a conta como membro
+     (Coach com o modelo e o limite de membro, Hipertrofia, CrossFit e Evolução). /api/videos e /api/telegram continuam como dono. */
+  {
+    const f0 = window.fetch.bind(window);
+    window.fetch = (u, o = {}) => {
+      if (typeof u === "string" && /^\/api\/(coach|hiper|wod|evolucao)\b/.test(u) && (() => { try { return JSON.parse(localStorage.getItem("fitai-state-v1") || "{}").verComoMembro; } catch { return false; } })())
+        o = { ...o, headers: { ...(o.headers || {}), "x-fitai-membro": "1" } };
+      return f0(u, o);
+    };
+  }
+
   /* ---------- Estado ---------- */
   const KEY = "fitai-state-v1";
   const padrao = { user: null, logado: false, onboarded: false, inicio: keyOf(mondayOf(hoje)), logs: {}, perfil: { peso: "", altura: "", idade: "" } };
@@ -2464,7 +2475,7 @@
 
   /* Vídeos do Insanity: vêm de /api/videos para quem está logado (interativo = avisa se der erro) */
   let souDono = false; // o servidor diz se a conta é a do dono (ALLOWED_EMAIL)
-  const veCorridas = () => !uid || souDono; // as corridas do Strava são do dono; visitante vê como demonstração
+  const veCorridas = () => !uid || (souDono && !S.verComoMembro); // as corridas do Strava são do dono; visitante vê como demonstração
   // idVideo: o vídeo cujo botão foi tocado (para explicar por que ele não veio)
   async function carregarVideos(interativo = false, idVideo = null) {
     if ((!interativo && Object.keys(INS_VID).length) || !uid || location.protocol === "file:") return false;
@@ -3963,7 +3974,7 @@
     const agenda = [...Array(8)].map((_, i) => tgDia(addDays(new Date(), i))).filter(Boolean);
     const feitos = [...Array(14)].map((_, i) => keyOf(addDays(new Date(), -i))).filter(feito);
     const kHoje = keyOf(new Date());
-    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, ini: n.ini, fim: n.fim, grad: graduado() || donoAtivo(), feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
+    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, comoMembro: !!S.verComoMembro, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, ini: n.ini, fim: n.fim, grad: graduado() || donoAtivo(), feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
     const assinatura = JSON.stringify(corpo);
     const coachVelho = Date.now() - tgCoachEm > 10 * 60000;
     if (!forcar && assinatura === tgUltimo && !coachVelho) return;

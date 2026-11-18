@@ -5,7 +5,7 @@
 // Resposta: texto em streaming (como o /api/coach). Conta como 3 perguntas do limite diário.
 import Anthropic from "@anthropic-ai/sdk";
 import { emailDoToken } from "../lib/dono.mjs";
-import { ehEmailDono } from "../lib/sessao.mjs";
+import { ehEmailDono, donoNaReq } from "../lib/sessao.mjs";
 import { cabeNoLimite, LIMITE_MEMBRO_DIA } from "../lib/limite.mjs";
 
 const SB_URL = process.env.SUPABASE_URL || "https://thckpqzvvjujuseqeusz.supabase.co";
@@ -68,7 +68,7 @@ export default async (req) => {
   const dono = atual.fotos[0].caminho.split("/")[0];
   if ([atual, ...anteriores].some((k) => k.fotos.some((f) => !f.caminho.startsWith(`${dono}/`)))) return json(400, { erro: "fotos" });
 
-  const souDono = ehEmailDono(email);
+  const souDono = donoNaReq(email, req);
   if (!souDono) {
     try {
       if (!(await cabeNoLimite(`conta:${email}`, LIMITE_MEMBRO_DIA, 3))) return json(429, { erro: "limite" });

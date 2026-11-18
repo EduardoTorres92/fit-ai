@@ -5,7 +5,7 @@
 // Gerar ou revisar um plano conta como 3 perguntas do limite diário do Coach (é uma chamada maior).
 import Anthropic from "@anthropic-ai/sdk";
 import { emailDoToken } from "../lib/dono.mjs";
-import { ehEmailDono } from "../lib/sessao.mjs";
+import { ehEmailDono, donoNaReq } from "../lib/sessao.mjs";
 import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/limite.mjs";
 import { REFERENCIA, LEGENDA } from "../lib/ref-calistenia21.mjs";
 import { ROTEIRO_FORTALECIMENTO, CALENDARIO_CALISTENICO } from "../lib/ref-calistenia-base.mjs";
@@ -163,7 +163,7 @@ export default async (req, context) => {
   if (!process.env.ANTHROPIC_API_KEY) return json(500, { erro: "sem_chave" });
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const email = await emailDoToken(token).catch(() => null);
-  const dono = ehEmailDono(email);
+  const dono = donoNaReq(email, req);
   if (!dono) {
     try {
       const quem = email ? `conta:${email}` : context?.ip || "sem-ip";

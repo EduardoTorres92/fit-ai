@@ -10,7 +10,7 @@ import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/li
 import { ROTEIRO_FORTALECIMENTO, CALENDARIO_CALISTENICO } from "../lib/ref-calistenia-base.mjs";
 import { GUIA_TEXTO } from "../lib/guia-alimentacao.mjs";
 import { emailDoToken } from "../lib/dono.mjs";
-import { ehEmailDono } from "../lib/sessao.mjs";
+import { ehEmailDono, donoNaReq } from "../lib/sessao.mjs";
 
 const MODO = {
   dono: { model: "claude-opus-5-5", max_tokens: 16000, mensagens: 24, porMensagem: 4000, contexto: 40000, programa: 60000 },
@@ -74,7 +74,7 @@ export default async (req, context) => {
   // Dono (ALLOWED_EMAIL): modelo completo. Quem tem conta: membro, com limite por conta. Sem conta: visitante, limite por IP.
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const email = await emailDoToken(token).catch(() => null);
-  const modo = ehEmailDono(email) ? "dono" : email ? "membro" : "visitante";
+  const modo = donoNaReq(email, req) ? "dono" : email ? "membro" : "visitante";
   const M = MODO[modo];
   if (modo !== "dono") {
     try {

@@ -148,6 +148,7 @@ export async function receberAgenda(email, c) {
   const antes = conta.aguaDia?.data === hojeK ? conta.aguaDia.ml : 0;
   if (ml > antes && conta.agua) conta.agua.ultimo = Date.now(); // bebeu pelo app: o próximo aviso conta a partir de agora
   conta.aguaDia = { data: hojeK, ml, meta: meta || conta.aguaDia?.meta || 0 };
+  conta.comoMembro = !!c.comoMembro; // dono testando a visão de usuário comum: o Coach responde como para um membro
   if (c.gami && typeof c.gami === "object") {
     const n = (v, max) => Math.min(max, Math.max(0, Math.round(Number(v) || 0)));
     conta.gami = { xp: n(c.gami.xp, 1e7), nivel: n(c.gami.nivel, 50) || 1, classe: txt(c.gami.classe, 30), ini: n(c.gami.ini, 1e7), fim: n(c.gami.fim, 1e7), grad: !!c.gami.grad,
@@ -314,7 +315,7 @@ export async function processar(u, permitido) {
   }
   if (!cmd && (texto || msg.photo || msg.voice || msg.audio || msg.video_note) && !/^(hoje|treino)$/i.test(texto)) {
     if (msg.voice || msg.audio || msg.video_note) { await enviar(chat, { text: "Ainda não entendo áudio 🙉 Manda por texto que eu respondo." }); return; }
-    naFila(chat, () => responderCoach(c, chat, msg, email, ehDono(email)));
+    naFila(chat, () => responderCoach(c, chat, msg, email, ehDono(email) && !c.comoMembro));
     return;
   }
   if (cmd === "hoje" || cmd === "start" || /^(treino|hoje)$/i.test(texto)) await enviar(chat, mensagemDia(c, hojeK, { cabeca: `Treino de hoje · ${dataBR(hojeK)}` }));

@@ -16,6 +16,9 @@ export const ehEmailDono = (email) => {
   return !!dono && normEmail(email) === dono;
 };
 
+// O dono pode testar o app como um usuário comum: o app manda x-fitai-membro: 1 e as funções o tratam como membro
+export const donoNaReq = (email, req) => ehEmailDono(email) && req?.headers?.get?.("x-fitai-membro") !== "1";
+
 async function segredo() {
   const l = loja();
   let s = await l.get("config/segredo-sessao");
