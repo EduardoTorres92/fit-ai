@@ -2929,8 +2929,9 @@
     ["mestre-de-armas", "Mestre de Armas", "ouro"], ["tita", "Titã", "ouro"], ["lenda", "Lenda", "diamante"], ["imortal", "Imortal", "diamante"],
   ];
   const NIVEL_MAX = 50;
-  const xpPara = (n) => 25 * n * (n - 1); // XP total para chegar ao nível n
-  const XP = { video: 100, pulse: 60, abs: 40, recorde: 50, teste: 50, serie: 5, metaEx: 20, completo: 60, cf: 100, seqDia: 10, seqMax: 70, semana: 150, agua: 10, desafio: 50 };
+  const xpPara = (n) => 40 * n * (n - 1); // XP total para chegar ao nível n
+  // Calibrado para o MAX:30 inteiro levar ao nível 10 (fim de Escudeiro) e a formatura empurrar para Guerreiro (nível 11)
+  const XP = { video: 50, pulse: 30, abs: 20, recorde: 25, teste: 25, serie: 3, metaEx: 10, completo: 30, cf: 50, seqDia: 5, seqMax: 30, semana: 75, agua: 5, desafio: 25, formatura: 500 };
   const EX_META = Object.fromEntries(TODOS_EX.map((e) => [e.id, e]));
   // XP de cada linha de treino (sem os bônus de sequência e semana)
   function xpLinha(r) {
@@ -2982,7 +2983,7 @@
     const ini = xpPara(n), fim = n < NIVEL_MAX ? xpPara(n + 1) : ini;
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
-  const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios || 0);
+  const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios || 0) + (graduado() ? XP.formatura : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -3057,6 +3058,7 @@
         <li>Treino da Fera: ${XP.serie} por série, +${XP.metaEx} por meta batida, +${XP.completo} pelo treino completo</li>
         <li>Dias seguidos: +${XP.seqDia} por dia, até +${XP.seqMax} · Semana do calendário completa: +${XP.semana}</li>
         <li>Meta de água: +${XP.agua} · Desafio do grupo: +${XP.desafio} · 2º treino no mesmo dia vale metade</li>
+        <li>Formatura no MAX:30: +${XP.formatura}</li>
         <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>`;
   }
   // Selo pequeno de nível (ranking do grupo, perfil de membro)
@@ -3958,7 +3960,7 @@
     const agenda = [...Array(8)].map((_, i) => tgDia(addDays(new Date(), i))).filter(Boolean);
     const feitos = [...Array(14)].map((_, i) => keyOf(addDays(new Date(), -i))).filter(feito);
     const kHoje = keyOf(new Date());
-    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, fim: n.fim, grad: graduado() || !!S.dono, feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
+    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, ini: n.ini, fim: n.fim, grad: graduado() || !!S.dono, feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
     const assinatura = JSON.stringify(corpo);
     const coachVelho = Date.now() - tgCoachEm > 10 * 60000;
     if (!forcar && assinatura === tgUltimo && !coachVelho) return;
