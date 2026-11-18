@@ -1050,3 +1050,5 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .gami-box .btn { width: 100%; margin-top: 10px; }
 @keyframes gami-pop { 0% { transform: scale(.4) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.08) rotate(2deg); opacity: 1; } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .gami-box .gami-crest { animation: none; } .xp-toast { transition: none; } }
+.profile .nv-selo { display: inline-flex; font-size: 12px; line-height: 1; margin-left: 4px; padding: 2px 7px 2px 3px; vertical-align: 2px; text-box: none; }
+.profile .nv-selo img { width: 16px; height: 18px; border-radius: 0; object-fit: contain; }
