@@ -1006,3 +1006,47 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .est-lista { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
 .est-lista li { display: flex; gap: 10px; font-size: 14px; line-height: 1.45; }
 .est-t { flex: none; min-width: 48px; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--muted); }
+
+/* ---------- Gamificação: nível, classe, XP ---------- */
+.xp-bar { display: block; height: 8px; border-radius: 99px; background: var(--secondary); overflow: hidden; }
+.xp-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2b54ff, #7b5bff); transition: width .6s var(--ease-out); }
+.nivel-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 20px; background: linear-gradient(135deg, #0f1631, #1d2a5c); color: #fff; }
+.nivel-card .xp-bar { background: rgba(255,255,255,.16); margin: 8px 0 6px; }
+.nc-crest, .gami-crest { position: relative; flex: none; width: 76px; height: 76px; display: grid; place-items: center; }
+.nc-crest .gm-frame, .gami-crest .gm-frame { position: absolute; inset: 0; width: 100%; height: 100%; }
+.nc-crest .gm-cls { width: 50px; height: 58px; position: relative; }
+.nc-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nc-k { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
+.nc-txt strong { font-family: var(--display); font-size: 26px; font-weight: 400; letter-spacing: .02em; line-height: 1.1; }
+.nc-txt small { font-size: 12px; opacity: .75; line-height: 1.35; }
+.metal-bronze .nc-k { color: #e7a56b; } .metal-prata .nc-k { color: #cfd7e3; } .metal-ouro .nc-k { color: #ffd66b; } .metal-diamante .nc-k { color: #8fe7ff; }
+.grad-box { padding: 14px 16px; border-radius: 16px; background: var(--blue-08); display: flex; flex-direction: column; gap: 8px; }
+.xp-regras summary { font-size: 13px; color: var(--blue); cursor: pointer; }
+.xp-regras ul { margin: 8px 0 0 18px; display: flex; flex-direction: column; gap: 4px; }
+.profile .foto-btn .foto-classe { position: absolute; left: -6px; bottom: -6px; width: 26px; height: 30px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.nv-selo { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; font-size: 11px; font-weight: 700; padding: 1px 6px 1px 2px; border-radius: 99px; background: var(--secondary); color: #333; }
+.nv-selo img { width: 16px; height: 18px; }
+.nv-selo.metal-bronze { background: #f6e3d2; color: #7a4318; } .nv-selo.metal-prata { background: #e6ebf2; color: #3d4757; }
+.nv-selo.metal-ouro { background: #fff1c4; color: #7a5a00; } .nv-selo.metal-diamante { background: #d9f6ff; color: #0b5d75; }
+.prog-opt.lock { opacity: .6; }
+.badge .b-img { width: 44px; height: 44px; margin: 0 auto; }
+.xp-toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); z-index: 1000; transform: translate(-50%, -140%); transition: transform .45s var(--ease-out);
+  display: flex; align-items: center; gap: 10px; min-width: 220px; padding: 10px 14px; border-radius: 16px; background: #0f1631; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.xp-toast.on { transform: translate(-50%, 0); }
+.xp-toast img { width: 30px; height: 35px; }
+.xp-toast div { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.xp-toast strong { font-size: 16px; color: #ffd66b; }
+.xp-toast small { font-size: 12px; opacity: .8; }
+.xp-toast .xp-bar { height: 5px; background: rgba(255,255,255,.16); margin-top: 3px; }
+#gami-dlg { margin: auto; border: 0; border-radius: 24px; padding: 0; width: min(340px, 90vw); background: radial-gradient(circle at 50% 20%, #26367a, #0f1631 70%); color: #fff; }
+#gami-dlg::backdrop { background: rgba(0,0,0,.55); }
+.gami-box { padding: 28px 22px 22px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.gami-box .gami-crest { width: 140px; height: 140px; animation: gami-pop .7s var(--ease-out); }
+.gami-box .gami-crest .gm-cls { width: 92px; height: 108px; position: relative; }
+.gami-box .gami-crest.metal-ouro:not(:has(.gm-frame)) .gm-cls { width: 130px; height: 130px; }
+.gami-k { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: #ffd66b; }
+.gami-box h2 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: .02em; }
+.gami-box .note { color: rgba(255,255,255,.8); }
+.gami-box .btn { width: 100%; margin-top: 10px; }
+@keyframes gami-pop { 0% { transform: scale(.4) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.08) rotate(2deg); opacity: 1; } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .gami-box .gami-crest { animation: none; } .xp-toast { transition: none; } }

@@ -59,7 +59,7 @@ export async function ligarWebhook() {
   await api("setWebhook", { url: `${SITE}/api/telegram`, secret_token: segredo(t), allowed_updates: ["message", "callback_query"], drop_pending_updates: false });
   await api("setMyCommands", { commands: [
     { command: "hoje", description: "Treino de hoje" }, { command: "amanha", description: "Treino de amanhã" },
-    { command: "semana", description: "Próximos 7 dias" }, { command: "nutri", description: "Falar com a Nutri AI" },
+    { command: "semana", description: "Próximos 7 dias" }, { command: "nivel", description: "Meu nível e XP" }, { command: "nutri", description: "Falar com a Nutri AI" },
     { command: "coach", description: "Falar com o Coach AI" }, { command: "novo", description: "Começar conversa nova" }, { command: "parar", description: "Desligar os avisos" },
   ] }).catch(() => {});
   return true;
@@ -126,6 +126,15 @@ export async function configurar(email, c) {
   salvar();
   return { ok: true, ...(await estado(email)) };
 }
+// /nivel: nível, classe, XP e a formatura do MAX:30 (o app calcula e manda junto com a agenda)
+function textoNivel(c) {
+  const g = c.gami;
+  if (!g) return "Abra o FIT.AI uma vez para eu receber o seu nível. 🛡️";
+  const barra = (pct) => "▰".repeat(Math.round(pct / 10)) + "▱".repeat(10 - Math.round(pct / 10));
+  const ini = 25 * g.nivel * (g.nivel - 1), pct = g.fim > ini ? Math.min(100, Math.round(((g.xp - ini) / (g.fim - ini)) * 100)) : 100;
+  const grad = g.grad ? "🎓 Formado no MAX:30: todos os programas liberados." : `🎓 Formatura do MAX:30: <b>${g.feitas}/${g.precisa}</b> sessões${g.final ? " ✓" : " + o Cardio Challenge final"}.`;
+  return `🛡️ <b>Nível ${g.nivel} · ${esc(g.classe || "Recruta")}</b>\n${barra(pct)} ${pct}%\n<b>${g.xp.toLocaleString("pt-BR")} XP</b>${g.nivel < 50 ? ` · faltam ${Math.max(0, g.fim - g.xp).toLocaleString("pt-BR")} para o nível ${g.nivel + 1}` : ""}\n\n${grad}`;
+}
 export async function receberAgenda(email, c) {
   const conta = (await todos()).contas[email];
   if (!conta) return { ligado: false };
@@ -139,6 +148,11 @@ export async function receberAgenda(email, c) {
   const antes = conta.aguaDia?.data === hojeK ? conta.aguaDia.ml : 0;
   if (ml > antes && conta.agua) conta.agua.ultimo = Date.now(); // bebeu pelo app: o próximo aviso conta a partir de agora
   conta.aguaDia = { data: hojeK, ml, meta: meta || conta.aguaDia?.meta || 0 };
+  if (c.gami && typeof c.gami === "object") {
+    const n = (v, max) => Math.min(max, Math.max(0, Math.round(Number(v) || 0)));
+    conta.gami = { xp: n(c.gami.xp, 1e7), nivel: n(c.gami.nivel, 50) || 1, classe: txt(c.gami.classe, 30), fim: n(c.gami.fim, 1e7), grad: !!c.gami.grad,
+      feitas: n(c.gami.feitas, 99), precisa: n(c.gami.precisa, 99), final: !!c.gami.final };
+  }
   if (typeof c.coachProg === "string") {
     const t = (v, n) => String(v ?? "").slice(0, n);
     conta.coach = { prog: t(c.coachProg, 60000), ctx: t(c.coachCtx, 40000), nutriProg: t(c.nutriProg, 60000), nutriCtx: t(c.nutriCtx, 20000), em: Date.now() };
@@ -278,10 +292,10 @@ export async function processar(u, permitido) {
     salvar();
     const conta = d.contas[v.email];
     if (ehDono(v.email)) await api("setMyCommands", { scope: { type: "chat", chat_id: chat }, commands: [
-      { command: "admin", description: "Painel do dono" }, { command: "hoje", description: "Treino de hoje" }, { command: "semana", description: "Próximos 7 dias" },
+      { command: "admin", description: "Painel do dono" }, { command: "hoje", description: "Treino de hoje" }, { command: "semana", description: "Próximos 7 dias" }, { command: "nivel", description: "Meu nível e XP" },
       { command: "nutri", description: "Falar com a Nutri AI" }, { command: "coach", description: "Falar com o Coach AI" }, { command: "novo", description: "Conversa nova" }, { command: "parar", description: "Desligar os avisos" },
     ] }).catch(() => {});
-    await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nMe escreva ou mande foto quando quiser: quem responde é o Coach AI, com o seu programa e o seu histórico.\n\nComandos: /hoje /amanha /semana /nutri /novo /parar${ehDono(v.email) ? "\n\n🛠️ Você é o dono: /admin abre o painel." : ""}` });
+    await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nMe escreva ou mande foto quando quiser: quem responde é o Coach AI, com o seu programa e o seu histórico.\n\nComandos: /hoje /amanha /semana /nivel /nutri /novo /parar${ehDono(v.email) ? "\n\n🛠️ Você é o dono: /admin abre o painel." : ""}` });
     return;
   }
   if (!c) { await enviar(chat, { text: "Oi! Eu sou o bot do <b>FIT.AI</b>. Para receber seus treinos aqui, abra o perfil no app e toque em <b>Conectar Telegram</b>." }); return; }
@@ -310,8 +324,9 @@ export async function processar(u, permitido) {
       const ok = (c.feitos || []).includes(k) || (c.marcar || []).includes(k);
       return `${ok ? "✅" : a?.descanso ? "😴" : "•"} <b>${dataBR(k)}</b> ${a ? esc(a.descanso ? "Descanso" : a.titulo) : "—"}`; });
     await enviar(chat, { text: `<b>Próximos 7 dias</b>\n${linhas.join("\n")}` });
-  } else if (cmd === "parar") await desligar(email);
-  else await enviar(chat, { text: "Pode me escrever ou mandar foto que o <b>Coach AI</b> responde (/nutri para a Nutri AI).\nComandos: /hoje /amanha /semana /novo /parar\nOs horários dos avisos mudam no perfil do FIT.AI." });
+  } else if (cmd === "nivel" || cmd === "xp") await enviar(chat, { text: textoNivel(c) });
+  else if (cmd === "parar") await desligar(email);
+  else await enviar(chat, { text: "Pode me escrever ou mandar foto que o <b>Coach AI</b> responde (/nutri para a Nutri AI).\nComandos: /hoje /amanha /semana /nivel /novo /parar\nOs horários dos avisos mudam no perfil do FIT.AI." });
 }
 
 

@@ -166,7 +166,7 @@
     ["Intermediário", "Já treino com regularidade"],
     ["Avançado", "Treino pesado há tempo (faço barra)"],
   ];
-  const recomendado = (nivel) => TRILHA.find((x) => x.nivel === nivel) || TRILHA[0];
+  const recomendado = (nivel) => (!S.dono && VP.insanity ? VP.insanity : TRILHA.find((x) => x.nivel === nivel) || TRILHA[0]);
   const caminhoTxt = () => TRILHA.map((x) => x.nome).join(" → ");
   // Programa de vídeo começa na segunda desta semana; de sexta em diante, na próxima segunda
   const inicioNovo = () => keyOf(hojeDia >= 4 ? addDays(mondayOf(hoje), 7) : mondayOf(hoje));
@@ -566,7 +566,7 @@
   /* Insanity: componentes */
   const INS_IMG = { Cardio: "banner-home.jpg", Tabata: "login.jpg", Potência: "login.jpg", Pliometria: "login.jpg", Teste: "banner-plano.jpg", Intervalos: "banner-home.jpg", Core: "treino-inferiores-2.jpg", Força: "treino-superiores-2.jpg", Luta: "treino-inferiores-1.jpg", Recuperação: "treino-inferiores-2.jpg", Abdômen: "treino-inferiores-2.jpg" };
   const progSwitch = (on) => {
-    const abas = [["plano", NOME_PROG], ...VPROGS.map((p) => [p.k, VPROGS.length > 1 ? p.curto : p.nome]), ...IAK.map((k) => [k, progDe(k)?.curto || IA[k].nome]), ["cf", "CrossFit"]];
+    const abas = [["plano", NOME_PROG], ...VPROGS.map((p) => [p.k, VPROGS.length > 1 ? p.curto : p.nome]), ...IAK.map((k) => [k, progDe(k)?.curto || IA[k].nome]), ["cf", "CrossFit"]].filter(([k]) => liberado(k));
     const rolar = abas.length > 4; // muitas abas: vira uma faixa que rola para o lado
     return `<nav class="seg prog${rolar ? " rolar" : ""}" aria-label="Programa" ${rolar ? "" : `style="grid-template-columns:repeat(${abas.length},1fr)"`}>
       ${abas.map(([r, nome]) => `<a href="#/${r}" class="${on === r ? "on" : ""}"${on === r ? ' aria-current="page"' : ""}>${esc(nome)}</a>`).join("")}</nav>`;
@@ -793,9 +793,10 @@
         <header class="header"><span class="logo-txt dark">Fit.ai</span></header>
         <div style="padding:20px;display:flex;flex-direction:column;gap:20px">
           <div class="profile">
-            <button class="foto-btn" id="trocar-foto" aria-label="Trocar foto de perfil"><img src="${esc(fotoPerfil())}" alt="Foto de ${esc(nomeCompleto())}" referrerpolicy="no-referrer"><span class="foto-cam" aria-hidden="true">📷</span></button>
+            <button class="foto-btn" id="trocar-foto" aria-label="Trocar foto de perfil"><img src="${esc(fotoPerfil())}" alt="Foto de ${esc(nomeCompleto())}" referrerpolicy="no-referrer"><span class="foto-cam" aria-hidden="true">📷</span><img class="foto-classe" src="${classeImg(meuNivel().slug)}" alt="" aria-hidden="true"></button>
             <input type="file" id="foto-arquivo" accept="image/*" hidden>
             <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
+          ${nivelCard()}
           ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
             ${stat("weight.svg", P.peso || "—", "Peso (kg)", { edit: "peso" })}
@@ -805,8 +806,8 @@
           </div>
           <div class="field">
             <span class="field-lbl">Seu programa principal · caminho: ${esc(caminhoTxt())}</span>
-            <div class="prog-cat">${CATALOGO.map((x, i) => `<button class="prog-opt${principal() === x.k ? " on" : ""}" data-principal="${x.k}">
-              <span class="po-n">${i + 1}</span><span class="po-txt"><strong>${esc(x.nome)}</strong><small>${esc(x.nivel)}${S.nivel === x.nivel ? " · seu nível" : ""}</small></span>${principal() === x.k ? "<b>✓</b>" : ""}</button>`).join("")}</div>
+            <div class="prog-cat">${CATALOGO.map((x, i) => `<button class="prog-opt${principal() === x.k ? " on" : ""}${travado(x.k) ? " lock" : ""}" data-principal="${x.k}"${travado(x.k) ? ' aria-disabled="true"' : ""}>
+              <span class="po-n">${travado(x.k) ? "🔒" : i + 1}</span><span class="po-txt"><strong>${esc(x.nome)}</strong><small>${travado(x.k) ? "Libera na formatura do MAX:30" : `${esc(x.nivel)}${S.nivel === x.nivel ? " · seu nível" : ""}`}</small></span>${principal() === x.k ? "<b>✓</b>" : ""}</button>`).join("")}</div>
           </div>
           <div class="perfil-rec">
             <div class="sec-head"><h2>Meus recordes</h2>${uid ? `<span>visíveis para o seu grupo</span>` : ""}</div>
@@ -2479,6 +2480,8 @@
       const dados = await r.json();
       Object.assign(INS_VID, dados.videos || {});
       souDono = !!dados.dono;
+      if (S.dono !== souDono) { S.dono = souDono; save(); }
+      aplicarTrava();
       tgSincronizar(); // os links dos vídeos entram na agenda do Telegram
       if (VP[location.hash.split("/")[1]]) render();
       videoRetomar();
@@ -2677,7 +2680,7 @@
   let syncTimer = null, sincronizando = false, deNovo = false;
   function agendarSync() {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { verificarConquistas(); if (uid) sincronizar(); }, 1200);
+    syncTimer = setTimeout(() => { verificarConquistas(); conferirXp(); if (uid) sincronizar(); }, 1200);
   }
   async function sincronizar() {
     if (!uid || !sb) return;
@@ -2709,7 +2712,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, graduado: S.graduadoMax30 || null }; })() };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -2903,7 +2906,10 @@
     return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
       melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
       insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length, fits: fitTests(rows).length,
-      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0, ...aguaMetricas() };
+      fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0, ...aguaMetricas(),
+      max30s1: (() => { const P = VP.insanity; if (!P) return 0; const ds = new Set(f.filter((r) => r.programa === "insanity" && r.detalhes?.w === 0).map((r) => r.detalhes.d)); return P.semanas[0].dias.every((t, d) => !t.ids.length || ds.has(d)) ? 1 : 0; })(),
+      grad: graduado() ? 1 : 0,
+      barras: rows.some((r) => r.programa === "calistenia" && Object.entries(r.detalhes?.sets || {}).some(([id, v]) => /^barra-(pronada|aberta|fechada|negativa|uma-mao)$/.test(id) && (v || []).some((n) => n > 0))) ? 1 : 0 };
   }
   // Água: melhor semana (litros), total e maior sequência de dias batendo a meta
   function aguaMetricas() {
@@ -2914,6 +2920,148 @@
     for (const k of [...ok].sort()) { seq = ok.has(keyOf(addDays(parseKey(k), -1))) ? seq + 1 : 1; melhor = Math.max(melhor, seq); }
     return { aguaSemana: Math.floor(Math.max(0, ...Object.values(sem)) / 1000), aguaTotal: Math.floor(soma(linhas.map((r) => r.ml)) / 1000), aguaSeq: melhor, aguaMetas: ok.size };
   }
+  /* ==========================================================
+     Gamificação: XP, níveis e classes (calculados a partir do histórico, então valem para treinos antigos)
+     ========================================================== */
+  const CLASSES = [
+    ["recruta", "Recruta", "bronze"], ["escudeiro", "Escudeiro", "bronze"], ["guerreiro", "Guerreiro", "bronze"],
+    ["cavaleiro", "Cavaleiro", "prata"], ["paladino", "Paladino", "prata"], ["campeao", "Campeão", "prata"],
+    ["mestre-de-armas", "Mestre de Armas", "ouro"], ["tita", "Titã", "ouro"], ["lenda", "Lenda", "diamante"], ["imortal", "Imortal", "diamante"],
+  ];
+  const NIVEL_MAX = 50;
+  const xpPara = (n) => 25 * n * (n - 1); // XP total para chegar ao nível n
+  const XP = { video: 100, pulse: 60, abs: 40, recorde: 50, teste: 50, serie: 5, metaEx: 20, completo: 60, cf: 100, seqDia: 10, seqMax: 70, semana: 150, agua: 10, desafio: 50 };
+  const EX_META = Object.fromEntries(TODOS_EX.map((e) => [e.id, e]));
+  // XP de cada linha de treino (sem os bônus de sequência e semana)
+  function xpLinha(r) {
+    const d = r.detalhes || {};
+    let xp = 0;
+    if (VP[r.programa]) {
+      for (const id of [...(d.feitos || []), ...(d.avulso || [])]) { const v = INSV[id]; if (!v) continue; xp += id === "pulse" ? XP.pulse : v.tipo === "Abdômen" ? XP.abs : XP.video; }
+      if (Array.isArray(d.fit) && d.fit.some((n) => n > 0)) xp += XP.teste;
+      if (d.max?.["cardio-challenge"]) xp += XP.teste;
+    } else if (r.programa === "calistenia") {
+      for (const [id, s] of Object.entries(d.sets || {})) {
+        if (!Array.isArray(s) || !s.length) continue;
+        xp += s.length * XP.serie;
+        const e = EX_META[id]; if (e && (e.un === "tiro" ? s.length : soma(s)) >= e.meta) xp += XP.metaEx;
+      }
+      if (d.done) xp += XP.completo;
+    } else if (IA[r.programa]) {
+      for (const s of Object.values(d.sets || {})) if (Array.isArray(s)) xp += s.length * XP.serie;
+      if (d.done) xp += XP.completo;
+    } else if (r.programa === "cf" && d.done) xp += XP.cf;
+    return xp;
+  }
+  // XP total de uma pessoa: rows = linhas de treino; agua = linhas de água; desafios = quantos fez
+  function xpDe(rows, agua = [], desafios = 0) {
+    const porDia = {};
+    rows.forEach((r) => (porDia[r.data] = porDia[r.data] || []).push(xpLinha(r)));
+    let xp = 0;
+    for (const lista of Object.values(porDia)) lista.sort((a, b) => b - a).forEach((v, i) => (xp += i ? Math.round(v / 2) : v)); // 2º treino no mesmo dia vale metade
+    // Recordes de Max Out (bater o melhor anterior no mesmo vídeo)
+    const best = {};
+    maxOuts(rows).sort((a, b) => a.k.localeCompare(b.k)).forEach((m) => { if (best[m.v] && m.s > best[m.v]) xp += XP.recorde; best[m.v] = Math.max(best[m.v] || 0, m.s); });
+    // Sequência: +10 por dia seguido, crescendo até 70
+    const dias = [...new Set(feitas(rows).map((r) => r.data))].sort();
+    let run = 0, prev = null;
+    for (const k of dias) { run = prev && diffDays(parseKey(prev), parseKey(k)) === 1 ? run + 1 : 1; xp += Math.min(XP.seqMax, run * XP.seqDia); prev = k; }
+    // Semana completa do programa de vídeo (todos os dias de treino da semana do calendário)
+    for (const p of VKEYS) {
+      const sem = {};
+      rows.filter((r) => r.programa === p && r.concluido && Number.isInteger(r.detalhes?.w)).forEach((r) => (sem[r.detalhes.w] = sem[r.detalhes.w] || new Set()).add(r.detalhes.d));
+      for (const [w, ds] of Object.entries(sem)) { const s = VP[p].semanas[w]; if (s && s.dias.every((t, d) => !t.ids.length || ds.has(d))) xp += XP.semana; }
+    }
+    xp += agua.filter((a) => a.ml >= a.meta).length * XP.agua;
+    xp += desafios * XP.desafio;
+    return xp;
+  }
+  function nivelDe(xp) {
+    let n = 1; while (n < NIVEL_MAX && xp >= xpPara(n + 1)) n++;
+    const ci = Math.min(CLASSES.length - 1, Math.floor((n - 1) / 5)), [slug, nome, metal] = CLASSES[ci];
+    const ini = xpPara(n), fim = n < NIVEL_MAX ? xpPara(n + 1) : ini;
+    return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
+  }
+  const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios || 0);
+  const meuNivel = () => nivelDe(meuXp());
+  const classeImg = (slug) => `assets/classes/${slug}.svg`;
+  const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
+
+  /* Formatura do MAX:30: 80% das sessões do calendário + o Cardio Challenge final (última semana) */
+  function max30Progresso() {
+    const P = VP.insanity; if (!P) return { feitas: 0, total: 0, pct: 0, final: false, ok: true };
+    const sessoes = []; P.semanas.forEach((s, w) => s.dias.forEach((t, d) => t.ids.length && sessoes.push([w, d])));
+    const feitosWD = new Set();
+    for (const [k, l] of Object.entries(S.insanity.logs)) if (insFeito("insanity", k) && Number.isInteger(l.w) && insDia("insanity", l.w, l.d)?.ids.length) feitosWD.add(`${l.w}|${l.d}`);
+    const ultima = P.semanas.length - 1, fimW = P.semanas[ultima].dias.findIndex((t) => t.ids.includes("cardio-challenge"));
+    const final = fimW >= 0 ? feitosWD.has(`${ultima}|${fimW}`) : true;
+    const feitas = sessoes.filter(([w, d]) => feitosWD.has(`${w}|${d}`)).length, precisa = Math.ceil(sessoes.length * 0.8);
+    return { feitas, total: sessoes.length, precisa, pct: Math.round((feitas / Math.max(1, sessoes.length)) * 100), final, ok: feitas >= precisa && final };
+  }
+  const graduado = () => !!S.graduadoMax30 || max30Progresso().ok;
+  // Quem não é o dono começa pelo MAX:30 e libera o resto ao se formar. O Treino da Fera ("plano") fica sempre como apoio (barras).
+  const liberado = (k) => k === "insanity" || k === "plano" || !!S.dono || graduado();
+  const travado = (k) => !liberado(k);
+  function aplicarTrava() {
+    if (S.dono || graduado() || principal() === "insanity") return;
+    escolherPrograma("insanity"); // MAX:30 é o principal de todo mundo; a Fera fica como apoio
+  }
+  // Depois de salvar: XP ganho, subida de nível/classe e formatura
+  let xpAntes = null;
+  function conferirXp(silencioso = false) {
+    const n = meuNivel(), antes = xpAntes; xpAntes = n;
+    if (!S.graduadoMax30 && max30Progresso().ok) { S.graduadoMax30 = hojeKey; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (!silencioso) setTimeout(() => modalFormatura(), 600); }
+    if (silencioso || !antes) return;
+    const ganho = n.xp - antes.xp;
+    if (ganho > 0) xpToast(ganho, n);
+    if (n.nivel > antes.nivel) setTimeout(() => modalNivel(n, n.ci > antes.ci), 1400);
+  }
+  function xpToast(ganho, n) {
+    const t = document.createElement("div");
+    t.className = "xp-toast"; t.setAttribute("role", "status");
+    t.innerHTML = `<img src="${classeImg(n.slug)}" alt="" width="34" height="34"><div><strong>+${ganho} XP</strong><small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="xp-bar"><i style="width:${n.pct}%"></i></span></div>`;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("on"));
+    setTimeout(() => { t.classList.remove("on"); setTimeout(() => t.remove(), 400); }, 2600);
+  }
+  function dlgGami(html) {
+    let d = document.getElementById("gami-dlg");
+    if (!d) { d = document.createElement("dialog"); d.id = "gami-dlg"; document.body.appendChild(d); d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-gami-ok]")) d.close(); }); }
+    d.innerHTML = `<div class="gami-box">${html}<button class="btn btn-blue" data-gami-ok>Bora!</button></div>`;
+    if (!d.open) d.showModal();
+  }
+  function modalNivel(n, novaClasse) {
+    dlgGami(`<div class="gami-crest metal-${n.metal}"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt=""></div>
+      <p class="gami-k">${novaClasse ? "Nova classe!" : "Subiu de nível!"}</p><h2>${novaClasse ? esc(n.classe) : `Nível ${n.nivel}`}</h2>
+      <p class="note">${novaClasse ? `Você agora é <b>${esc(n.classe)}</b> (nível ${n.nivel}).` : `${esc(n.classe)} · faltam ${n.fim - n.xp} XP para o nível ${n.nivel + 1}.`}</p>`);
+  }
+  function modalFormatura() {
+    dlgGami(`<div class="gami-crest metal-ouro"><img class="gm-cls" src="assets/emblemas/graduado-max30.svg" alt=""></div>
+      <p class="gami-k">Formatura</p><h2>MAX:30 concluído!</h2>
+      <p class="note">Você fechou 80% das sessões e o Cardio Challenge final. Os outros programas estão liberados: Perfil → Seu programa principal.</p>`);
+  }
+  // Card do nível no perfil
+  function nivelCard() {
+    const n = meuNivel(), g = max30Progresso(), prox = CLASSES[n.ci + 1];
+    return `<div class="nivel-card metal-${n.metal}">
+      <div class="nc-crest"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
+      <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""}</span><strong>${esc(n.classe)}</strong>
+        <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
+        <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
+      ${S.dono || S.graduadoMax30 ? "" : `<div class="grad-box"><div class="sec-head"><h2>Formatura MAX:30</h2><span>${g.feitas}/${g.precisa} sessões</span></div>
+        <span class="xp-bar"><i style="width:${Math.min(100, Math.round((g.feitas / Math.max(1, g.precisa)) * 100))}%"></i></span>
+        <p class="note small">Feche ${g.precisa} das ${g.total} sessões do calendário e o <b>Cardio Challenge final</b> (sábado da semana 8)${g.final ? " ✓" : ""} para liberar os outros programas. O Treino da Fera fica sempre liberado como apoio para as barras.</p></div>`}
+      <details class="xp-regras"><summary>Como ganhar XP</summary><ul class="note small">
+        <li>Vídeo principal: ${XP.video} · Pulse: ${XP.pulse} · Abdômen: ${XP.abs}</li>
+        <li>Recorde de Max Out: +${XP.recorde} · Cardio Challenge ou Fit Test registrado: +${XP.teste}</li>
+        <li>Treino da Fera: ${XP.serie} por série, +${XP.metaEx} por meta batida, +${XP.completo} pelo treino completo</li>
+        <li>Dias seguidos: +${XP.seqDia} por dia, até +${XP.seqMax} · Semana do calendário completa: +${XP.semana}</li>
+        <li>Meta de água: +${XP.agua} · Desafio do grupo: +${XP.desafio} · 2º treino no mesmo dia vale metade</li>
+        <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>`;
+  }
+  // Selo pequeno de nível (ranking do grupo, perfil de membro)
+  const nivelSelo = (cfg) => (cfg && cfg.nivel_xp ? `<span class="nv-selo metal-${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][2])}" title="${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][1])}"><img src="${classeImg(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][0])}" alt="" width="16" height="16">${Number(cfg.nivel_xp) || 1}</span>` : "");
+
   const CONQ = [
     ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
     ["t10", "💪", "10 treinos", (m) => [m.treinos, 10]],
@@ -2944,7 +3092,13 @@
     ["aguas20", "🌊", "20 L de água numa semana", (m) => [m.aguaSemana, 20]],
     ["aguaseq7", "🐳", "7 dias seguidos na meta de água", (m) => [m.aguaSeq, 7]],
     ["agua100", "🏝️", "100 L de água no total", (m) => [m.aguaTotal, 100]],
+    ["max30s1", "🛡️", "1ª semana do MAX:30 completa", (m) => [m.max30s1, 1]],
+    ["barra1", "🧗", "Primeira barra registrada", (m) => [m.barras, 1]],
+    ["grad30", "🎓", "Formado no MAX:30", (m) => [m.grad, 1]],
   ];
+  // Emblemas desenhados (assets/emblemas); as outras conquistas usam o emoji
+  const CONQ_IMG = { seq7: "sequencia-7", maxrec: "recorde-max-out", aguaseq7: "hidratado-7", max30s1: "max30-semana-1", barra1: "primeira-barra", grad30: "graduado-max30" };
+  const conqIc = (id, ic) => (CONQ_IMG[id] ? `<img class="b-img" src="assets/emblemas/${CONQ_IMG[id]}.svg" alt="" width="44" height="44">` : ic);
   const CONQI = Object.fromEntries(CONQ.map((c) => [c[0], c]));
   function verificarConquistas(silencioso = false) {
     const m = metricasConquista(linhasLocais());
@@ -2966,7 +3120,7 @@
     const ganhas = CONQ.filter(([id]) => S2[id]).length;
     return `<p class="note small">${ganhas} de ${CONQ.length} conquistas</p><div class="badges">${CONQ.map(([id, ic, nome, f]) => {
       const [v, alvo] = f(m), ok = !!S2[id];
-      return `<div class="badge${ok ? " on" : ""}" title="${esc(nome)}"><span class="b-ic">${ic}</span><strong>${esc(nome)}</strong><small>${ok ? `Desde ${ddmm(S2[id])}` : `${Math.min(v, alvo)}/${alvo}`}</small></div>`;
+      return `<div class="badge${ok ? " on" : ""}" title="${esc(nome)}"><span class="b-ic">${conqIc(id, ic)}</span><strong>${esc(nome)}</strong><small>${ok ? `Desde ${ddmm(S2[id])}` : `${Math.min(v, alvo)}/${alvo}`}</small></div>`;
     }).join("")}</div>`;
   }
 
@@ -3071,7 +3225,7 @@
     const ids = (ms.data || []).map((m) => m.usuario_id);
     const desde = PERIODOS.tudo[1]();
     const [pf, tr, cq] = await Promise.all([
-      sb.from("perfis").select("id, nome, foto_url").in("id", ids),
+      sb.from("perfis").select("id, nome, foto_url, config").in("id", ids),
       sb.from("treinos").select("usuario_id, data, programa, titulo, concluido, minutos, detalhes, atualizado_em").in("usuario_id", ids).gte("data", keyOf(addDays(parseKey(desde), -35))),
       sb.from("conquistas").select("usuario_id, codigo, ganha_em").in("usuario_id", ids).order("ganha_em", { ascending: false }).limit(30),
     ]);
@@ -3166,20 +3320,24 @@
     fit: ["Fit Test", (k) => k.fit, (v) => (v ? `${v} reps` : "—")],
     fitevo: ["Evolução Fit Test", (k) => k.fitEvo, (v) => (v ? `${v > 0 ? "+" : ""}${v} reps` : "—")],
     agua: ["💧 Água", (k) => k.agua, (v) => (v ? fmtL(v) : "—")],
+    xp: ["🛡️ XP", (k) => k.xp, (v) => (v ? `${v.toLocaleString("pt-BR")} XP` : "—")],
   };
+  // Nível de quem está no grupo: o meu é calculado aqui; o dos outros vem do que cada um sincronizou (perfis.config)
+  const cfgNivel = (id) => (id === uid ? (() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel }; })() : G.perfis[id]?.config || null);
   function ranking() {
     const [, val, fmt] = RANKS[G.rank];
-    const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual, agua: mlNoPeriodo(aguaDe(id), PERIODOS[G.periodo][1]()) } }; })
+    const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual, agua: mlNoPeriodo(aguaDe(id), PERIODOS[G.periodo][1]()), xp: Number(cfgNivel(id)?.xp) || 0 } }; })
       .sort((a, b) => val(b.k) - val(a.k) || b.k.treinos - a.k.treinos);
     const med = ["🥇", "🥈", "🥉"];
     return `<ol class="rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}" data-membro="${x.id}" role="link" tabindex="0" aria-label="Ver perfil de ${esc(x.p?.nome || "Atleta")}">
       <span class="pos">${val(x.k) && i < 3 ? med[i] : i + 1}</span>${avatar(x.p, 36)}
-      <span class="nome">${esc(x.p?.nome || "Atleta")}${x.id === uid ? " <small>(você)</small>" : ""}</span>
+      <span class="nome">${esc(x.p?.nome || "Atleta")}${x.id === uid ? " <small>(você)</small>" : ""} ${nivelSelo(cfgNivel(x.id))}</span>
       <strong>${fmt(val(x.k))}</strong></li>`).join("")}</ol>
       ${G.rank === "maxout" ? `<p class="note small">Média do Max Out nos vídeos do ${esc(NOMES_MAXOUT)} no período: quanto mais tarde a pessoa cansou, melhor.</p>` : ""}
       ${G.rank === "fit" ? `<p class="note small">Total de repetições no último Fit Test do Insanity feito no período.</p>` : ""}
       ${G.rank === "fitevo" ? `<p class="note small">Quantas repetições a pessoa ganhou do primeiro ao último Fit Test do período.</p>` : ""}
       ${G.rank === "minutos" ? `<p class="note small">Tempo dos vídeos concluídos e do cronômetro. Na calistenia sem cronômetro, conta 3 min por série.</p>` : ""}
+      ${G.rank === "xp" ? `<p class="note small">XP total desde o começo (vídeos, séries, recordes, sequência e metas). O de cada pessoa atualiza quando ela abre o app.</p>` : ""}
       ${G.rank === "agua" ? `<p class="note small">Litros de água anotados no período (aba Nutrição ou “Bebi” na notificação).</p>` : ""}`;
   }
   // Hidratação do dia no grupo: quem está bebendo mais hoje e quem já bateu a meta
@@ -3263,7 +3421,7 @@
     const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows);
     return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
       <div class="page-head"><a class="icon-btn" href="#/grupo" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a><h1>Perfil</h1><span class="spacer"></span></div>
-      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""}</strong><span>${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
+      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""} ${nivelSelo(cfgNivel(id))}</strong><span>${cfgNivel(id)?.nivel_xp ? `Nível ${cfgNivel(id).nivel_xp} · ${esc(CLASSES[Math.min(9, Math.floor((cfgNivel(id).nivel_xp - 1) / 5))][1])} · ` : ""}${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
       <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
       <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
       <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
@@ -3578,6 +3736,7 @@
     if (!S.logado) rota = "login";
     else if (!S.onboarded && rota !== "login") rota = "onboarding";
     else if (!telas[rota] || rota === "login" || rota === "onboarding") rota = "home";
+    if ((VP[rota] || IA[rota] || rota === "cf") && travado(rota)) { rota = "insanity"; p1 = p2 = undefined; setTimeout(() => toast("🔒 Esse programa libera na formatura do MAX:30."), 50); }
     if (rota === "treino" && (p2 === undefined || !treino(p1 === "E" ? "E" : Number(p1), Number(p2)))) rota = "home";
     let alvo = `#/${rota}`;
     if (rota === "treino") alvo += `/${p1}/${p2}`;
@@ -3679,7 +3838,7 @@
   async function aoLogar(session) {
     const u = session.user, novo = uid !== u.id;
     // Outra conta neste aparelho: não mistura os treinos de uma pessoa com os da outra
-    if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; G.grupos = null; }
+    if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; S.dono = false; S.graduadoMax30 = null; xpAntes = null; G.grupos = null; }
     S.contaId = u.id;
     uid = u.id;
     let perfil = null;
@@ -3693,11 +3852,12 @@
       if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
       if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
       if (perfil.config.nutri && !S.nutri) S.nutri = perfil.config.nutri;
+      if (perfil.config.graduado && !S.graduadoMax30) S.graduadoMax30 = perfil.config.graduado;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
     else { S.user = user; save(); }
-    if (novo) { await puxarTreinos(); tgCarregar().then(() => tgSincronizar(true)); setTimeout(conferirAvisos, 1500); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
+    if (novo) { await puxarTreinos(); conferirXp(true); tgCarregar().then(() => tgSincronizar(true)); setTimeout(conferirAvisos, 1500); sincronizar(); verificarConquistas(true); if (S.convite) entrarComCodigo(S.convite); carregarVideos(); }
     render();
   }
   if (sb) {
@@ -3798,7 +3958,7 @@
     const agenda = [...Array(8)].map((_, i) => tgDia(addDays(new Date(), i))).filter(Boolean);
     const feitos = [...Array(14)].map((_, i) => keyOf(addDays(new Date(), -i))).filter(feito);
     const kHoje = keyOf(new Date());
-    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua };
+    const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua, gami: (() => { const n = meuNivel(), g = max30Progresso(); return { xp: n.xp, nivel: n.nivel, classe: n.classe, fim: n.fim, grad: graduado() || !!S.dono, feitas: g.feitas, precisa: g.precisa, final: g.final }; })() };
     const assinatura = JSON.stringify(corpo);
     const coachVelho = Date.now() - tgCoachEm > 10 * 60000;
     if (!forcar && assinatura === tgUltimo && !coachVelho) return;
@@ -3974,6 +4134,7 @@
     else if (t.dataset.membro) location.hash = `#/grupo/membro/${t.dataset.membro}`;
     else if (t.dataset.principal) {
       const x = progDe(t.dataset.principal);
+      if (x && travado(x.k)) { const g = max30Progresso(); toast(`🔒 ${x.nome} libera quando você se formar no MAX:30 (${g.feitas}/${g.precisa} sessões${g.final ? "" : " + Cardio Challenge final"}).`, 4500); return; }
       if (!x || x.k === principal()) return;
       escolherPrograma(x.k);
       toast(VP[x.k] && insSemanaDe(x.k, hoje) < 0 ? `${x.nome} é seu programa principal. Começa na segunda, ${ddmm(S[x.k].inicio)}. 💪` : `${x.nome} é seu programa principal agora. 💪`, 4000);
@@ -4421,6 +4582,8 @@
     out.push(`Hoje: ${DIAS[hojeDia]}, ${hojeKey}. ${nomeSemana(w)}, ciclo ${cicloDe(hoje)}. Treino de hoje: ${t ? t.titulo : "—"}.`);
     out.push(`Perfil: ${P.peso || "?"} kg, ${P.altura || "?"} cm, ${P.idade || "?"} anos. Sequência atual: ${sequencia()} dias. Treinos concluídos: ${treinosFeitos()}.`);
     out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
+    { const n = meuNivel(), g = max30Progresso();
+      out.push(`Gamificação: nível ${n.nivel} (${n.classe}), ${n.xp} XP, faltam ${Math.max(0, n.fim - n.xp)} XP para o próximo nível. ${S.dono ? "Conta do dono: todos os programas liberados." : graduado() ? "Formado no MAX:30: todos os programas liberados." : `Ainda não se formou no MAX:30 (${g.feitas}/${g.precisa} sessões${g.final ? "" : ", falta o Cardio Challenge final"}); só MAX:30 e Treino da Fera (apoio para barras) estão liberados. Não recomende outros programas antes da formatura.`}`); }
     const lh = logHoje();
     if (lh) out.push(`Registrado hoje (${lh.done ? "concluído" : "em andamento"}): ${Object.entries(lh.sets || {}).filter(([, v]) => v.length).map(([id, v]) => `${EXI[id]?.nome || id} ${v.join("+")}`).join("; ") || "nada ainda"}.`);
     const dias = Object.keys(S.logs).sort().filter((k) => k < hojeKey).slice(-21);
@@ -4576,11 +4739,12 @@
         const r = recomendado(n[0]);
         etapa = "programa"; chips.innerHTML = "";
         await falar(`Pelo que você disse, comece pelo <b>${esc(r.nome)}</b>: ${esc(r.sobre)}`, 1100);
-        if (r !== TRILHA[0]) await falar(`Se preferir ir com calma, o caminho natural começa pelo <b>${esc(TRILHA[0].nome)}</b>.`);
-        setChips(chips, [`Começar o ${r.nome}`, ...CATALOGO.filter((x) => x !== r).map((x) => `Prefiro o ${x.nome}`)]);
+        if (!S.dono) await falar(`Aqui funciona como um jogo: cada vídeo dá <b>XP</b>, você sobe de nível e de classe (Recruta → Escudeiro → Guerreiro…). Ao se formar no MAX:30 (80% das sessões + o Cardio Challenge final), os outros programas são liberados. O <b>Treino da Fera</b> fica sempre aberto como apoio para as barras. 🛡️`);
+        else if (r !== TRILHA[0]) await falar(`Se preferir ir com calma, o caminho natural começa pelo <b>${esc(TRILHA[0].nome)}</b>.`);
+        setChips(chips, [`Começar o ${r.nome}`, ...CATALOGO.filter((x) => x !== r && liberado(x.k) && x.k !== "plano").map((x) => `Prefiro o ${x.nome}`)]);
       } else if (etapa === "programa") {
         addMsg(box, esc(txt), true);
-        const x = CATALOGO.find((p) => t.endsWith(norm(p.nome)));
+        const x = CATALOGO.find((p) => t.endsWith(norm(p.nome)) && liberado(p.k));
         if (!x) return falar("Toque numa das opções abaixo. 😉");
         await escolhido(x);
       } else if (etapa === "semana") {
@@ -4601,6 +4765,8 @@
     form.addEventListener("submit", (e) => { e.preventDefault(); const i = $("#ob-input"); if (i.value.trim()) responder(i.value.trim()); i.value = ""; });
   }
 
+  if (S.logado && !S.user) aplicarTrava(); // visitante: só o MAX:30 (e a Fera de apoio)
+  conferirXp(true);
   render();
   carregarVideos();
   vtTick(); // cronômetro de vídeo que ficou rodando antes de recarregar a página
