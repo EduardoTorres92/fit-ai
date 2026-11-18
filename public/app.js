@@ -2983,7 +2983,7 @@
     const ini = xpPara(n), fim = n < NIVEL_MAX ? xpPara(n + 1) : ini;
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
-  const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios || 0) + (graduado() ? XP.formatura : 0);
+  const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0) + (graduado() ? XP.formatura : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -3214,7 +3214,7 @@
       G.grupos = data || [];
       if (!G.grupos.some((g) => g.id === G.sel)) G.sel = G.grupos[0]?.id || null;
       const meus = await sb.from("desafio_feitos").select("desafio_id").eq("usuario_id", uid);
-      if (!meus.error) G.meusDesafios = (meus.data || []).length;
+      if (!meus.error) { G.meusDesafios = (meus.data || []).length; if (S.desafiosN !== G.meusDesafios) { S.desafiosN = G.meusDesafios; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } }
       if (G.sel) await carregarGrupo(G.sel);
       else { G.desafios = []; G.feitos = []; }
       G.carregadoEm = Date.now(); G.erro = false;
@@ -3702,7 +3702,7 @@
     if (error) { toast("Não consegui salvar. Tente de novo."); return; }
     const primeiro = !G.feitos.some((f) => f.desafio_id === id);
     G.meusDesafios = (G.meusDesafios || 0) + 1;
-    await carregarGrupos(true); verificarConquistas();
+    await carregarGrupos(true); verificarConquistas(); setTimeout(() => conferirXp(), 2700); // +XP depois do aviso do desafio
     toast(primeiro ? "🏅 Conquista da semana garantida para o grupo!" : "Desafio cumprido! 🔥");
   }
 
@@ -3840,7 +3840,7 @@
   async function aoLogar(session) {
     const u = session.user, novo = uid !== u.id;
     // Outra conta neste aparelho: não mistura os treinos de uma pessoa com os da outra
-    if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; S.dono = false; S.graduadoMax30 = null; xpAntes = null; G.grupos = null; }
+    if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; S.dono = false; S.graduadoMax30 = null; S.desafiosN = 0; xpAntes = null; G.grupos = null; }
     S.contaId = u.id;
     uid = u.id;
     let perfil = null;
