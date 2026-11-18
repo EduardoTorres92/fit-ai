@@ -3703,7 +3703,7 @@
      O app manda ao servidor a agenda dos próximos 8 dias do programa principal e os dias já feitos; o servidor manda o
      treino do dia, lembra à noite e recebe "✅ Feito". O Feito tocado no Telegram volta para cá e vira o treino registrado.
      Fase de teste: o servidor só aceita a conta do dono. */
-  let tgInfo, tgUltimo = "", tgEspera = null;
+  let tgInfo, tgUltimo = "", tgEspera = null, tgCoachEm = 0;
   async function tgApi(acao, extra = {}) {
     const token = await tokenSB();
     if (!token) return null;
@@ -3759,9 +3759,15 @@
     const kHoje = keyOf(new Date());
     const corpo = { agenda, feitos, tz: -new Date().getTimezoneOffset(), nome: S.user?.primeiro || "", aguaHoje: soma((S.agua?.[kHoje] || []).map((x) => x.ml || 0)), aguaMeta: nutriMetas().agua };
     const assinatura = JSON.stringify(corpo);
-    if (!forcar && assinatura === tgUltimo) return;
+    const coachVelho = Date.now() - tgCoachEm > 10 * 60000;
+    if (!forcar && assinatura === tgUltimo && !coachVelho) return;
+    // Material do Coach AI no Telegram (programa e histórico), no máximo a cada 10 min
+    if (forcar || coachVelho) {
+      try { Object.assign(corpo, { coachProg: programaTexto(), coachCtx: contextoTexto(true), nutriProg: nutriBase(), nutriCtx: nutriContexto() }); } catch {}
+    }
     try {
       const r = await tgApi("agenda", corpo);
+      if (corpo.coachProg) tgCoachEm = Date.now();
       if (!r) return;
       tgUltimo = assinatura;
       if (r.ligado === false) { S.tg.ligado = false; save(); return; }

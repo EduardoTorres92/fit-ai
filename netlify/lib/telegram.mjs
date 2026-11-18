@@ -3,11 +3,15 @@
 // - O token vem de TELEGRAM_TOKEN ou é colado uma vez pelo dono no app (fica em DADOS_DIR/telegram/config.json).
 // - O app manda a agenda dos próximos dias (o servidor não conhece a lógica dos programas) e os dias já feitos.
 // - Um "Feito" tocado no Telegram fica em "marcar" até o app abrir e registrar o treino de verdade.
+// - Mensagem livre (texto ou foto) vai para o Coach AI (ou a Nutri AI, com /nutri), com o programa e o histórico que o app
+//   mandou e ferramentas para marcar o treino como feito e anotar água.
 // - iniciarTelegram() liga o webhook e roda o agendador a cada minuto (no server.mjs).
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import Anthropic from "@anthropic-ai/sdk";
+import { paramsCoach } from "../functions/coach.mjs";
 
 const PASTA = join(process.env.DADOS_DIR || join(homedir(), "fitai-dados"), "telegram");
 const ARQ = join(PASTA, "dados.json"), CFG = join(PASTA, "config.json");
@@ -51,7 +55,8 @@ export async function ligarWebhook() {
   await api("setWebhook", { url: `${SITE}/api/telegram`, secret_token: segredo(t), allowed_updates: ["message", "callback_query"], drop_pending_updates: false });
   await api("setMyCommands", { commands: [
     { command: "hoje", description: "Treino de hoje" }, { command: "amanha", description: "Treino de amanhã" },
-    { command: "semana", description: "Próximos 7 dias" }, { command: "parar", description: "Desligar os avisos" },
+    { command: "semana", description: "Próximos 7 dias" }, { command: "nutri", description: "Falar com a Nutri AI" },
+    { command: "coach", description: "Falar com o Coach AI" }, { command: "novo", description: "Começar conversa nova" }, { command: "parar", description: "Desligar os avisos" },
   ] }).catch(() => {});
   return true;
 }
@@ -126,6 +131,10 @@ export async function receberAgenda(email, c) {
   const antes = conta.aguaDia?.data === hojeK ? conta.aguaDia.ml : 0;
   if (ml > antes && conta.agua) conta.agua.ultimo = Date.now(); // bebeu pelo app: o próximo aviso conta a partir de agora
   conta.aguaDia = { data: hojeK, ml, meta: meta || conta.aguaDia?.meta || 0 };
+  if (typeof c.coachProg === "string") {
+    const t = (v, n) => String(v ?? "").slice(0, n);
+    conta.coach = { prog: t(c.coachProg, 40000), ctx: t(c.coachCtx, 40000), nutriProg: t(c.nutriProg, 40000), nutriCtx: t(c.nutriCtx, 20000), em: Date.now() };
+  }
   salvar();
   return { ok: true, ...(await estado(email)) };
 }
@@ -247,13 +256,24 @@ export async function processar(u, permitido) {
     d.contas[v.email] = { hora: 7 * 60, noite: 20 * 60, tz: -180, agenda: [], feitos: [], marcar: [], ...antiga, chat, desde: antiga.desde || Date.now() };
     salvar();
     const conta = d.contas[v.email];
-    await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nComandos: /hoje /amanha /semana /parar` });
+    await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nMe escreva ou mande foto quando quiser: quem responde é o Coach AI, com o seu programa e o seu histórico.\n\nComandos: /hoje /amanha /semana /nutri /novo /parar` });
     return;
   }
   if (!c) { await enviar(chat, { text: "Oi! Eu sou o bot do <b>FIT.AI</b>. Para receber seus treinos aqui, abra o perfil no app e toque em <b>Conectar Telegram</b>." }); return; }
   const cmd = (texto.match(/^\/(\w+)/) || [])[1]?.toLowerCase();
   const hojeK = diaLocal(c.tz ?? -180);
-  if (cmd === "hoje" || cmd === "start" || /^(treino|hoje)\b/i.test(texto)) await enviar(chat, mensagemDia(c, hojeK, { cabeca: `Treino de hoje · ${dataBR(hojeK)}` }));
+  if (cmd === "novo") { c.conversa = []; salvar(); await enviar(chat, { text: "Conversa nova 🧹 Pode mandar." }); return; }
+  if (cmd === "nutri" || cmd === "coach") {
+    c.papel = cmd; c.conversa = []; salvar();
+    await enviar(chat, { text: cmd === "nutri" ? "🥗 Agora quem responde é a <b>Nutri AI</b>. Mande sua dúvida ou a foto do prato. /coach volta para o treino." : "💪 Agora quem responde é o <b>Coach AI</b>. /nutri para falar de alimentação." });
+    return;
+  }
+  if (!cmd && (texto || msg.photo || msg.voice || msg.audio || msg.video_note) && !/^(hoje|treino)$/i.test(texto)) {
+    if (msg.voice || msg.audio || msg.video_note) { await enviar(chat, { text: "Ainda não entendo áudio 🙉 Manda por texto que eu respondo." }); return; }
+    naFila(chat, () => responderCoach(c, chat, msg));
+    return;
+  }
+  if (cmd === "hoje" || cmd === "start" || /^(treino|hoje)$/i.test(texto)) await enviar(chat, mensagemDia(c, hojeK, { cabeca: `Treino de hoje · ${dataBR(hojeK)}` }));
   else if (cmd === "amanha" || /^amanh/i.test(texto)) await enviar(chat, mensagemDia(c, somarDia(hojeK, 1), { cabeca: `Treino de amanhã · ${dataBR(somarDia(hojeK, 1))}`, botoes: false }));
   else if (cmd === "semana") {
     const linhas = [...Array(7)].map((_, i) => { const k = somarDia(hojeK, i), a = (c.agenda || []).find((x) => x.data === k);
@@ -261,7 +281,112 @@ export async function processar(u, permitido) {
       return `${ok ? "✅" : a?.descanso ? "😴" : "•"} <b>${dataBR(k)}</b> ${a ? esc(a.descanso ? "Descanso" : a.titulo) : "—"}`; });
     await enviar(chat, { text: `<b>Próximos 7 dias</b>\n${linhas.join("\n")}` });
   } else if (cmd === "parar") await desligar(email);
-  else await enviar(chat, { text: "Comandos: /hoje /amanha /semana /parar\nOs horários dos avisos mudam no perfil do FIT.AI." });
+  else await enviar(chat, { text: "Pode me escrever ou mandar foto que o <b>Coach AI</b> responde (/nutri para a Nutri AI).\nComandos: /hoje /amanha /semana /novo /parar\nOs horários dos avisos mudam no perfil do FIT.AI." });
+}
+
+
+/* ---------- Coach AI no Telegram ---------- */
+const filas = new Map(); // uma resposta por vez em cada chat
+function naFila(chat, fn) {
+  const p = (filas.get(chat) || Promise.resolve()).then(fn).catch((e) => console.error("telegram: coach", e?.status, e?.message));
+  filas.set(chat, p);
+  p.finally(() => { if (filas.get(chat) === p) filas.delete(chat); });
+}
+// Markdown simples do Coach (**negrito** e listas "- ") para o HTML do Telegram, em partes de até 4000 caracteres
+function paraTelegram(t) {
+  const h = esc(String(t || "").trim()).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/^(\s*)[-*] /gm, "$1• ").replace(/^#{1,4}\s*(.+)$/gm, "<b>$1</b>");
+  const partes = [];
+  let resto = h;
+  while (resto.length > 4000) { let i = resto.lastIndexOf("\n", 4000); if (i < 1000) i = 4000; partes.push(resto.slice(0, i)); resto = resto.slice(i).replace(/^\n+/, ""); }
+  if (resto) partes.push(resto);
+  return partes;
+}
+async function baixarFoto(fotos) {
+  const f = [...fotos].sort((a, b) => (b.file_size || 0) - (a.file_size || 0)).find((x) => !x.file_size || x.file_size <= 4_500_000);
+  if (!f) return null;
+  const info = await api("getFile", { file_id: f.file_id });
+  const r = await fetch(`https://api.telegram.org/file/bot${await token()}/${info.file_path}`);
+  if (!r.ok) return null;
+  const b = Buffer.from(await r.arrayBuffer());
+  return b.length <= 4_500_000 ? { type: "image", source: { type: "base64", media_type: /\.png$/i.test(info.file_path) ? "image/png" : "image/jpeg", data: b.toString("base64") } } : null;
+}
+const FERRAMENTAS = [
+  { name: "marcar_treino_feito", description: "Marca como concluído o treino do programa principal numa data, quando a pessoa disser que já fez o treino (hoje, se ela não disser o dia). O registro entra no histórico e na constância quando ela abrir o app. Não use para treino que ela só pretende fazer.",
+    input_schema: { type: "object", properties: { data: { type: "string", description: "Data no formato AAAA-MM-DD. Padrão: hoje." } } } },
+  { name: "anotar_agua", description: "Anota água que a pessoa disse que bebeu agora (em ml; um copo comum tem cerca de 250 ml, uma garrafinha 500 ml).",
+    input_schema: { type: "object", properties: { ml: { type: "integer", description: "Quantidade em ml, de 50 a 2000." } }, required: ["ml"] } },
+  { name: "ver_agenda", description: "Mostra os treinos dos próximos 7 dias do programa principal e quais dias já estão feitos.", input_schema: { type: "object", properties: {} } },
+];
+function usarFerramenta(c, nome, entrada) {
+  const tz = c.tz ?? -180, hojeK = diaLocal(tz);
+  if (nome === "marcar_treino_feito") {
+    const k = DATA.test(String(entrada?.data || "")) ? entrada.data : hojeK;
+    if (k > hojeK || k < somarDia(hojeK, -7)) return "Só dá para marcar treinos de hoje ou dos últimos 7 dias.";
+    const a = (c.agenda || []).find((x) => x.data === k);
+    if ((c.feitos || []).includes(k) || (c.marcar || []).includes(k)) return `O treino de ${dataBR(k)} já estava marcado como feito.`;
+    if (a?.descanso) return `${dataBR(k)} é dia de descanso no programa; não há treino para marcar.`;
+    (c.marcar = c.marcar || []).push(k); salvar();
+    return `Marcado: treino de ${dataBR(k)}${a ? ` (${a.titulo})` : ""} como feito. Entra na constância quando a pessoa abrir o app.`;
+  }
+  if (nome === "anotar_agua") {
+    const ml = Math.round(Number(entrada?.ml));
+    if (!(ml >= 50 && ml <= 2000)) return "Quantidade inválida (use de 50 a 2000 ml).";
+    (c.aguaPend = c.aguaPend || []).push({ id: randomBytes(6).toString("hex"), data: hojeK, ml, t: minStr(minLocal(tz)) });
+    if (c.agua) c.agua.ultimo = Date.now();
+    salvar();
+    return `Anotado: ${ml} ml. ${aguaProgresso(c)}`;
+  }
+  if (nome === "ver_agenda") return agendaTexto(c);
+  return "Ferramenta desconhecida.";
+}
+function agendaTexto(c) {
+  const hojeK = diaLocal(c.tz ?? -180);
+  return [...Array(7)].map((_, i) => { const k = somarDia(hojeK, i), a = (c.agenda || []).find((x) => x.data === k);
+    const ok = (c.feitos || []).includes(k) || (c.marcar || []).includes(k);
+    return `${k} (${dataBR(k)}): ${a ? (a.descanso ? "descanso" : `${a.prog} · ${a.titulo} — ${a.itens.join("; ")}`) : "sem dados"}${ok ? " [FEITO]" : ""}`; }).join("\n");
+}
+async function responderCoach(c, chat, msg) {
+  if (!process.env.ANTHROPIC_API_KEY) { await enviar(chat, { text: "O Coach está sem a chave da IA no servidor agora." }); return; }
+  const digitando = () => api("sendChatAction", { chat_id: chat, action: "typing" }).catch(() => {});
+  digitando();
+  const tm = setInterval(digitando, 4500);
+  try {
+    const texto = String(msg.text || msg.caption || "").slice(0, 4000);
+    const conteudo = [];
+    if (msg.photo) { const img = await baixarFoto(msg.photo).catch(() => null); if (img) conteudo.push(img); else { await enviar(chat, { text: "Não consegui abrir essa foto. Tenta mandar de novo?" }); return; } }
+    conteudo.push({ type: "text", text: texto || "(foto sem legenda)" });
+    const nutri = c.papel === "nutri", K = c.coach || {};
+    const tz = c.tz ?? -180, agora = new Date(Date.now() + tz * 60000);
+    const atualizado = K.em ? new Date(K.em + tz * 60000).toISOString().slice(0, 16).replace("T", " ") : null;
+    const extra = `\n\nCanal: você está respondendo pelo Telegram (bot do FIT.AI). Agora: ${dataBR(diaLocal(tz))} ${agora.toISOString().slice(11, 16)}.
+${atualizado ? `O contexto acima veio do app em ${atualizado}; o que a pessoa fez depois disso pode não aparecer.` : "A pessoa ainda não abriu o app depois de ligar o Coach no Telegram, então não há histórico detalhado: diga que, abrindo o app uma vez, você passa a ver o programa e o histórico."}
+Agenda dos próximos dias:\n${agendaTexto(c)}
+Água de hoje: ${aguaProgresso(c) || "nada anotado"}.
+Ferramentas: quando a pessoa disser que já treinou, use marcar_treino_feito; quando disser que bebeu água, use anotar_agua. Confirme em uma frase o que anotou.
+Escreva para o Telegram: frases curtas, **negrito** e listas com "- ". Sem tabelas e sem títulos.`;
+    const historico = [...(c.conversa || []).slice(-16), { role: "user", content: conteudo }];
+    while (historico.length && historico[0].role !== "user") historico.shift();
+    const params = paramsCoach("dono", { papel: nutri ? "nutri" : "coach", programa: nutri ? K.nutriProg : K.prog, contexto: `${(nutri ? K.nutriCtx : K.ctx) || ""}${extra}` }, historico);
+    params.tools = FERRAMENTAS;
+    const cliente = new Anthropic();
+    let resposta = "", msgs = historico;
+    for (let volta = 0; volta < 4; volta++) {
+      const r = await cliente.beta.messages.create({ ...params, messages: msgs, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
+      const txt = r.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      if (txt) resposta = resposta ? `${resposta}\n\n${txt}` : txt;
+      const usos = r.content.filter((b) => b.type === "tool_use");
+      if (r.stop_reason === "refusal") { resposta = "Não consigo responder isso. Tenta perguntar de outro jeito."; break; }
+      if (r.stop_reason !== "tool_use" || !usos.length) break;
+      msgs = [...msgs, { role: "assistant", content: r.content }, { role: "user", content: usos.map((u) => ({ type: "tool_result", tool_use_id: u.id, content: usarFerramenta(c, u.name, u.input) })) }];
+    }
+    if (!resposta) resposta = "Feito ✅";
+    c.conversa = [...(c.conversa || []), { role: "user", content: `${msg.photo ? "[foto] " : ""}${texto}`.trim() || "[foto]" }, { role: "assistant", content: resposta.slice(0, 4000) }].slice(-16);
+    salvar();
+    for (const parte of paraTelegram(resposta)) await enviar(chat, { text: parte });
+  } catch (e) {
+    console.error("telegram: coach falhou", e?.status, e?.message);
+    await enviar(chat, { text: e?.status === 429 ? "Muitas mensagens seguidas. Espera um minutinho 🙏" : "Falhei ao falar com o Coach agora. Tenta de novo?" }).catch(() => {});
+  } finally { clearInterval(tm); }
 }
 
 /* ---------- Agendador: treino do dia e lembrete da noite ---------- */
