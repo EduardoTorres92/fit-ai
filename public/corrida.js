@@ -1,0 +1,71 @@
+/* FIT.AI — catálogo do programa "Corrida e Híbrido" montado pelo Coach AI.
+   Sessões de corrida (medidas em minutos ou em tiros cronometrados) e exercícios de força e educativos próprios do corredor.
+   O Coach mistura estes itens com os da academia e da calistenia (o catálogo completo é montado no app e no servidor).
+   equip: corrida (registra minutos) | tiro (registra segundos de cada tiro) | corpo | halter.
+   Funciona no navegador (window.FITAI_CORRIDA) e no servidor (globalThis.FITAI_CORRIDA). */
+(function (g) {
+  const X = (id, nome, grupo, musculos, equip, med, exec, erros) => ({ id, nome, grupo, musculos, equip, med, yt: null, exec, erros });
+  g.FITAI_CORRIDA = [
+    // Corrida contínua (minutos)
+    X("run-caminhada-corrida", "Caminhada intercalada com corrida", "Corrida", "Cardio, pernas e adaptação das articulações", "corrida", "min",
+      "Alterne 1 a 2 min de trote leve com 1 a 2 min de caminhada rápida. Ritmo em que dá para conversar.", "Começar rápido demais e não conseguir manter as trocas."),
+    X("run-aquecimento", "Aquecimento: trote leve + mobilidade", "Corrida", "Cardio e mobilidade de quadril e tornozelo", "corrida", "min",
+      "5 a 10 min de trote bem leve, depois balanços de perna, rotação de quadril e tornozelo.", "Pular o aquecimento antes de tiros."),
+    X("run-regenerativo", "Corrida regenerativa (bem leve)", "Corrida", "Cardio aeróbico e recuperação", "corrida", "min",
+      "Bem devagar, dá para conversar com frases completas. Serve para recuperar entre treinos fortes.", "Acelerar e transformar em treino forte."),
+    X("run-rodagem", "Rodagem (corrida contínua moderada)", "Corrida", "Base aeróbica, pernas e coração", "corrida", "min",
+      "Ritmo confortável e constante, respirando pelo nariz e pela boca sem ofegar. Passada curta e leve.", "Correr todo dia nesse ritmo sem nenhum treino leve ou forte."),
+    X("run-longao", "Longão", "Corrida", "Resistência aeróbica e mental", "corrida", "min",
+      "A corrida mais longa da semana, em ritmo leve a moderado. Hidrate-se a cada 20 a 30 min se passar de 1 hora.", "Fazer o longão rápido ou aumentar mais de 10% por semana."),
+    X("run-progressivo", "Corrida progressiva", "Corrida", "Resistência e controle de ritmo", "corrida", "min",
+      "Comece leve e acelere um pouco a cada terço; termine no ritmo forte, ainda controlado.", "Começar já no ritmo forte."),
+    X("run-tempo", "Tempo run (ritmo forte sustentado)", "Corrida", "Limiar de lactato e ritmo de prova", "corrida", "min",
+      "Ritmo 'confortavelmente difícil': dá para falar só palavras soltas. Antes, 10 min de trote; depois, 5 a 10 min solto.", "Ir no máximo e quebrar na metade."),
+    X("run-fartlek", "Fartlek (variação livre de ritmo)", "Corrida", "Velocidade e resistência", "corrida", "min",
+      "Dentro da corrida, alterne trechos fortes (30 s a 2 min) com trechos leves, pelo tempo combinado.", "Fazer os trechos leves parados."),
+    X("run-esteira-inclinada", "Caminhada na esteira inclinada", "Corrida", "Glúteos, panturrilhas e cardio sem impacto", "corrida", "min",
+      "Inclinação de 8 a 12%, passo firme, sem se segurar no corrimão.", "Segurar no painel e tirar o peso das pernas."),
+    X("run-bike", "Bike ou elíptico (cardio sem impacto)", "Corrida", "Cardio e pernas sem impacto", "corrida", "min",
+      "Pedale em ritmo moderado, cadência alta (80 a 90 rpm). Ótimo para recuperar ou somar volume sem impacto.", "Carga pesada demais e cadência baixa."),
+    X("run-remo", "Remo ergômetro", "Corrida", "Cardio, costas, pernas e core", "corrida", "min",
+      "Empurre com as pernas, depois incline o tronco e puxe com os braços. Volte na ordem inversa.", "Puxar só com os braços e curvar a lombar."),
+    // Tiros (registra os segundos de cada tiro)
+    X("run-tiro-100", "Tiro de 100 m (velocidade)", "Corrida", "Velocidade e potência", "tiro", "s",
+      "Acelere progressivamente até ~90% nos primeiros 30 m e mantenha. Recupere caminhando.", "Sair a 100% sem aquecer."),
+    X("run-tiro-200", "Tiro de 200 m", "Corrida", "Velocidade e VO2máx", "tiro", "s",
+      "Forte e constante do início ao fim. Recuperação: trote ou caminhada do mesmo tempo ou o dobro.", "Fazer o primeiro muito mais rápido que os outros."),
+    X("run-tiro-400", "Tiro de 400 m", "Corrida", "VO2máx e ritmo de 5 km", "tiro", "s",
+      "Ritmo de 5 km ou um pouco mais rápido. Recupere 1 a 2 min trotando.", "Variar muito o tempo entre os tiros."),
+    X("run-tiro-800", "Tiro de 800 m", "Corrida", "VO2máx e resistência de velocidade", "tiro", "s",
+      "Ritmo entre 5 e 10 km. Recupere 2 min trotando.", "Começar forte e terminar se arrastando."),
+    X("run-tiro-1000", "Tiro de 1 km", "Corrida", "Limiar e ritmo de 10 km", "tiro", "s",
+      "Ritmo de prova de 10 km. Recupere 2 a 3 min trotando.", "Recuperação parada que esfria demais."),
+    X("run-subida", "Tiros em subida", "Corrida", "Força de pernas, glúteos e potência", "tiro", "s",
+      "Suba forte por 30 a 60 s, tronco levemente à frente e braços ativos. Desça caminhando ou trotando.", "Olhar para o chão e encurtar demais a passada."),
+    X("run-teste-5k", "Teste de 5 km", "Corrida", "Avaliação do ritmo", "tiro", "s",
+      "Depois de aquecer, corra 5 km no seu melhor ritmo sustentável e anote o tempo total em segundos.", "Sair rápido demais no primeiro km."),
+    // Educativos e força do corredor
+    X("run-educativos", "Educativos de corrida", "Técnica", "Coordenação, panturrilhas e flexores do quadril", "corrida", "min",
+      "Skipping baixo e alto, anfersen (calcanhar no glúteo), dribbling e passada saltada, 20 a 30 m cada.", "Fazer correndo, sem caprichar na técnica."),
+    X("run-strides", "Acelerações (strides)", "Técnica", "Mecânica de corrida e velocidade", "tiro", "s",
+      "60 a 100 m acelerando até ~85% com passada solta e relaxada. Volte caminhando.", "Travar ombros e mandíbula."),
+    X("run-panturrilha-excentrica", "Panturrilha excêntrica no degrau", "Força do corredor", "Panturrilhas e tendão de Aquiles", "corpo", "reps",
+      "Suba com as duas pernas e desça devagar (3 s) com uma só, até abaixo da linha do degrau.", "Descer rápido e quicar."),
+    X("run-elevacao-pelvica-unilateral", "Elevação pélvica unilateral", "Força do corredor", "Glúteos e posterior de coxa", "corpo", "reps",
+      "Deitado, um pé no chão e a outra perna estendida; suba o quadril contraindo o glúteo, sem girar a pelve.", "Deixar o quadril cair para um lado."),
+    X("run-stiff-unilateral", "Stiff unilateral (equilíbrio)", "Força do corredor", "Posterior de coxa, glúteo e estabilidade do tornozelo", "corpo", "reps",
+      "Em uma perna, incline o tronco à frente levando a outra perna para trás, coluna neutra, e volte. Pode segurar um peso.", "Arredondar as costas e girar o quadril."),
+    X("run-saltos-pliometricos", "Saltos pliométricos (pogo jumps)", "Força do corredor", "Panturrilhas, tendões e reatividade", "corpo", "s",
+      "Saltinhos rápidos na ponta dos pés, joelhos quase estendidos, mínimo tempo no chão.", "Aterrissar no calcanhar."),
+    X("run-prancha-lateral-abducao", "Prancha lateral com abdução de perna", "Força do corredor", "Glúteo médio, oblíquos e estabilidade do quadril", "corpo", "reps",
+      "Em prancha lateral, eleve a perna de cima e desça devagar.", "Deixar o quadril cair."),
+    X("run-wall-ball", "Wall ball (arremesso na parede)", "Híbrido", "Pernas, ombros e cardio", "halter", "reps",
+      "Agache com a bola no peito e, na subida, arremesse num alvo a ~3 m. Receba já descendo para o próximo.", "Arremessar só com os braços."),
+    X("run-farmer-walk", "Farmer walk (caminhada com carga)", "Híbrido", "Pegada, core, trapézio e pernas", "halter", "s",
+      "Halteres ou kettlebells pesados ao lado do corpo, tronco ereto, passos curtos e firmes.", "Inclinar o tronco ou encolher os ombros."),
+    X("run-burpee-salto-frente", "Burpee com salto à frente", "Híbrido", "Corpo inteiro e cardio", "corpo", "reps",
+      "Burpee completo e, em vez de saltar para cima, salte à frente. Repita em sequência.", "Deixar a lombar cair na prancha."),
+    X("run-afundo-caminhando", "Afundo caminhando (com ou sem carga)", "Híbrido", "Quadríceps, glúteos e equilíbrio", "halter", "reps",
+      "Passos longos alternando as pernas, joelho de trás quase tocando o chão, tronco ereto.", "Joelho da frente para dentro."),
+  ];
+})(typeof window !== "undefined" ? window : globalThis);

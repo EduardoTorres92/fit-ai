@@ -1,5 +1,5 @@
 // Programas montados pelo Coach AI: Hipertrofia (academia) e Calistenia 21 dias.
-// POST /api/hiper  { programa: "hiper" | "c21", acao: "plano" | "revisao", perfil, plano?, historico?, checkins?, feedback? }
+// POST /api/hiper  { programa: "hiper" | "c21" | "run", acao: "plano" | "revisao", perfil, plano?, historico?, checkins?, feedback? }
 // Resposta: { mensagem, plano }. O plano usa só exercícios do catálogo do programa (public/academia.js ou
 // public/calistenia21.js) e é conferido aqui antes de voltar para o app.
 // Gerar ou revisar um plano conta como 3 perguntas do limite diário do Coach (é uma chamada maior).
@@ -11,6 +11,7 @@ import { REFERENCIA, LEGENDA } from "../lib/ref-calistenia21.mjs";
 import { ROTEIRO_FORTALECIMENTO, CALENDARIO_CALISTENICO } from "../lib/ref-calistenia-base.mjs";
 import "../../public/academia.js";
 import "../../public/calistenia21.js";
+import "../../public/corrida.js";
 
 const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -24,7 +25,31 @@ const COMUM = `- Use SOMENTE exercícios do catálogo, pelo id exato.
 - Você não é médico nem nutricionista; alimentação só em linhas gerais.
 - Responda SEMPRE chamando a ferramenta salvar_plano (nunca só com texto). A mensagem é curta (3 a 6 frases), em português do Brasil, tom de personal trainer parceiro.`;
 
+// Corrida e Híbrido: corrida + força do corredor + calistenia + academia (sem ids repetidos; a calistenia vem antes da academia)
+const RUN_CAT = (() => {
+  const run = globalThis.FITAI_CORRIDA || [], cal = globalThis.FITAI_CAL21 || [], ac = globalThis.FITAI_ACADEMIA || [];
+  const ids = new Set([...run, ...cal].map((e) => e.id));
+  return [...run, ...cal, ...ac.filter((e) => !ids.has(e.id))];
+})();
+
 const PROGRAMAS = {
+  run: {
+    cat: RUN_CAT, semanas: 0, maxEx: 10,
+    sistema: `Você é o Coach AI do FIT.AI e monta treinos de CORRIDA e TREINO HÍBRIDO (corrida + força) como um treinador de corrida experiente.
+Regras:
+- O plano é SEMANAL (repete toda semana, o Coach revisa toda semana): um item em "dias" por dia de treino, sem o campo semana.
+- Sessões de corrida (grupo "Corrida", equipamento "corrida") usam reps em minutos, ex.: "30 min", e series = 1. Tiros (equipamento "tiro") usam series = número de tiros e reps = distância ou tempo do tiro, ex.: series 6, reps "400 m"; o descanso é a recuperação entre tiros, em segundos. Comece os dias de tiro ou tempo run com run-aquecimento e, se couber, run-educativos ou run-strides.
+- Distribuição da semana (80/20): a maior parte da corrida em ritmo leve (rodagem, regenerativo, longão) e no máximo 1 a 2 sessões fortes (tiros, tempo run, fartlek, subida). Longão 1x por semana a partir de quem já corre 5 km. Nunca dois dias fortes seguidos.
+- Iniciante ou voltando: comece com run-caminhada-corrida e progrida o tempo correndo; sem tiros nas primeiras semanas.
+- Objetivo de prova (5 km, 10 km, meia): monte a semana para a distância; meia maratona pede longão progressivo.
+- Híbrido (correr e ganhar força) e HYROX: 2 a 3 sessões de corrida + 2 a 3 de força; pode MISTURAR estilos no mesmo dia (ex.: rodagem curta + força de pernas, ou circuito híbrido com run-farmer-walk, run-wall-ball, run-afundo-caminhando, run-burpee-salto-frente e corrida). Coloque força de pernas longe do dia de tiros e do longão.
+- Força: siga onde a pessoa treina. Academia → exercícios de barra, halter, máquina e polia; em casa com halteres → halter e corpo; só peso do corpo ou barra fixa → exercícios da calistenia (corpo, barra). "Só quero correr" → apenas força do corredor (run-panturrilha-excentrica, run-elevacao-pelvica-unilateral, run-stiff-unilateral, run-prancha-lateral-abducao, run-saltos-pliometricos, prancha) 1 a 2x por semana, no fim de uma corrida leve.
+- Força do corredor sempre presente pelo menos 1x por semana (panturrilha e glúteo previnem lesão).
+- O tempo total de cada dia cabe no tempo que a pessoa tem.
+- Use o ritmo informado (pace) para orientar na observação (obs) os ritmos de cada sessão (ex.: "rodagem a 6:30–7:00/km", "tiros a 5:20/km"). Sem ritmo informado, oriente pela conversa (dá para conversar = leve; só palavras soltas = forte).
+- Dores em joelho, canela ou tornozelo: reduza o volume e o impacto (troque parte da corrida por run-bike, run-remo ou run-esteira-inclinada) e diga isso na mensagem.
+${COMUM}`,
+  },
   hiper: {
     cat: globalThis.FITAI_ACADEMIA || [], semanas: 0, maxEx: 10,
     sistema: `Você é o Coach AI do FIT.AI e monta treinos de musculação (academia) como um personal trainer experiente.
@@ -106,8 +131,8 @@ const FERRAMENTA = {
                     type: "object",
                     properties: {
                       id: { type: "string" },
-                      series: { type: "integer", minimum: 1, maximum: 6 },
-                      reps: { type: "string", description: "Ex.: '8-12', '15', 'máx', '30 s' ou '20 min' (cardio)" },
+                      series: { type: "integer", minimum: 1, maximum: 12, description: "Séries (até 6) ou número de tiros (até 12)" },
+                      reps: { type: "string", description: "Ex.: '8-12', '15', 'máx', '30 s', '20 min' (cardio e corrida) ou '400 m' (tiro)" },
                       descanso: { type: "integer", description: "Descanso em segundos" },
                       obs: { type: "string", description: "Observação curta opcional" },
                     },
@@ -140,7 +165,7 @@ function limparPlano(p, P) {
     const circuito = P.semanas && d.circuito !== false && d.rodadas != null; // no 21 dias, dias de força/habilidade vêm sem voltas
     const rodadas = circuito ? num(d.rodadas, 1, 6, 3) : null;
     const ex = (Array.isArray(d.exercicios) ? d.exercicios : []).filter((e) => P.ci[e?.id]).slice(0, P.maxEx).map((e) => ({
-      id: e.id, series: num(rodadas || e.series, 1, 6, 3), reps: txt(e.reps, 20) || "10", descanso: num(e.descanso, 0, circuito ? 60 : 300, circuito ? 15 : 90),
+      id: e.id, series: num(rodadas || e.series, 1, P.ci[e.id].equip === "tiro" ? 12 : 6, 3), reps: txt(e.reps, 20) || "10", descanso: num(e.descanso, 0, circuito ? 60 : 300, circuito ? 15 : 90),
       ...(txt(e.obs, 160) ? { obs: txt(e.obs, 160) } : {}),
     }));
     if (!ex.length) return null;
@@ -153,7 +178,7 @@ function limparPlano(p, P) {
     cardio: txt(p.cardio, 300), alimentacao: txt(p.alimentacao, 300), ...(P.semanas ? { semanas: P.semanas } : {}), dias };
 }
 
-const ROTULOS = { objetivo: "Objetivo", experiencia: "Experiência", nivel: "Nível", equipamento: "Equipamento", dias: "Dias por semana", diasSemana: "Dias preferidos",
+const ROTULOS = { pace: "Ritmo/tempo em 5 km", forca: "Onde treina força", objetivo: "Objetivo", experiencia: "Experiência", nivel: "Nível", equipamento: "Equipamento", dias: "Dias por semana", diasSemana: "Dias preferidos",
   tempo: "Tempo por treino", local: "Onde treina", foco: "Prioridade", sexo: "Sexo", idade: "Idade", peso: "Peso (kg)", altura: "Altura (cm)", limitacoes: "Limitações/dores", extra: "Outras informações", etapa: "Etapa da trilha" };
 const linhaPerfil = (p = {}) => Object.entries(ROTULOS).filter(([k]) => p[k] !== undefined && p[k] !== "").map(([k, r]) =>
   `${r}: ${k === "diasSemana" ? (Array.isArray(p[k]) && p[k].length ? p[k].map((d) => DIAS[d] || "").join(", ") : "sem preferência") : txt(p[k], 400)}`).join("\n");

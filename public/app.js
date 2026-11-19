@@ -152,16 +152,18 @@
   const VKEYS = VPROGS.map((p) => p.k);
   const vazioVP = () => ({ inicio: null, logs: {} });
   const vazioIA = () => ({ perfil: {}, etapa: 0, plano: null, inicio: null, logs: {}, checkins: [], msgs: [] });
-  const IA_KEYS = ["hiper", "c21"]; // programas montados pelo Coach AI (o motor fica mais abaixo)
+  const IA_KEYS = ["hiper", "c21", "run"]; // programas montados pelo Coach AI (o motor fica mais abaixo)
   // Catálogo em ordem de nível: o caminho natural é do primeiro ao último (MAX:30 → Insanity → calistenia)
   // Hipertrofia (academia) é um programa à parte: entra no catálogo (dá para escolher como principal), mas não no caminho de níveis
   const HIPER = { k: "hiper", nome: "Hipertrofia", curto: "Hipertrofia", nivel: "Academia", ordem: 99, extra: true,
     sobre: "Musculação na academia: o Coach AI faz uma entrevista (objetivo, dias, experiência, peso) e monta o treino semanal, com registro de carga e repetições, vídeo de execução em cada exercício e revisão semanal do plano." };
   const C21 = { k: "c21", nome: "Calistenia 21 dias", curto: "21 dias", nivel: "Montado pelo Coach", ordem: 98, extra: true,
     sobre: "Calistenia de resistência em 3 semanas, montada pelo Coach AI no seu nível a partir dos treinos do treinador: circuitos com peso do corpo ou barra fixa, contador de voltas e cronômetro." };
+  const RUNP = { k: "run", nome: "Corrida e Híbrido", curto: "Corrida", nivel: "Montado pelo Coach", ordem: 96, extra: true,
+    sobre: "Corrida do primeiro trote à meia maratona, ou treino híbrido: o Coach AI mistura corrida (rodagem, tiros, longão) com força na academia ou com o peso do corpo, no seu nível e nos seus dias." };
   const CF = { k: "cf", nome: "CrossFit", curto: "CrossFit", nivel: "Box ou garagem", ordem: 97, extra: true,
     sobre: "O WOD do dia do seu box: tire uma foto do quadro e a IA lança o treino (blocos, formato, movimentos e cargas); cronômetro de For Time, AMRAP, EMOM e Tabata, resultado RX/Scaled e recordes nos WODs repetidos. Sem box, o Coach monta um WOD." };
-  const CATALOGO = [...VPROGS, CALI, ...(window.FITAI_CAL21 ? [C21] : []), ...(window.FITAI_ACADEMIA ? [HIPER] : []), CF].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
+  const CATALOGO = [...VPROGS, CALI, ...(window.FITAI_CAL21 ? [C21] : []), ...(window.FITAI_ACADEMIA ? [HIPER] : []), ...(window.FITAI_CORRIDA ? [RUNP] : []), CF].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
   const TRILHA = CATALOGO.filter((x) => !x.extra); // caminho natural de níveis
   const progDe = (k) => CATALOGO.find((x) => x.k === k) || null;
   const NIVEIS = [
@@ -899,6 +901,32 @@
       { k: "extra", q: "Quer me contar mais alguma coisa? Se não, é só tocar no botão.", op: ["Não, pode montar!"], livre: true },
     ],
   };
+  // Corrida e Híbrido: sessões de corrida + força do corredor + academia e calistenia (o Coach mistura os estilos)
+  const RUNC = window.FITAI_CORRIDA || [];
+  if (RUNC.length) {
+    const ids = new Set([...RUNC, ...CAL21].map((e) => e.id));
+    IA.run = {
+      k: "run", nome: "Corrida e Híbrido", rotulo: "Corrida", cat: [...RUNC, ...CAL21, ...ACAD.filter((e) => !ids.has(e.id))], banner: "cards/cardio-1.jpg", semanas: 0, carga: true,
+      cargaEx: (c) => ["barra", "halter", "maquina", "polia"].includes(c?.equip),
+      convite: "Corrida ou treino híbrido feito para você", resumoConvite: "O Coach AI faz {n} perguntas (nível, objetivo, prova, dias, onde treina força…) e monta a sua semana misturando corrida (rodagem, tiros, longão) com força na academia ou com o peso do corpo. Você anota os minutos de cada corrida e o tempo de cada tiro, e manda o print do Strava ou do relógio para virar XP.",
+      intro: "Bora montar sua corrida", oQue: "sua semana de corrida e força, no seu nível",
+      passos: [
+        { k: "nivel", q: "Como está a sua corrida hoje?", op: ["Nunca corri ou estou voltando", "Corro até 5 km", "Corro 10 km", "Já fiz meia maratona ou mais"] },
+        { k: "objetivo", q: "Qual é o seu objetivo?", op: ["Começar a correr", "Completar 5 km", "Completar 10 km", "Meia maratona (21 km)", "Melhorar o meu tempo", "Híbrido: correr e ganhar força", "Prova híbrida (HYROX)", "Perder gordura"] },
+        { k: "pace", q: "Sabe o seu tempo em 5 km ou o seu ritmo médio? Escreva abaixo (ex.: 30 min, 6:00/km).", op: ["Não sei"], livre: true },
+        { k: "forca", q: "E a força, onde você treina?", op: ["Academia", "Em casa com halteres", "Só peso do corpo", "Barra fixa e peso do corpo", "Só quero correr"] },
+        { k: "dias", q: "Quantos dias por semana você consegue treinar (corrida + força)?", op: ["3", "4", "5", "6"], fmt: (v) => `${v} dias por semana` },
+        { k: "diasSemana", q: "Quais dias ficam melhores?", multi: true },
+        { k: "tempo", q: "Quanto tempo você tem por treino?", op: ["30 min", "45 min", "1 hora", "1h30"] },
+        { k: "sexo", q: "Para calibrar volume e ritmo: qual o seu sexo?", op: ["Masculino", "Feminino", "Prefiro não dizer"] },
+        { k: "idade", q: "Qual a sua idade?", num: [14, 99], un: "anos", perfil: "idade" },
+        { k: "peso", q: "Qual o seu peso hoje, em kg?", num: [30, 300], un: "kg", perfil: "peso" },
+        { k: "altura", q: "E a sua altura, em cm?", num: [120, 230], un: "cm", perfil: "altura" },
+        { k: "limitacoes", q: "Tem alguma dor ou lesão (joelho, canela, tornozelo, lombar…)? Se tiver, escreva no campo abaixo.", op: ["Nenhuma"], livre: true },
+        { k: "extra", q: "Tem alguma prova marcada ou quer me contar mais alguma coisa? Se não, é só tocar no botão.", op: ["Não, pode montar!"], livre: true },
+      ],
+    };
+  }
   const IAK = Object.keys(IA);
   for (const I of Object.values(IA)) I.ci = Object.fromEntries(I.cat.map((e) => [e.id, e]));
   const exDe = (pk, id) => IA[pk]?.ci[id] || null;
@@ -909,9 +937,12 @@
   const ANIM_CAL = "polichinelo skipping pe-na-bunda false-rope deslocamento-lateral mountain-climbers burpee agachamento agachamento-salto agachamento-isometrico afundo-elevacao afundo-saltando passada-lateral agachamento-reverencia agachamento-chute salto-frontal pistol-suporte ponte flexao-joelhos flexao-inclinada flexao-declinada flexao-explosiva flexao-diamante flexao-pike flexao-pike-elevada flexao-handstand extensao-triceps-barra dip-coreana-iso caminhada-pike barra-supinada escapula-barra superman-hold isometria-topo-barra barra-assistida prancha prancha-lateral prancha-alcance prancha-joelho-cotovelo prancha-rotacao prancha-toque-ombro prancha-elevacao-perna prancha-alta-baixa prancha-alta-baixa-flexao side-crunch chair-crunch sit-up canivete toe-touches bike leg-raises leg-flutters canoa-hold flexao-hold afundo-explosivo".split(" ");
   const ANIM = {
     hiper: Object.fromEntries(ANIM_HIPER.map((id) => [id, id])),
-    c21: { ...Object.fromEntries(ANIM_CAL.map((id) => [id, `cal-${id}`])), "agachamento-sumo": "agachamento-sumo", afundo: "afundo-peso-corpo", "step-up": "step-up", panturrilha: "panturrilha-cal", "panturrilha-unilateral": "panturrilha-cal",
+    c21: null,
+    _c21: { ...Object.fromEntries(ANIM_CAL.map((id) => [id, `cal-${id}`])), "agachamento-sumo": "agachamento-sumo", afundo: "afundo-peso-corpo", "step-up": "step-up", panturrilha: "panturrilha-cal", "panturrilha-unilateral": "panturrilha-cal",
       flexao: "flexao", barra: "barra-fixa", "barra-australiana": "barra-australiana", dips: "paralelas", "triceps-banco": "triceps-banco", crunch: "abdominal-supra" },
   };
+  ANIM.c21 = ANIM._c21; delete ANIM._c21;
+  ANIM.run = { ...ANIM.hiper, ...ANIM.c21 }; // no Corrida e Híbrido, a calistenia tem prioridade nos ids repetidos (o catálogo também)
   const animDe = (pk, id) => ANIM[pk]?.[id] || null;
   const fmtKg = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
   const faixa = (r) => { const n = String(r).match(/\d+/g) || []; const a = +n[0] || 0; return [a, +(n[1] || a)]; };
@@ -919,14 +950,18 @@
   // Como a série é medida: "min" (cardio), "s" (tempo) ou "reps"
   function unDe(pk, ex) {
     const c = exDe(pk, ex.id);
-    if (c?.equip === "cardio") return "min";
+    if (c?.equip === "cardio" || c?.equip === "corrida") return "min";
+    if (c?.equip === "tiro") return "s";
     if (/\d\s*s\b|seg/i.test(ex.reps) || (ehMax(ex.reps) && c?.med === "s")) return "s";
     return "reps";
   }
   const fmtSet = (s, un) => (un === "min" ? `${s.r} min` : un === "s" ? `${s.kg ? `${fmtKg(s.kg)}kg · ` : ""}${s.r}s` : s.kg ? `${fmtKg(s.kg)}kg×${s.r}` : `${s.r} reps`);
   const fmtDesc = (s) => (s >= 60 ? `${Math.floor(s / 60)}${s % 60 ? `:${pad(s % 60)}` : ""} min` : `${s}s`);
   const maxKg = (sets) => Math.max(0, ...sets.map((s) => s.kg || 0));
+  // Duração de um tiro: "400 m" (≈ 3,5 m/s), "1 km", "45 s" ou "2 min"
+  const segTiro = (r) => { const t = String(r).toLowerCase(), [a] = faixa(t); return /km/.test(t) ? a * 290 : /min/.test(t) ? a * 60 : /\d\s*m\b/.test(t) ? Math.round(a / 3.5) : a || 30; };
   const minSess = (pk, t) => Math.round(soma(t.exercicios.map((e) => { const u = unDe(pk, e), [a] = faixa(e.reps);
+    if (exDe(pk, e.id)?.equip === "tiro") return e.series * (segTiro(e.reps) + (e.descanso ?? 90));
     return u === "min" ? (a || 10) * 60 : e.series * ((u === "s" ? a || 30 : 40) + (e.descanso ?? 60)); })) / 60 + (t.rodadas ? ((t.rodadas - 1) * (t.descansoRodada || 60)) / 60 : 0));
   const gruposDe = (pk, t) => [...new Set(t.exercicios.map((e) => exDe(pk, e.id)?.grupo).filter((g) => g && g !== "Cardio"))];
 
@@ -983,7 +1018,8 @@
     return { kg, txt: `Mantenha ${fmtKg(kg)} kg e busque ${mx} reps em todas as séries.` };
   }
   const iaSessFeita = (pk, t) => Object.entries(S[pk].logs).some(([k, l]) => l.done && l.d === t.dia && (t.semana != null ? (l.w ?? 0) === t.semana : k >= keyOf(mondayOf(hoje))));
-  const IA_IMG = { // [academia, calistenia]
+  const IA_IMG = { // [academia, calistenia/corrida]
+    corrida: [/corr|run\b|tiro|long[aã]o|rodagem|fartlek|\d\s?km|h[ií]brid|hyrox/i, ["cardio-1", "cardio-2"], ["cardio-2", "cardio-1"]],
     costas: [/costa|puxar|pull|barra|remada/i, ["academia-costas"], ["calistenia-barra"]], pernas: [/perna|inferior|gl[uú]te|lower|leg|agach/i, ["academia-pernas"], ["forca-1", "potencia-1"]],
     core: [/abd|core/i, ["core-1", "core-2"], ["core-2", "core-1"]], bracos: [/bra[çc]|b[ií]ceps|tr[ií]ceps/i, ["academia-bracos"], ["calistenia-paralelas"]],
     peito: [/peito|ombro|superior|push|upper|empurr|flex/i, ["academia-peito"], ["calistenia-paralelas"]], cardio: [/cardio|corpo|full|circuito|hiit/i, ["cross-1", "cardio-1"], ["potencia-2", "cardio-2"]] };
@@ -1118,6 +1154,8 @@
       : "Adaptação (primeiras 4 semanas da trilha Academia): técnica, cargas moderadas, longe da falha (2–3 reps de reserva), volume moderado.";
     if (pk === "c21" && formaturas().c21) return "Novo ciclo (já concluiu um ciclo de 21 dias): aumente a dificuldade em relação ao ciclo anterior.";
     if (pk === "c21") return "Primeiro ciclo da trilha Calistenia: o último treino do plano deve ser um teste máximo (máximo de repetições nos exercícios principais).";
+    if (pk === "run" && formaturas()["base-corrida"]) return "Performance (já concluiu as 4 semanas de base): pode incluir tiros e tempo run com mais volume, e periodizar para a prova se houver.";
+    if (pk === "run") return "Base de corrida (primeiras 4 semanas da trilha Corrida): volume leve e progressivo (no máximo +10% por semana), quase tudo em ritmo confortável, força do corredor 1 a 2x por semana. No fim da 4ª semana, um treino-teste (ex.: teste de 5 km ou o maior tempo contínuo).";
     return "";
   }
   const iaPerfil = (pk) => ({ ...S[pk].perfil, ...(etapaPerfil(pk) ? { etapa: etapaPerfil(pk) } : {}), idade: S[pk].perfil.idade || S.perfil.idade, peso: S.perfil.peso || S[pk].perfil.peso, altura: S[pk].perfil.altura || S.perfil.altura });
@@ -1273,14 +1311,14 @@
 
   /* ---------- Dia de treino ---------- */
   function iaExCard(pk, ex, editavel, sess) {
-    const c = exDe(pk, ex.id) || { nome: ex.id, musculos: "", exec: "", erros: "" }, un = unDe(pk, ex), carga = IA[pk].carga && un !== "min";
+    const c = exDe(pk, ex.id) || { nome: ex.id, musculos: "", exec: "", erros: "" }, un = unDe(pk, ex), carga = un !== "min" && (IA[pk].cargaEx ? IA[pk].cargaEx(c) : IA[pk].carga);
     const sets = editavel ? (iaLogHoje(pk)?.sets?.[ex.id] || []) : [];
     const prev = iaAnterior(pk, ex.id), meta = iaMeta(pk, ex), ult = sets[sets.length - 1];
     const kgSug = ult ? ult.kg || "" : meta?.kg ?? (prev ? maxKg(prev.sets) || "" : "");
     const [a, b] = faixa(ex.reps);
     const rSug = ult ? ult.r : un === "min" ? a || 10 : b || (ehMax(ex.reps) ? iaRecorde(pk, ex.id) || "" : 10);
     const q = encodeURIComponent(`${c.nome} execução correta`), feitoTudo = sets.length >= ex.series;
-    const nome = sess?.rodadas ? "Volta" : "Série";
+    const nome = sess?.rodadas ? "Volta" : c.equip === "tiro" ? "Tiro" : "Série", plural = { Volta: "voltas", Tiro: "tiros", "Série": "séries" }[nome];
     return `<div class="ex hx${feitoTudo ? " done" : ""}" data-hx-ex="${ex.id}" data-pk="${pk}">
       <div class="ex-top"><span class="ex-name"><span class="ex-check">${check}</span>${esc(c.nome)}</span>
         <button class="ask" data-ia-ask="${ex.id}" data-pk="${pk}" aria-label="Perguntar ao Coach AI sobre ${esc(c.nome)}">${icon("circle-question.svg", 20)}</button></div>
@@ -1296,16 +1334,16 @@
       ${c.exec ? `<details class="musc hx-como"><summary><span>📋 Como fazer</span></summary>
         <div class="hx-dica"><p><b>Execução:</b> ${esc(c.exec)}</p><p><b>Evite:</b> ${esc(c.erros)}</p></div></details>` : ""}
       ${editavel ? `
-      <div class="ia-contador${feitoTudo ? " ok" : ""}">${feitoTudo ? `✓ ${ex.series} ${nome === "Volta" ? "voltas" : "séries"} feitas` : `${nome} <b>${sets.length + 1}</b> de ${ex.series}`}</div>
+      <div class="ia-contador${feitoTudo ? " ok" : ""}">${feitoTudo ? `✓ ${ex.series} ${plural} feit${nome === "Tiro" ? "os" : "as"}` : `${nome} <b>${sets.length + 1}</b> de ${ex.series}`}</div>
       ${iaTimerHtml(pk, ex, un, editavel)}
       <div class="sets">
         ${sets.map((s, i) => `<button class="set" data-ia-del="${i}" title="Toque para remover" aria-label="${nome} ${i + 1}: ${esc(fmtSet(s, un))}. Toque para remover">${esc(fmtSet(s, un))}</button>`).join("")}
         <form class="add-set hx-add" data-ia-add="${ex.id}" data-pk="${pk}">
           ${carga ? `<input name="kg" type="number" inputmode="decimal" step="0.5" min="0" max="999" value="${kgSug}" placeholder="kg" aria-label="Carga em kg (deixe vazio se for sem peso)"><span class="hx-x">${un === "s" ? "kg ·" : "×"}</span>` : ""}
-          <input name="r" type="number" inputmode="numeric" min="1" max="999" value="${rSug}" placeholder="${un === "s" ? "seg" : "reps"}" aria-label="${un === "reps" ? "Repetições" : un === "s" ? "Segundos" : "Minutos"}">
+          <input name="r" type="number" inputmode="numeric" min="1" max="999" value="${rSug}" placeholder="${un === "s" ? "seg" : un === "min" ? "min" : "reps"}" aria-label="${un === "reps" ? "Repetições" : un === "s" ? "Segundos" : "Minutos"}">
           ${un === "s" ? `<span class="hx-x">s</span>` : ""}
           <button type="submit" class="btn btn-blue">${un === "min" ? "+ min" : `+ ${nome}`}</button></form></div>
-      <div class="progress"><div class="bar"><i style="width:${Math.min(100, Math.round((sets.length / ex.series) * 100))}%"></i></div><span>${sets.length}/${ex.series} ${nome === "Volta" ? "voltas" : "séries"}</span></div>` : ""}
+      <div class="progress"><div class="bar"><i style="width:${Math.min(100, Math.round((sets.length / ex.series) * 100))}%"></i></div><span>${sets.length}/${ex.series} ${plural}</span></div>` : ""}
     </div>`;
   }
   function telaIaDia(pk, d, w) {
@@ -1361,7 +1399,7 @@
   }
   function iaProgramaTexto(pk) {
     const I = IA[pk], St = S[pk], pl = St.plano;
-    if (!pl) return `# Programa extra: ${I.nome}\n${I.convite}. A pessoa ainda não montou o plano: para começar, toque no botão do Coach e escolha ${pk === "hiper" ? "Hipertrofia" : "Calistenia → Calistenia 21 dias"}.`;
+    if (!pl) return `# Programa extra: ${I.nome}\n${I.convite}. A pessoa ainda não montou o plano: para começar, toque no botão do Coach e escolha ${pk === "hiper" ? "Hipertrofia" : pk === "run" ? "Corrida" : "Calistenia → Calistenia 21 dias"}.`;
     return [`# Programa extra: ${I.nome} — plano "${pl.nome}" (${pl.divisao}), montado pelo Coach AI${I.semanas ? `; começou em ${St.inicio}, 3 semanas` : ""}`, pl.resumo, `Progressão: ${pl.progressao}`, pl.cardio && `Cardio: ${pl.cardio}`, pl.alimentacao && `Alimentação: ${pl.alimentacao}`,
       ...pl.dias.map((t) => `## ${t.semana != null ? `Semana ${t.semana + 1} · ` : ""}${DIAS[t.dia]} · ${t.titulo}${t.rodadas ? ` (circuito, ${t.rodadas} voltas, ${t.descansoRodada}s entre voltas)` : ""}\n${t.exercicios.map((e) => `- ${exDe(pk, e.id)?.nome || e.id} [${e.id}] (${exDe(pk, e.id)?.musculos || ""}): ${e.series}×${e.reps}, descanso ${e.descanso}s${e.obs ? ` — ${e.obs}` : ""}`).join("\n")}`),
       `Entrevista: ${I.passos.map((p) => `${p.k}: ${iaResp(p, St.perfil[p.k])}`).join("; ")}`,
@@ -2969,8 +3007,21 @@
       insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length, fits: fitTests(rows).length,
       fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0, ...aguaMetricas(),
       max30s1: (() => { const P = VP.insanity; if (!P) return 0; const ds = new Set(f.filter((r) => r.programa === "insanity" && r.detalhes?.w === 0).map((r) => r.detalhes.d)); return P.semanas[0].dias.every((t, d) => !t.ids.length || ds.has(d)) ? 1 : 0; })(),
-      grad: graduado() ? 1 : 0,
+      grad: graduado() ? 1 : 0, ...corridaMetricas(rows),
       barras: rows.some((r) => r.programa === "calistenia" && Object.entries(r.detalhes?.sets || {}).some(([id, v]) => /^barra-(pronada|aberta|fechada|negativa|uma-mao)$/.test(id) && (v || []).some((n) => n > 0))) ? 1 : 0 };
+  }
+  // Corrida (prints e plano de Corrida e Híbrido): maior corrida, km no total, 5 km mais rápido, semana, bike e dia híbrido
+  function corridaMetricas(rows) {
+    const it = rows.filter((r) => r.programa === "corrida").flatMap((r) => (Array.isArray(r.detalhes?.itens) ? r.detalhes.itens : []).map((a) => ({ ...a, data: r.data })));
+    const runs = it.filter((a) => a.tipo === "corrida" || a.tipo === "esteira"), sem = {};
+    const planoRun = rows.filter((r) => r.programa === "run" && r.concluido);
+    [...runs.map((a) => a.data), ...planoRun.map((r) => r.data)].forEach((d) => { const k = keyOf(mondayOf(parseKey(d))); (sem[k] = sem[k] || new Set()).add(d); });
+    const cincoK = runs.filter((a) => a.km >= 5 && a.tempo > 0).map((a) => (a.tempo / a.km) * 5);
+    const forca = new Set(rows.filter((r) => r.concluido && r.programa !== "corrida").map((r) => r.data));
+    return { corridas: runs.length + planoRun.length, maiorCorrida: Math.floor(Math.max(0, ...runs.map((a) => a.km || 0)) * 10) / 10, kmCorrida: Math.floor(soma(runs.map((a) => a.km || 0))),
+      melhor5k: cincoK.length ? Math.min(...cincoK) : 0, corridasSemana: Math.max(0, ...Object.values(sem).map((x) => x.size)),
+      maiorBike: Math.floor(Math.max(0, ...it.filter((a) => a.tipo === "bike").map((a) => a.km || 0))), planoRun: planoRun.length,
+      diaHibrido: runs.some((a) => forca.has(a.data)) || planoRun.some((r) => (r.detalhes?.sets && Object.keys(r.detalhes.sets).some((id) => !/^run-/.test(id)) && Object.keys(r.detalhes.sets).some((id) => /^run-/.test(id)))) ? 1 : 0 };
   }
   // Água: melhor semana (litros), total e maior sequência de dias batendo a meta
   function aguaMetricas() {
@@ -3181,6 +3232,7 @@
     calistenia: { nome: "Calistenia", ic: "🤸", desc: "Calistenia 21 dias no seu nível e depois o Treino da Fera" },
     cross: { nome: "Cross", ic: "⏱️", desc: "O WOD do seu box: tire uma foto do quadro e eu lanço o treino" },
     hibrido: { nome: "Híbridos", ic: "⚡", desc: "Vídeos do Insanos + academia ou calistenia (3 + 2 dias)" },
+    ...(RUNC.length ? { corrida: { nome: "Corrida", ic: "🏃", desc: "Corrida ou treino híbrido: o Coach mistura corrida com força (academia ou peso do corpo)" } } : {}),
   };
   const trilha = () => (TRILHAS[S.trilha] ? S.trilha : "insanos");
   const forcaHibrido = () => (S.forca === "c21" && IA.c21 ? "c21" : "hiper");
@@ -3200,7 +3252,7 @@
   // Programa do Coach: 80% das sessões das primeiras semanas (Calistenia 21 dias: 3; academia: 4 de adaptação) + o teste de saída
   function progIA(pk, semanas) {
     const St = S[pk];
-    const testeTxt = pk === "hiper" ? "um recorde de carga em qualquer exercício" : "o último treino do plano (teste máximo)";
+    const testeTxt = pk === "hiper" ? "um recorde de carga em qualquer exercício" : pk === "run" ? "o último treino da 4ª semana" : "o último treino do plano (teste máximo)";
     if (!St?.plano || !St.inicio) return { feitas: 0, precisa: 0, total: 0, final: false, teste: testeTxt, ok: false, semPlano: true };
     const ini = mondayOf(parseKey(St.inicio)), semDe = (k, l) => (Number.isInteger(l.w) && pk === "c21" ? l.w : Math.floor(diffDays(ini, parseKey(k)) / 7));
     const total = soma([...Array(semanas)].map((_, w) => iaSessoesSemana(pk, w).length)), precisa = Math.ceil(total * 0.8);
@@ -3225,7 +3277,8 @@
     if (t === "academia") return [{ k: "adaptacao", prog: "hiper", nome: "Adaptação", p: () => progIA("hiper", 4) }, { k: "hipertrofia", prog: "hiper", nome: "Hipertrofia", p: null }];
     if (t === "calistenia" && IA.c21) return [{ k: "c21", prog: "c21", nome: "Calistenia 21 dias", p: () => progIA("c21", 3) }, { k: "fera", prog: "plano", nome: "Treino da Fera", p: null }];
     if (t === "calistenia") return [{ k: "fera", prog: "plano", nome: "Treino da Fera", p: null }];
-    if (t === "cross") return [{ k: "box", prog: "cf", nome: "WOD do box", p: null }]; // o WOD vem do box: sem etapas, XP por sessão
+    if (t === "cross") return [{ k: "box", prog: "cf", nome: "WOD do box", p: null }];
+    if (t === "corrida" && IA.run) return [{ k: "base-corrida", prog: "run", nome: "Base de corrida", p: () => progIA("run", 4) }, { k: "performance", prog: "run", nome: "Performance", p: null }]; // o WOD vem do box: sem etapas, XP por sessão
     return [max30, ...ins, { k: "ciclos", prog: VP.insanity60 ? "insanity60" : "insanity", nome: "Novos ciclos", p: null }]; // insanos e híbridos
   }
   function etapaAtual(t = trilha()) {
@@ -3239,6 +3292,7 @@
     if (t === "academia") return dias("hiper") || 4;
     if (t === "calistenia") return dias("c21") || 5;
     if (t === "cross") return 3;
+    if (t === "corrida") return dias("run") || 4;
     if (t === "hibrido") return 5;
     return 6;
   }
@@ -3367,6 +3421,20 @@
     ["max30s1", "🛡️", "1ª semana do MAX:30 completa", (m) => [m.max30s1, 1]],
     ["barra1", "🧗", "Primeira barra registrada", (m) => [m.barras, 1]],
     ["grad30", "🎓", "Formado no MAX:30", (m) => [m.grad, 1]],
+    ["run1", "👟", "Primeira corrida", (m) => [m.corridas, 1]],
+    ["run5k", "🥉", "5 km numa corrida", (m) => [m.maiorCorrida, 5]],
+    ["run10k", "🥈", "10 km numa corrida", (m) => [m.maiorCorrida, 10]],
+    ["run21k", "🥇", "Meia maratona (21 km)", (m) => [m.maiorCorrida, 21]],
+    ["run42k", "🏅", "Maratona (42 km)", (m) => [m.maiorCorrida, 42]],
+    ["sub30", "⚡", "5 km abaixo de 30 min", (m) => [m.melhor5k && m.melhor5k < 1800 ? 1 : 0, 1]],
+    ["sub25", "💨", "5 km abaixo de 25 min", (m) => [m.melhor5k && m.melhor5k < 1500 ? 1 : 0, 1]],
+    ["km50", "🛣️", "50 km correndo", (m) => [m.kmCorrida, 50]],
+    ["km100", "🌎", "100 km correndo", (m) => [m.kmCorrida, 100]],
+    ["km250", "🚀", "250 km correndo", (m) => [m.kmCorrida, 250]],
+    ["runsem3", "📆", "3 corridas numa semana", (m) => [m.corridasSemana, 3]],
+    ["bike50", "🚴", "50 km de bike numa saída", (m) => [m.maiorBike, 50]],
+    ["hibrido1", "🦾", "Dia híbrido: corrida + força", (m) => [m.diaHibrido, 1]],
+    ["planorun10", "🧭", "10 treinos do plano de corrida", (m) => [m.planoRun, 10]],
   ];
   // Emblemas desenhados (assets/emblemas); as outras conquistas usam o emoji
   const CONQ_IMG = { seq7: "sequencia-7", maxrec: "recorde-max-out", aguaseq7: "hidratado-7", max30s1: "max30-semana-1", barra1: "primeira-barra", grad30: "graduado-max30" };
@@ -4608,7 +4676,7 @@
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
   const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
-  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", "CrossFit", "Nutrição", "Minha evolução", "Evolução por foto"];
+  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Nutrição", "Minha evolução", "Evolução por foto"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
   const chatLogs = { coach: chatLog, nutri: [] };
@@ -4720,7 +4788,7 @@
     if (t === "nutricao") { openChat(null, "nutri"); return true; }
     if (t === "abrir o grupo") { closeChat(); location.hash = "#/grupo"; return true; }
     if (t === "evolucao por foto" || t === "ver ultima analise" || t === "apagar minhas fotos") { evoChip(t, texto); return true; }
-    if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", fera].includes(t)) return false;
+    if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", "corrida", "corrida e hibrido", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);
     const ir = async (msg, hash) => {
       const stop = typing(msgsEl); await wait(450); stop();
@@ -4753,7 +4821,8 @@
     } else if (t === "crossfit") {
       const l = cfLog();
       ir(l?.wod ? `Bora de <b>CrossFit</b>! Hoje é <b>${esc(l.wod.titulo)}</b>. Abrindo… 🔥` : `Bora de <b>CrossFit</b>! Tire uma foto do quadro do box e eu lanço o WOD para você. 📷`, "#/cf");
-    } else if (t === "ver meu treino") irIA(iaUltimo || "hiper");
+    } else if ((t === "corrida" || t === "corrida e hibrido") && IA.run) irIA("run");
+    else if (t === "ver meu treino") irIA(iaUltimo || "hiper");
     else irIA("hiper");
     return true;
   }
