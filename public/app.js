@@ -898,6 +898,15 @@
   const IAK = Object.keys(IA);
   for (const I of Object.values(IA)) I.ci = Object.fromEntries(I.cat.map((e) => [e.id, e]));
   const exDe = (pk, id) => IA[pk]?.ci[id] || null;
+  /* Animações 3D de execução (certo × errado), em assets/anim/<arquivo>.mp4 + .jpg (capa).
+     Academia: o arquivo tem o mesmo id do exercício. Calistenia: id do exercício → arquivo. */
+  const ANIM_HIPER = "supino-reto-barra supino-reto-halteres supino-inclinado-halteres crucifixo-halteres crossover peck-deck paralelas puxada-frente barra-fixa remada-curvada remada-baixa remada-unilateral pulldown-corda levantamento-terra desenvolvimento-halteres elevacao-lateral crucifixo-inverso face-pull encolhimento rosca-direta rosca-alternada rosca-martelo rosca-scott triceps-corda triceps-testa triceps-frances agachamento-livre agachamento-goblet leg-press hack cadeira-extensora stiff afundo agachamento-bulgaro elevacao-pelvica cadeira-abdutora panturrilha-pe abdominal-supra".split(" ");
+  const ANIM = {
+    hiper: Object.fromEntries(ANIM_HIPER.map((id) => [id, id])),
+    c21: { "agachamento-sumo": "agachamento-sumo", afundo: "afundo-peso-corpo", "step-up": "step-up", panturrilha: "panturrilha-cal", "panturrilha-unilateral": "panturrilha-cal",
+      flexao: "flexao", barra: "barra-fixa", "barra-australiana": "barra-australiana", dips: "paralelas", "triceps-banco": "triceps-banco", crunch: "abdominal-supra" },
+  };
+  const animDe = (pk, id) => ANIM[pk]?.[id] || null;
   const fmtKg = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
   const faixa = (r) => { const n = String(r).match(/\d+/g) || []; const a = +n[0] || 0; return [a, +(n[1] || a)]; };
   const ehMax = (r) => /m[aá]x/i.test(String(r));
@@ -1274,6 +1283,8 @@
         ${prev ? `<span class="pill gray">Última: ${esc(prev.sets.map((s) => fmtSet(s, un)).join(" · "))}</span>` : ""}</div>
       ${meta && editavel ? `<p class="hx-meta">🎯 ${esc(meta.txt)}</p>` : ""}
       ${ex.obs ? `<p class="ex-obs">${esc(ex.obs)}</p>` : ""}
+      ${animDe(pk, ex.id) ? `<button class="hx-anim" data-ia-anim="${animDe(pk, ex.id)}" aria-label="Ver a animação de ${esc(c.nome)}">
+        <img src="assets/anim/${animDe(pk, ex.id)}.jpg" alt="" loading="lazy"><span class="hx-anim-tag">▶ Animação · certo × errado</span></button>` : ""}
       <div class="hx-video">${c.yt ? `<button class="btn btn-outline hx-play" data-ia-play="${ex.id}" data-pk="${pk}">▶ Ver como fazer</button>` : ""}
         <a class="lnk-btn" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${c.yt ? "Mais vídeos no YouTube" : "▶ Ver vídeos de execução no YouTube"}</a></div>
       ${c.exec ? `<details class="musc hx-como"><summary><span>📋 Como fazer</span></summary>
@@ -1967,6 +1978,14 @@
   });
 
   document.addEventListener("click", (e) => {
+    const an = e.target.closest("[data-ia-anim]");
+    if (an) {
+      const v = document.createElement("video");
+      Object.assign(v, { src: `assets/anim/${an.dataset.iaAnim}.mp4`, poster: `assets/anim/${an.dataset.iaAnim}.jpg`, autoplay: true, loop: true, muted: true, playsInline: true, controls: true });
+      v.className = "hx-anim-video"; v.setAttribute("playsinline", ""); v.setAttribute("muted", "");
+      an.replaceWith(v); v.play?.().catch(() => {});
+      return;
+    }
     const t = e.target.closest("[data-ia-chat],[data-ia-play],[data-ia-del],[data-ia-hoje],[data-ia-concluir],[data-ia-ask],[data-ia-revisar],[data-ia-checkin],[data-ia-perguntar],[data-ia-refazer],[data-ia-desfazer],[data-ia-sem],[data-ia-cron],[data-ia-parar],[data-ia-cancelar]");
     if (!t) return;
     const ds = t.dataset, card = t.closest(".ex.hx"), pk = ds.pk || card?.dataset.pk;

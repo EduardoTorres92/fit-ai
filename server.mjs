@@ -34,7 +34,7 @@ const TIPOS = {
   ".mjs": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml",
   ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
   ".ico": "image/x-icon", ".webmanifest": "application/manifest+json", ".woff": "font/woff", ".woff2": "font/woff2",
-  ".txt": "text/plain; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8", ".mp4": "video/mp4",
 };
 const SEGURANCA = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin" };
 
@@ -86,12 +86,24 @@ createServer(async (req, res) => {
     if (req.method !== "GET" && req.method !== "HEAD") { res.writeHead(405, SEGURANCA).end(); return; }
     const achado = await arquivo(url.pathname);
     if (!achado) { res.writeHead(404, { ...SEGURANCA, "content-type": "text/plain; charset=utf-8" }).end("Página não encontrada."); return; }
-    res.writeHead(200, {
+    const tam = achado.info.size, cab = {
       ...SEGURANCA,
       "content-type": TIPOS[extname(achado.caminho).toLowerCase()] || "application/octet-stream",
-      "content-length": achado.info.size,
+      "accept-ranges": "bytes",
       "cache-control": url.pathname.startsWith("/assets/") ? "public, max-age=604800" : "no-cache",
-    });
+    };
+    // Pedaços do arquivo (Range): o Safari do iPhone só toca vídeo se o servidor responder 206
+    const faixa = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+    if (faixa && (faixa[1] || faixa[2])) {
+      let ini = faixa[1] ? Number(faixa[1]) : tam - Number(faixa[2]), fim = faixa[1] && faixa[2] ? Number(faixa[2]) : tam - 1;
+      ini = Math.max(0, ini); fim = Math.min(fim, tam - 1);
+      if (ini > fim || ini >= tam) { res.writeHead(416, { ...SEGURANCA, "content-range": `bytes */${tam}` }).end(); return; }
+      res.writeHead(206, { ...cab, "content-range": `bytes ${ini}-${fim}/${tam}`, "content-length": fim - ini + 1 });
+      if (req.method === "HEAD") { res.end(); return; }
+      createReadStream(achado.caminho, { start: ini, end: fim }).pipe(res);
+      return;
+    }
+    res.writeHead(200, { ...cab, "content-length": tam });
     if (req.method === "HEAD") { res.end(); return; }
     createReadStream(achado.caminho).pipe(res);
   } catch (e) {
