@@ -694,15 +694,13 @@
           </div>
         </div>
         <div class="section">
-          ${grupoHome()}
-          <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
-          ${IA.hiper && principal() !== "hiper" && liberado("hiper") ? iaHome("hiper", false) : ""}
-          ${IA.c21 && principal() !== "c21" && liberado("c21") && (S.c21.plano || S.c21.etapa) ? iaHome("c21", false) : ""}
-          ${principal() !== "cf" && liberado("cf") && Object.keys(S.cf.logs).length ? cfHome(false) : ""}
           ${principal() === "cf" ? cfHome(true) : principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : IA[principal()] ? iaHome(principal(), true) : treinoHojeVideo(principal())}
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
-          ${videoHome(principal())}
+          ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
+          ${desafioHome()}
+          ${grupoHome()}
+          <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -3559,6 +3557,18 @@
       <div>${recordesHtml(rows, `${esc((p.nome || "Essa pessoa").split(" ")[0])} ainda não registrou Max Out nem Fit Test.`)}</div>
       </div></section>`;
   }
+  // Desafio da semana em destaque no Início (com a capa do vídeo, quando tem)
+  function desafioHome() {
+    if (!uid || !G.grupos || !grupoSel()) return "";
+    const d = desafioDaSemana();
+    if (!d) return `<a class="emerg" href="#/grupo"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>`;
+    const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa], fim = 6 - hojeDia;
+    return `<div class="sec-head"><h2>Desafio da semana</h2><a href="#/grupo">${fim === 0 ? "termina hoje" : `${fim} ${fim === 1 ? "dia" : "dias"}`}</a></div>
+      <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo">
+        ${capa ? `<img src="${esc(capa)}" alt="" loading="lazy">` : ""}
+        <div class="dh-txt"><span class="dh-tag">⚔️ ${esc(MEDIDAS[d.medida].split(" (")[0])}${eu ? " · ✓ você cumpriu" : ""}</span>
+          <strong>${esc(d.titulo)}</strong><small>${fs.length ? `🏅 ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}` : "Ninguém cumpriu ainda. Seja o primeiro!"}</small></div></a>`;
+  }
   function grupoHome() {
     if (!uid) return "";
     if (!G.grupos) { carregarGrupos(); return ""; }
@@ -3568,8 +3578,6 @@
     const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
     return `<a class="g-card" href="#/grupo"><div class="sec-head"><h2>${esc(g.nome)}</h2><span>${semana}/${g.meta_semanal} na semana</span></div>
       <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
-      ${(() => { const d = desafioDaSemana(), n = d ? feitosDe(d).length : 0;
-        return `<p class="d-mini">⚔️ ${d ? `${esc(d.titulo)} · ${n ? `🏅 ${n} cumpriu${n > 1 ? "ram" : ""}` : "ninguém cumpriu ainda"}` : "Sem desafio esta semana. Lance um!"}</p>`; })()}
       ${(() => { const top = G.membros.map((id) => ({ id, ml: aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0 })).sort((a, b) => b.ml - a.ml)[0];
         return `<p class="d-mini">💧 ${top?.ml ? `${top.id === uid ? "Você lidera" : `${esc((G.perfis[top.id]?.nome || "Alguém").split(" ")[0])} lidera`} a água de hoje com ${fmtL(top.ml)}` : "Ninguém anotou água hoje ainda"}</p>`; })()}
       ${avatarGroup(G.membros, { max: 6, size: 34, overlap: 12, label: "Membros do grupo", estatico: true })}</a>`;
