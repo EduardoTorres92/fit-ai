@@ -13,4 +13,4 @@ jobs:
       - run: python3 tools/listar.py | tee listar.log
       - run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lista.json listar.log; git commit -m "Lista dos GIFs" || exit 0; git push origin HEAD:gifs-import
+          git add lista2.json listar.log; git commit -m "Lista dos GIFs" || exit 0; git push origin HEAD:gifs-import
