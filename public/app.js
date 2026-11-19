@@ -208,10 +208,12 @@
         if (!s[k].logs || typeof s[k].logs !== "object") s[k].logs = {};
       }
       s.cf = { logs: {}, perfil: {}, ...(s.cf || {}) };
+      s.corrida = { logs: {}, ...(s.corrida || {}) };
+      if (!s.corrida.logs || typeof s.corrida.logs !== "object") s.corrida.logs = {};
       if (!s.cf.logs || typeof s.cf.logs !== "object") s.cf.logs = {};
       if (s.user && !s.user.id) { s.logado = false; s.user = null; s.sessao = null; } // login antigo (antes do Supabase): entra de novo
       return s;
-    } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])), cf: { logs: {}, perfil: {} } }; }
+    } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])), cf: { logs: {}, perfil: {} }, corrida: { logs: {} } }; }
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
@@ -702,6 +704,7 @@
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
           ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
+          ${ativHome()}
           ${desafioHome()}
           ${grupoHome()}
           <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
@@ -793,6 +796,7 @@
           <div class="sec-head"><h2>Progresso por exercício</h2></div>
           ${progresso()}
         </div>
+        ${secaoAtividades()}
         ${secaoCorridas()}</section>`;
     },
 
@@ -2717,6 +2721,12 @@
       out.push({ data: k, programa: "cf", titulo: String(l.wod.titulo || "WOD").slice(0, 120), concluido: !!l.done, minutos: Math.min(600, cfMinutos(l)),
         detalhes: { wod: l.wod, res: l.res || {}, done: !!l.done, ...(l.msg ? { msg: l.msg } : {}) } });
     }
+    for (const [k, l] of Object.entries(S.corrida.logs)) {
+      const it = (l.itens || []).slice(0, 10);
+      if (!it.length) continue;
+      out.push({ data: k, programa: "corrida", titulo: it.map(ativTitulo).join(" + ").slice(0, 120), concluido: true,
+        minutos: Math.min(600, Math.round(soma(it.map((a) => a.tempo || 0)) / 60)), detalhes: { itens: it, done: true } });
+    }
     return out;
   }
 
@@ -2775,10 +2785,10 @@
   let puxadoEm = 0;
   async function atualizarDaConta() {
     if (!uid || !sb || document.visibilityState !== "visible" || Date.now() - puxadoEm < 60000) return;
-    const antes = JSON.stringify([S.logs, S.cf.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]);
+    const antes = JSON.stringify([S.logs, S.cf.logs, S.corrida.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]);
     await puxarTreinos();
     await tgSincronizar(true);
-    if (JSON.stringify([S.logs, S.cf.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]) !== antes) { G.carregadoEm = 0; render(); }
+    if (JSON.stringify([S.logs, S.cf.logs, S.corrida.logs, ...VKEYS.map((p) => S[p].logs), ...IAK.map((k) => S[k].logs)]) !== antes) { G.carregadoEm = 0; render(); }
   }
   document.addEventListener("visibilitychange", atualizarDaConta);
   window.addEventListener("focus", atualizarDaConta);
@@ -2812,6 +2822,10 @@
       }
       if (r.programa === "cf" && !S.cf.logs[r.data] && d.wod && Array.isArray(d.wod.partes)) {
         S.cf.logs[r.data] = { wod: d.wod, res: d.res && typeof d.res === "object" ? d.res : {}, done: !!d.done, ...(d.msg ? { msg: String(d.msg) } : {}) }; mudou = true;
+      }
+      if (r.programa === "corrida" && !S.corrida.logs[r.data] && Array.isArray(d.itens)) {
+        const itens = d.itens.map(ativLimpa).filter(Boolean);
+        if (itens.length) { S.corrida.logs[r.data] = { itens }; mudou = true; }
       }
       if (IA[r.programa] && !S[r.programa].logs[r.data]) {
         const sets = {};
@@ -2981,6 +2995,109 @@
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
     recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500 };
+  /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
+  // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
+  const ATIV = {
+    corrida: { nome: "Corrida", ic: "🏃", base: 30, porKm: 8, max: 40, minKm: 6 },
+    esteira: { nome: "Esteira", ic: "🏃", base: 30, porKm: 8, max: 40, minKm: 6 },
+    caminhada: { nome: "Caminhada", ic: "🚶", base: 20, porKm: 4, max: 20, minKm: 12 },
+    bike: { nome: "Bike", ic: "🚴", base: 30, porKm: 2, max: 40, minKm: 2.5 },
+  };
+  XP.ativMax = 120;
+  function xpAtiv(a) {
+    const t = ATIV[a?.tipo]; if (!t) return 0;
+    const kms = Number(a.km) > 0 ? Number(a.km) : Number(a.tempo) > 0 ? a.tempo / 60 / t.minKm : 0;
+    return t.base + Math.min(t.max, Math.round(t.porKm * kms));
+  }
+  function ativLimpa(a) {
+    if (!a || !ATIV[a.tipo]) return null;
+    const km = Number(a.km) > 0 && Number(a.km) <= 500 ? Math.round(Number(a.km) * 100) / 100 : 0, tempo = Number(a.tempo) > 0 && Number(a.tempo) <= 86400 ? Math.round(Number(a.tempo)) : 0;
+    if (!km && !tempo) return null;
+    const n = (v, a1, b) => (Number(v) >= a1 && Number(v) <= b ? Math.round(Number(v)) : 0);
+    return { tipo: a.tipo, ...(km ? { km } : {}), ...(tempo ? { tempo } : {}), ...(n(a.elev, 1, 10000) ? { elev: n(a.elev, 1, 10000) } : {}), ...(n(a.fc, 40, 230) ? { fc: n(a.fc, 40, 230) } : {}),
+      ...(n(a.kcal, 1, 10000) ? { kcal: n(a.kcal, 1, 10000) } : {}), ...(a.app ? { app: String(a.app).slice(0, 30) } : {}), ...(a.titulo ? { titulo: String(a.titulo).slice(0, 60) } : {}) };
+  }
+  function ativTitulo(a) { const t = ATIV[a.tipo] || ATIV.corrida; return `${t.nome}${a.km ? ` ${String(a.km).replace(".", ",")} km` : a.tempo ? ` ${fmtDur(a.tempo)}` : ""}`; }
+  const hmsDe = (s) => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`; };
+  const segAtiv = (t) => { const p = String(t || "").trim().split(":").map(Number); if (!p.length || p.some((x) => !Number.isFinite(x) || x < 0)) return 0; return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0] * 60; };
+  let ativLendo = false;
+  function ativHome() {
+    const hojeIt = S.corrida.logs[hojeKey]?.itens || [];
+    return `<label class="emerg ativ-home${ativLendo ? " lendo" : ""}"><span>${ativLendo ? "⏳" : "🏃"}</span><div><strong>${ativLendo ? "Lendo o print…" : hojeIt.length ? `Hoje: ${esc(hojeIt.map(ativTitulo).join(" + "))} ✓` : "Correu, caminhou ou pedalou?"}</strong>
+      <small>${ativLendo ? "O Coach está conferindo os números" : "Mande o print do Strava, do relógio ou da esteira e vira XP"}</small></div>
+      <em class="btn btn-blue">${hojeIt.length ? "+ Outra" : "Enviar print"}</em><input type="file" accept="image/*" data-ativ-print hidden${ativLendo ? " disabled" : ""}></label>`;
+  }
+  function secaoAtividades() {
+    const dias = Object.entries(S.corrida.logs).filter(([, l]) => l.itens?.length).sort((a, b) => b[0].localeCompare(a[0]));
+    if (!dias.length) return "";
+    const todas = dias.flatMap(([k, l]) => l.itens.map((a, i) => ({ k, i, a })));
+    const kmTot = soma(todas.map((x) => x.a.km || 0)), runs = todas.filter((x) => x.a.tipo === "corrida" || x.a.tipo === "esteira");
+    const kmR = soma(runs.map((x) => x.a.km || 0)), tR = soma(runs.filter((x) => x.a.km).map((x) => x.a.tempo || 0));
+    return `<div class="section"><div class="sec-head"><h2>Corridas e pedaladas</h2><span class="strava-tag">pelo print</span></div>
+      <div class="stats-row">${stat("circle-check.svg", todas.length, "Atividades")}${stat("zap.svg", km(kmTot * 1000), "Km no total")}${stat("timer.svg", kmR && tR ? ritmo(tR, kmR * 1000) : "—", "Ritmo médio")}</div>
+      <div class="runs">${todas.slice(0, 8).map(({ k, i, a }) => `<div class="run ativ-run"><span class="ativ-ic">${(ATIV[a.tipo] || ATIV.corrida).ic}</span>
+        <div class="ativ-txt"><strong>${esc(a.titulo || ativTitulo(a))}</strong><small>${diaCurto(k)}${a.km ? ` · ${km(a.km * 1000)} km` : ""}${a.tempo ? ` · ${hmsDe(a.tempo)}` : ""}${a.km && a.tempo && a.tipo !== "bike" ? ` · ${ritmo(a.tempo, a.km * 1000)}/km` : ""}${a.fc ? ` · ${a.fc} bpm` : ""} · +${xpAtiv(a)} XP</small></div>
+        <button class="lnk-btn" data-ativ-del="${k}|${i}" aria-label="Apagar">✕</button></div>`).join("")}</div></div>`;
+  }
+  function diaCurto(k) { const d = parseKey(k); return k === hojeKey ? "Hoje" : `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; }
+  async function ativLerPrint(arquivo) {
+    if (ativLendo) return;
+    let b64;
+    try { b64 = await cfReduzir(arquivo); if (b64.length > 1_300_000) b64 = await cfReduzir(arquivo, 1280, 0.75); } catch { toast("Não consegui abrir essa imagem."); return; }
+    ativLendo = true; render();
+    let d = null;
+    try {
+      const token = await tokenSB();
+      const r = await fetch("/api/corrida", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ imagem: b64, hoje: hojeKey }) });
+      d = await r.json().catch(() => ({}));
+      if (!d.atividade) toast(d.erro === "ilegivel" ? "Não achei distância ou tempo nesse print. Tente o print da tela da atividade aberta." : d.erro === "limite" ? "Você chegou ao limite do Coach por hoje. Preencha à mão." : d.erro === "imagem" ? "Imagem grande demais. Tente de novo." : "Não consegui ler agora. Preencha à mão.", 5000);
+    } catch { toast("Sem conexão. Preencha à mão."); }
+    ativLendo = false; render();
+    ativConfirmar(d?.atividade || { tipo: "corrida" });
+  }
+  function ativConfirmar(a) {
+    let dl = document.getElementById("ativ-dlg");
+    if (!dl) {
+      dl = document.createElement("dialog"); dl.id = "ativ-dlg"; dl.className = "ativ-dlg"; document.body.appendChild(dl);
+      dl.addEventListener("click", (e) => { if (e.target === dl || e.target.closest("[data-ativ-cancelar]")) dl.close(); });
+      dl.addEventListener("input", () => { const f = dl.querySelector("form"), kmv = Number(String(f.km.value).replace(",", ".")), t = segAtiv(f.tempo.value), p = dl.querySelector(".ativ-prev");
+        if (p) p.textContent = kmv > 0 && t > 0 && f.tipo.value !== "bike" ? `Ritmo ${ritmo(t, kmv * 1000)}/km · +${xpAtiv({ tipo: f.tipo.value, km: kmv, tempo: t })} XP` : `+${xpAtiv({ tipo: f.tipo.value, km: kmv, tempo: t })} XP`; });
+      dl.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const f = e.target, dia = /^\d{4}-\d{2}-\d{2}$/.test(f.data.value) && f.data.value <= hojeKey ? f.data.value : hojeKey;
+        const it = ativLimpa({ ...JSON.parse(f.dataset.extra || "{}"), tipo: f.tipo.value, km: Number(String(f.km.value).replace(",", ".")), tempo: segAtiv(f.tempo.value), elev: f.elev.value, fc: f.fc.value });
+        if (!it) { toast("Preencha a distância ou o tempo."); return; }
+        const l = S.corrida.logs[dia] || { itens: [] };
+        l.itens = [...(l.itens || []), it].slice(0, 10); S.corrida.logs[dia] = l;
+        save(); dl.close(); render(); toast(`${ATIV[it.tipo].ic} ${ativTitulo(it)} registrada · +${xpAtiv(it)} XP`, 3500);
+      });
+    }
+    const extra = { ...(a.app ? { app: a.app } : {}), ...(a.titulo ? { titulo: a.titulo } : {}), ...(a.kcal ? { kcal: a.kcal } : {}) };
+    const dia = a.data && a.data <= hojeKey && a.data >= keyOf(addDays(hoje, -30)) ? a.data : hojeKey;
+    dl.innerHTML = `<form class="ativ-box" data-extra='${esc(JSON.stringify(extra))}'>
+      <h2>${a.km || a.tempo ? "Confira os números" : "Registrar atividade"}</h2>
+      ${a.app ? `<p class="note small">Lido do print${a.app ? ` (${esc(a.app)})` : ""}. Ajuste se algo saiu errado.</p>` : ""}
+      <div class="seg ativ-tipos">${Object.entries(ATIV).map(([k, t]) => `<label><input type="radio" name="tipo" value="${k}"${(a.tipo || "corrida") === k ? " checked" : ""}><span>${t.ic} ${t.nome}</span></label>`).join("")}</div>
+      <div class="ativ-grid">
+        <label class="field"><span class="field-lbl">Distância (km)</span><input name="km" inputmode="decimal" value="${a.km ? String(a.km).replace(".", ",") : ""}" placeholder="5,0"></label>
+        <label class="field"><span class="field-lbl">Tempo (h:mm:ss)</span><input name="tempo" inputmode="numeric" value="${a.tempo ? hmsDe(a.tempo) : ""}" placeholder="30:00"></label>
+        <label class="field"><span class="field-lbl">Data</span><input name="data" type="date" value="${dia}" max="${hojeKey}"></label>
+        <label class="field"><span class="field-lbl">Elevação (m)</span><input name="elev" inputmode="numeric" value="${a.elev || ""}" placeholder="opcional"></label>
+        <label class="field"><span class="field-lbl">FC média</span><input name="fc" inputmode="numeric" value="${a.fc || ""}" placeholder="opcional"></label>
+      </div>
+      <p class="ativ-prev note"></p>
+      <div class="ativ-acoes"><button type="button" class="btn btn-outline" data-ativ-cancelar>Cancelar</button><button class="btn btn-blue">Salvar</button></div></form>`;
+    if (!dl.open) dl.showModal();
+    dl.dispatchEvent(new Event("input"));
+  }
+  document.addEventListener("change", (e) => { const f = e.target.closest?.("[data-ativ-print]"); if (f && f.files?.[0]) { const arq = f.files[0]; f.value = ""; ativLerPrint(arq); } });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest?.("[data-ativ-del]"); if (!b) return;
+    const [k, i] = b.dataset.ativDel.split("|"), l = S.corrida.logs[k];
+    if (!l || !confirm("Apagar esta atividade?")) return;
+    l.itens.splice(Number(i), 1); if (!l.itens.length) delete S.corrida.logs[k];
+    save(); render();
+  });
   const EX_META = Object.fromEntries(TODOS_EX.map((e) => [e.id, e]));
   const nSets = (sets) => soma(Object.values(sets || {}).map((s) => (Array.isArray(s) ? s.length : 0)));
   const xpSessao = (done, n) => (done ? XP.sessao + Math.min(XP.volumeMax, n) : Math.min(XP.parcialMax, n * XP.parcialSerie));
@@ -2999,6 +3116,7 @@
       xp += Math.min(XP.metaExMax, metas);
     } else if (IA[r.programa]) xp += xpSessao(!!d.done, nSets(d.sets));
     else if (r.programa === "cf" && d.done) xp += XP.cf;
+    else if (r.programa === "corrida") xp += Math.min(XP.ativMax, soma((Array.isArray(d.itens) ? d.itens : []).map(xpAtiv)));
     return xp;
   }
   // Recordes nas linhas (em ordem de data): Max Out, carga na academia/calistenia do Coach e repetições no Treino da Fera
@@ -3208,6 +3326,7 @@
         <li>Treino concluído (academia, calistenia): ${XP.sessao} + até ${XP.volumeMax} pelo volume · WOD do Cross: ${XP.cf}</li>
         <li>Recorde (Max Out, carga, repetições ou PR do Cross): +${XP.recorde} · Cardio Challenge ou Fit Test: +${XP.teste}</li>
         <li>Meta da semana (${metaSemana()} treinos de seg a dom): +${XP.semana}, e +${XP.semanaSeguida} por semana seguida (até +${XP.semanaSeguidaMax})</li>
+        <li>Corrida ou esteira pelo print: ${ATIV.corrida.base} + ${ATIV.corrida.porKm} por km (até +${ATIV.corrida.max}) · Bike: ${ATIV.bike.base} + ${ATIV.bike.porKm} por km · Caminhada: ${ATIV.caminhada.base} + ${ATIV.caminhada.porKm} por km</li>
         <li>Meta de água: +${XP.agua} · Desafio do grupo: +${XP.desafio} · 2º treino no mesmo dia vale metade</li>
         <li>Formatura de cada etapa: +${XP.formatura}</li>
         <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>`;
@@ -4872,6 +4991,8 @@
     }
     for (const pk of IAK) { const c = iaContextoTexto(pk); if (c) out.push(c); }
     { const c = cfContextoTexto(); if (c) out.push(c); }
+    { const a = Object.entries(S.corrida.logs).sort().slice(-12).flatMap(([k, l]) => (l.itens || []).map((x) => `- ${k} ${ativTitulo(x)}${x.tempo ? `, ${fmtDur(x.tempo)}` : ""}${x.km && x.tempo && x.tipo !== "bike" ? `, ritmo ${ritmo(x.tempo, x.km * 1000)}/km` : ""}${x.fc ? `, FC ${x.fc}` : ""}`));
+      if (a.length) out.push("Corridas, caminhadas e pedaladas registradas pelo print:\n" + a.join("\n")); }
     const cs = comCorridas ? corridas().slice(0, 10) : [];
     if (comCorridas) out.push("Corridas do Strava:\n" + (cs.length ? cs.map((c) => `- ${c.data} ${c.nome}: ${km(c.dist)} km, ${fmtDur(c.tempo)}, ritmo ${ritmo(c.tempo, c.dist)}/km${c.fc ? `, FC ${Math.round(c.fc)}` : ""}`).join("\n") : "- nenhuma sincronizada"));
     return out.join("\n");
