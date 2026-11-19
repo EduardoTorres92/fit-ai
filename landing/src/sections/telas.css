@@ -1,0 +1,28 @@
+/* Por dentro do app: seis telas do FIT.AI em molduras de celular; no celular, um trilho que rola de lado. */
+.telas__cabeca { position: relative; }
+.vaga--telas {
+  position: absolute; right: calc(40 * var(--su)); top: calc(-56 * var(--su));
+  width: calc(240 * var(--su)); height: calc(240 * var(--su)); --foco: 0.27;
+}
+.telas__trilho { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(48 * var(--su)) calc(28 * var(--su)); }
+.tela { margin: 0; display: flex; flex-direction: column; gap: 16px; }
+.tela__moldura {
+  position: relative; aspect-ratio: 600 / 1298; max-height: 640px; width: 100%; max-width: 300px; margin-inline: auto;
+  border-radius: 34px; padding: 9px; background: #151515; box-shadow: inset 0 0 0 1px var(--fio), 0 30px 60px -30px rgba(0, 0, 0, .9);
+}
+.tela__moldura img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 26px; }
+.tela figcaption { display: flex; flex-direction: column; gap: 4px; max-width: 300px; margin-inline: auto; width: 100%; }
+.tela figcaption b { font: 800 26px/1 var(--f-display); text-transform: uppercase; }
+.tela figcaption span { font-size: 15px; line-height: 1.45; color: var(--apoio); }
+@media (max-width: 900px) { .telas__trilho { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) {
+  .vaga--telas { right: -6px; top: -26px; width: 108px; height: 108px; --foco: 0.2; }
+  .telas__trilho {
+    display: flex; gap: 14px; overflow-x: auto; margin-inline: calc(-1 * var(--margem)); padding: 4px var(--margem) 10px;
+    scrollbar-width: none; overscroll-behavior-x: contain;
+  }
+  .telas__trilho::-webkit-scrollbar { display: none; }
+  .tela { flex: 0 0 72%; }
+  .tela__moldura { max-width: none; border-radius: 28px; padding: 7px; }
+  .tela__moldura img { border-radius: 22px; }
+}
