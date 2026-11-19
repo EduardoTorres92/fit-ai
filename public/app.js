@@ -2525,12 +2525,30 @@
     if (!titulo) { toast("Dê um título ao desafio."); return; }
     if (link && !/^https:\/\//i.test(link)) { toast("O link precisa começar com https://"); return; }
     const btn = ev.target.querySelector("button[type=submit]"); btn.disabled = true;
-    const capa = formDesafio === "link" && desafioRascunho?.capa ? await subirCapa(desafioRascunho.capa, G.sel) : null;
-    const { error } = await sb.from("desafios").insert({ grupo_id: G.sel, semana: semanaAtual(), titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito", criado_por: uid, ...(capa ? { capa } : {}) });
+    const campos = { titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito" };
+    if (formDesafio === "editar" && desafioEditando) { // edição: quem lançou ou o dono do grupo
+      const e0 = desafioEditando, prazo = d.prazo === "manter" ? e0.prazo || null : prazoDe(d.prazo);
+      const { titulo: tituloAntes, semana: semanaAntes } = e0;
+      const mud = { ...campos, prazo: prazo && prazo >= e0.semana ? prazo : keyOf(addDays(parseKey(e0.semana), 6)) };
+      const { error } = await sb.from("desafios").update(mud).eq("id", e0.id);
+      if (!error && d.todos && e0.criado_por === uid) // o mesmo desafio lançado junto nos outros grupos (mesma semana e título)
+        await sb.from("desafios").update(mud).eq("criado_por", uid).eq("semana", semanaAntes).eq("titulo", tituloAntes);
+      btn.disabled = false;
+      if (error) { toast("Não consegui salvar a edição."); return; }
+      formDesafio = null; desafioEditando = null; await carregarGrupos(true);
+      toast("Desafio atualizado ✓"); return;
+    }
+    const prazo = prazoDe(d.prazo || "dom"), alvos = d.todos ? (G.grupos || []).map((g) => g.id) : [G.sel];
+    let ok = 0, ja = 0, falhou = 0;
+    for (const gid of alvos) {
+      const capa = formDesafio === "link" && desafioRascunho?.capa ? await subirCapa(desafioRascunho.capa, gid) : null;
+      const { error } = await sb.from("desafios").insert({ grupo_id: gid, semana: semanaAtual(), ...campos, prazo, criado_por: uid, ...(capa ? { capa } : {}) });
+      if (!error) ok++; else if (/duplicate|unique/i.test(error.message)) ja++; else falhou++;
+    }
     btn.disabled = false;
-    if (error) { toast(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana." : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
+    if (!ok) { toast(ja ? (alvos.length > 1 ? "Todos os grupos já têm desafio esta semana." : "Alguém já lançou o desafio desta semana.") : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
     formDesafio = null; desafioRascunho = null; await carregarGrupos(true);
-    toast("Desafio lançado! Avise a galera. ⚔️");
+    toast(alvos.length > 1 ? `Desafio lançado em ${ok} ${ok === 1 ? "grupo" : "grupos"}${ja ? ` (${ja} já ${ja === 1 ? "tinha" : "tinham"} desafio nesta semana)` : ""}. ⚔️` : "Desafio lançado! Avise a galera. ⚔️", 4000);
   });
   document.addEventListener("submit", (ev) => {
     const mx = ev.target.closest(".ins-max");
@@ -3575,7 +3593,7 @@
     ]);
     const ag = await sb.from("agua").select("usuario_id, data, ml, meta, atualizado_em").in("usuario_id", ids).gte("data", desde);
     G.agua = ag.data || [];
-    const ds = await sb.from("desafios").select("id, semana, titulo, descricao, link, medida, capa, criado_por, criado_em").eq("grupo_id", id).gte("semana", keyOf(addDays(mondayOf(hoje), -7 * 11))).order("semana", { ascending: false });
+    const ds = await sb.from("desafios").select("id, semana, titulo, descricao, link, medida, capa, prazo, criado_por, criado_em").eq("grupo_id", id).gte("semana", keyOf(addDays(mondayOf(hoje), -7 * 11))).order("semana", { ascending: false });
     const dids = (ds.data || []).map((d) => d.id);
     const fs = dids.length ? await sb.from("desafio_feitos").select("desafio_id, usuario_id, resultado, prova, feito_em").in("desafio_id", dids) : { data: [] };
     G.desafios = ds.data || []; G.feitos = fs.data || [];
@@ -3780,8 +3798,8 @@
     if (!uid || !G.grupos || !grupoSel()) return "";
     const d = desafioDaSemana();
     if (!d) return `<a class="emerg" href="#/grupo"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>`;
-    const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa], fim = 6 - hojeDia;
-    return `<div class="sec-head"><h2>Desafio da semana</h2><a href="#/grupo">${fim === 0 ? "termina hoje" : `${fim} ${fim === 1 ? "dia" : "dias"}`}</a></div>
+    const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa];
+    return `<div class="sec-head"><h2>Desafio do grupo</h2><a href="#/grupo">${faltaDesafio(d, true)}</a></div>
       <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo">
         ${capa ? `<img src="${esc(capa)}" alt="" loading="lazy">` : ""}
         <div class="dh-txt"><span class="dh-tag">⚔️ ${esc(MEDIDAS[d.medida].split(" (")[0])}${eu ? " · ✓ você cumpriu" : ""}</span>
@@ -3995,7 +4013,15 @@
   const fmtRes = (d, v) => (v == null ? "" : d.medida === "reps" ? `${v} reps` : mmss(v));
   const melhorPrimeiro = (d) => (a, b) => d.medida === "tempo" ? (a.resultado ?? 1e9) - (b.resultado ?? 1e9) : d.medida === "feito" ? String(a.feito_em).localeCompare(String(b.feito_em)) : (b.resultado ?? 0) - (a.resultado ?? 0);
   const feitosDe = (d) => G.feitos.filter((f) => f.desafio_id === d.id).sort(melhorPrimeiro(d));
-  const desafioDaSemana = () => G.desafios.find((d) => d.semana === semanaAtual()) || null;
+  // Prazo do desafio: o último dia para cumprir (sem prazo, o domingo da semana em que foi lançado)
+  const fimDesafio = (d) => d.prazo || keyOf(addDays(parseKey(d.semana), 6));
+  const desafioDaSemana = () => (G.desafios || []).filter((d) => d.semana <= hojeKey && fimDesafio(d) >= hojeKey).sort((a, b) => b.semana.localeCompare(a.semana))[0] || null;
+  const faltaDesafio = (d, curto = false) => { const n = diffDays(hoje, parseKey(d ? fimDesafio(d) : keyOf(addDays(mondayOf(hoje), 6))));
+    return n <= 0 ? "termina hoje" : curto ? `${n} ${n === 1 ? "dia" : "dias"}` : `${n} ${n === 1 ? "dia" : "dias"} para acabar`; };
+  // Opções de prazo do formulário: até domingo ou N dias a partir de hoje (o último dia conta)
+  const PRAZOS = [["dom", "Até domingo"], ["3", "3 dias"], ["5", "5 dias"], ["7", "7 dias"], ["10", "10 dias"], ["14", "14 dias"], ["21", "21 dias"]];
+  const prazoDe = (v) => (v === "dom" ? keyOf(addDays(mondayOf(hoje), 6)) : keyOf(addDays(hoje, Math.max(1, Number(v) || 7) - 1)));
+  let desafioEditando = null; // o desafio aberto no formulário de edição
   let formDesafio = null; // null | índice do modelo ("" = em branco) | "link" (montado pelo Coach a partir de um vídeo)
   let desafioRascunho = null; // { titulo, descricao, medida, link, nota, duvida }
   const LINK_VIDEO = /(?:https?:\/\/)?(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
@@ -4025,13 +4051,15 @@
   }
   function cardDesafio(g) {
     const d = desafioDaSemana();
-    const fim = 6 - hojeDia, prazo = fim === 0 ? "termina hoje" : `${fim} ${fim === 1 ? "dia" : "dias"} para acabar`;
+    const prazo = faltaDesafio(d);
     if (formDesafio !== null) {
-      const m = formDesafio === "link" && desafioRascunho ? desafioRascunho : MODELOS[formDesafio] || { titulo: "", descricao: "", medida: "feito" };
+      const ed = formDesafio === "editar" && desafioEditando;
+      const m = ed ? desafioEditando : formDesafio === "link" && desafioRascunho ? desafioRascunho : MODELOS[formDesafio] || { titulo: "", descricao: "", medida: "feito" };
+      const outros = !ed && (G.grupos || []).length > 1;
       return `<form class="desafio form-desafio" id="form-desafio">
-        <div class="sec-head"><h2>Lançar desafio da semana</h2></div>
-        <div class="chips">${MODELOS.map((x, i) => `<button type="button" class="chip${String(i) === String(formDesafio) ? " primary" : ""}" data-modelo="${i}">${esc(x.titulo)}</button>`).join("")}<button type="button" class="chip${formDesafio === "" ? " primary" : ""}" data-modelo="">Em branco</button></div>
-        ${m.capa ? `<div class="dsf-capa prev"><img src="${esc(m.capa)}" alt="Capa do vídeo"></div>` : ""}
+        <div class="sec-head"><h2>${ed ? "Editar desafio" : "Lançar desafio"}</h2></div>
+        ${ed ? "" : `<div class="chips">${MODELOS.map((x, i) => `<button type="button" class="chip${String(i) === String(formDesafio) ? " primary" : ""}" data-modelo="${i}">${esc(x.titulo)}</button>`).join("")}<button type="button" class="chip${formDesafio === "" ? " primary" : ""}" data-modelo="">Em branco</button></div>`}
+        ${!ed && m.capa ? `<div class="dsf-capa prev"><img src="${esc(m.capa)}" alt="Capa do vídeo"></div>` : ""}
         <div class="dsf-link"><label>Tem um reel? Cole o link e o Coach monta o desafio<input name="link" type="url" inputmode="url" maxlength="300" value="${esc(m.link || "")}" placeholder="https://www.instagram.com/reel/..."></label>
           <details${m.nota ? " open" : ""}><summary>A legenda não explica o exercício? Descreva o vídeo</summary><textarea name="nota" maxlength="600" rows="2" placeholder="Ex.: 10 burpees + 20 agachamentos, 5 rodadas, contra o relógio">${esc(m.nota || "")}</textarea></details>
           <button type="button" class="btn btn-outline" id="desafio-link">✨ Montar pelo link</button>
@@ -4039,7 +4067,11 @@
         <label>Título<input name="titulo" required maxlength="80" value="${esc(m.titulo)}" placeholder="Ex.: Desafio do reel"></label>
         <label>Como fazer<textarea name="descricao" maxlength="500" rows="3" placeholder="Explique a regra do desafio">${esc(m.descricao)}</textarea></label>
         <label>Como medir<select name="medida">${Object.entries(MEDIDAS).map(([k, n]) => `<option value="${k}"${k === m.medida ? " selected" : ""}>${n}</option>`).join("")}</select></label>
-        <div class="row2"><button type="button" class="btn btn-outline" id="desafio-cancelar">Cancelar</button><button type="submit" class="btn btn-blue">Lançar</button></div>
+        <label>Tempo para cumprir<select name="prazo">${ed ? `<option value="manter" selected>Manter: até ${ddmm(fimDesafio(m))}</option>` : ""}${PRAZOS.map(([v, n]) => `<option value="${v}"${!ed && v === "dom" ? " selected" : ""}>${n} · até ${ddmm(prazoDe(v))}</option>`).join("")}</select></label>
+        ${ed && G.feitos.some((f) => f.desafio_id === m.id) ? `<p class="note small">Já tem gente que cumpriu: trocar a forma de medir pode deixar os resultados antigos sem sentido.</p>` : ""}
+        ${outros ? `<label class="dsf-todos"><input type="checkbox" name="todos" value="1"> Lançar em todos os meus grupos (${G.grupos.length})</label>` : ""}
+        ${ed && m.criado_por === uid && (G.grupos || []).length > 1 ? `<label class="dsf-todos"><input type="checkbox" name="todos" value="1" checked> Aplicar também nos outros grupos onde lancei este desafio</label>` : ""}
+        <div class="row2"><button type="button" class="btn btn-outline" id="desafio-cancelar">Cancelar</button><button type="submit" class="btn btn-blue">${ed ? "Salvar" : "Lançar"}</button></div>
       </form>`;
     }
     if (!d) return `<div class="desafio vazio"><div class="sec-head"><h2>⚔️ Desafio da semana</h2><span>${prazo}</span></div>
@@ -4052,13 +4084,13 @@
       ${capa ? `<a class="dsf-capa" ${d.link ? `href="${esc(d.link)}" target="_blank" rel="noopener"` : ""}><img src="${esc(capa)}" alt="Capa do vídeo do desafio" loading="lazy"><span>${d.link ? "▶ Ver o vídeo" : ""}</span></a>` : ""}
       <div class="sec-head"><h2>⚔️ ${esc(d.titulo)}</h2><span>${prazo}</span></div>
       ${d.descricao ? `<p class="d-desc">${esc(d.descricao)}</p>` : ""}
-      <div class="ex-tags"><span class="pill gray">${esc(MEDIDAS[d.medida].split(" (")[0])}</span><span class="pill gray">por ${esc((G.perfis[d.criado_por]?.nome || "alguém").split(" ")[0])}</span></div>
+      <div class="ex-tags"><span class="pill gray">${esc(MEDIDAS[d.medida].split(" (")[0])}</span><span class="pill gray">até ${ddmm(fimDesafio(d))}</span><span class="pill gray">por ${esc((G.perfis[d.criado_por]?.nome || "alguém").split(" ")[0])}</span></div>
       ${d.link && !capa ? `<a class="btn btn-outline" href="${esc(d.link)}" target="_blank" rel="noopener">▶ Ver o desafio</a>` : ""}
       <p class="d-status">${fs.length ? `🏅 <b>Conquista da semana garantida!</b> ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}.` : "Ninguém cumpriu ainda. Bora ser o primeiro? 💪"}</p>
       ${fs.length ? `<ol class="rank">${fs.map((f, i) => `<li class="${f.usuario_id === uid ? "eu" : ""}"><span class="pos">${d.medida !== "feito" && i < 3 ? med[i] : "✓"}</span>${avatar(G.perfis[f.usuario_id], 32)}
         <span class="nome">${esc(G.perfis[f.usuario_id]?.nome || "Atleta")}</span>${f.prova ? `<a class="lnk-btn" href="${esc(f.prova)}" target="_blank" rel="noopener">prova</a>` : ""}<strong>${esc(fmtRes(d, f.resultado))}</strong></li>`).join("")}</ol>` : ""}
       ${eu ? `<button class="btn btn-outline done" id="desafio-desfazer" data-id="${d.id}">Você cumpriu ✓ (toque para desfazer)</button>` : `<button class="btn btn-blue" id="desafio-cumpri" data-id="${d.id}">✅ Cumpri o desafio</button>`}
-      ${podeApagar ? `<button class="lnk-btn" id="desafio-apagar" data-id="${d.id}">Apagar desafio</button>` : ""}
+      ${podeApagar ? `<div class="dsf-acoes"><button class="lnk-btn" id="desafio-editar" data-id="${d.id}">Editar desafio</button><button class="lnk-btn" id="desafio-apagar" data-id="${d.id}">Apagar desafio</button></div>` : ""}
     </div>`;
   }
   function historicoDesafios() {
@@ -4520,7 +4552,8 @@
     else if (t.id === "g-criar") criarGrupo();
     else if (t.id === "desafio-novo") { formDesafio = 0; render(); }
     else if (t.dataset.modelo !== undefined) { formDesafio = t.dataset.modelo === "" ? "" : Number(t.dataset.modelo); render(); }
-    else if (t.id === "desafio-cancelar") { formDesafio = null; desafioRascunho = null; render(); }
+    else if (t.id === "desafio-cancelar") { formDesafio = null; desafioRascunho = null; desafioEditando = null; render(); }
+    else if (t.id === "desafio-editar") { desafioEditando = G.desafios.find((x) => x.id === t.dataset.id) || null; if (desafioEditando) { formDesafio = "editar"; render(); document.getElementById("form-desafio")?.scrollIntoView({ block: "start" }); } }
     else if (t.id === "desafio-link") {
       const f = t.closest("form"), link = linkCompleto(f.elements.link.value.trim()), nota = f.elements.nota.value.trim();
       if (!LINK_VIDEO.test(link)) { toast("Cole o link de um reel do Instagram, TikTok ou YouTube."); return; }
@@ -4738,7 +4771,7 @@
     if (!texto || busy) return;
     const coach = chatPapel === "coach";
     if (coach && iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
-    if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar no grupo|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
+    if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar no grupo|lançar em todos os grupos|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
     if (coach && atalhoHoje(texto)) return;
     busy = true;
     addMsg(msgsEl, esc(texto), true, chatLog);
@@ -4765,13 +4798,17 @@
     const g = grupoSel();
     if (!g) return fala("Você ainda não está em nenhum grupo. Crie um ou entre com um código na aba <b>Grupo</b> e me mande o link de novo. 🤝", ["Abrir o grupo"]);
     if (/^editar antes de lançar$/i.test(texto)) { formDesafio = "link"; busy = false; closeChat(); location.hash = "#/grupo"; render(); return; }
-    if (/^lançar no grupo$/i.test(texto)) {
-      const d = desafioRascunho;
-      const capa = d.capa ? await subirCapa(d.capa, g.id) : null;
-      const { error } = await sb.from("desafios").insert({ grupo_id: g.id, semana: semanaAtual(), titulo: d.titulo, descricao: d.descricao, link: d.link, medida: d.medida, criado_por: uid, ...(capa ? { capa } : {}) });
-      if (error) return fala(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana. Ele fica guardado: toque em <b>Editar antes de lançar</b> na semana que vem." : "Não consegui lançar agora. Tente de novo.");
+    if (/^lançar (no grupo|em todos os grupos)$/i.test(texto)) {
+      const d = desafioRascunho, todos = /todos/i.test(texto), alvos = todos ? G.grupos : [g];
+      let ok = 0, ja = 0;
+      for (const gr of alvos) {
+        const capa = d.capa ? await subirCapa(d.capa, gr.id) : null;
+        const { error } = await sb.from("desafios").insert({ grupo_id: gr.id, semana: semanaAtual(), titulo: d.titulo, descricao: d.descricao, link: d.link, medida: d.medida, prazo: prazoDe("dom"), criado_por: uid, ...(capa ? { capa } : {}) });
+        if (!error) ok++; else if (/duplicate|unique/i.test(error.message)) ja++;
+      }
+      if (!ok) return fala(ja ? `${todos ? "Todos os grupos já têm" : "O grupo já tem"} o desafio desta semana. Ele fica guardado: toque em <b>Editar antes de lançar</b> na semana que vem.` : "Não consegui lançar agora. Tente de novo.");
       desafioRascunho = null; formDesafio = null; carregarGrupos(true);
-      return fala(`Desafio lançado no grupo <b>${esc(g.nome)}</b>! ⚔️ Avise a galera.`, ["Abrir o grupo"]);
+      return fala(todos ? `Desafio lançado em <b>${ok} ${ok === 1 ? "grupo" : "grupos"}</b>${ja ? ` (${ja} já ${ja === 1 ? "tinha" : "tinham"} o desta semana)` : ""}! ⚔️ Vale até domingo; para mudar o prazo, toque em <b>Editar desafio</b> no grupo.` : `Desafio lançado no grupo <b>${esc(g.nome)}</b>! ⚔️ Vale até domingo; para mudar o prazo, toque em <b>Editar desafio</b> no grupo.`, ["Abrir o grupo"]);
     }
     const bruto = texto.match(LINK_VIDEO)[0], link = linkCompleto(bruto), nota = texto.replace(bruto, "").trim();
     const stop = typing(msgsEl);
@@ -4781,7 +4818,7 @@
       desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida, capa: j.capa || "" };
       const ja = desafioDaSemana();
       addMsg(msgsEl, `${j.capa ? `<img class="dsf-capa-chat" src="${esc(j.capa)}" alt="Capa do vídeo">` : ""}Montei o desafio a partir do vídeo${j.fonte?.leu ? "" : " (não consegui ler a legenda, usei a capa e o que você escreveu)"}:<br><br><b>${esc(j.desafio.titulo)}</b><br>${esc(j.desafio.descricao)}<br><small>Como medir: ${esc(MEDIDAS[j.desafio.medida])}</small>${j.duvida ? `<br><br>⚠️ ${esc(j.duvida)}` : ""}${ja ? `<br><br>O grupo <b>${esc(g.nome)}</b> já tem o desafio desta semana (<b>${esc(ja.titulo)}</b>).` : ""}`, false, chatLog);
-      setChips(chipsEl, ja ? ["Editar antes de lançar"] : ["Lançar no grupo", "Editar antes de lançar"], true);
+      setChips(chipsEl, ja ? ["Editar antes de lançar", ...(G.grupos.length > 1 ? ["Lançar em todos os grupos"] : [])] : ["Lançar no grupo", ...(G.grupos.length > 1 ? ["Lançar em todos os grupos"] : []), "Editar antes de lançar"], true);
     } catch (e) { stop(); addMsg(msgsEl, esc(e.message), false, chatLog); setChips(chipsEl, CHIPS_PADRAO); }
     busy = false;
   }
