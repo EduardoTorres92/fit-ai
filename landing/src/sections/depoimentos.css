@@ -1,0 +1,23 @@
+/* Depoimentos: três falas lado a lado, cada uma sob um fio; o kettlebell 3D ao lado do título. */
+.depoimentos__cabeca { position: relative; }
+.vaga--depoimentos {
+  position: absolute; right: calc(70 * var(--su)); top: calc(-104 * var(--su));
+  width: calc(216 * var(--su)); height: calc(216 * var(--su)); --foco: 0.24;
+}
+.depoimentos__grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(40 * var(--su)); }
+.fala { display: flex; flex-direction: column; gap: 28px; padding-top: 22px; border-top: 1px solid var(--fio); }
+.fala blockquote { font-size: 20px; line-height: 1.4; letter-spacing: -0.005em; flex: 1; }
+.fala blockquote::before { content: '“'; display: block; height: 0.5em; margin-bottom: 0.1em; font: 800 64px/1 var(--f-display); color: var(--acento); }
+html[data-tema='brasa'] .fala blockquote::before { color: var(--tinta); }
+.fala figcaption { display: grid; gap: 2px; }
+.fala figcaption b { font-size: 15px; font-weight: 600; }
+.fala figcaption span { font-size: 13px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase; color: var(--apoio); }
+@media (max-width: 900px) {
+  .depoimentos__grade { grid-template-columns: 1fr; gap: 26px; }
+  .fala { gap: 18px; }
+}
+@media (max-width: 760px) {
+  .depoimentos__cabeca { padding-right: 104px; }
+  .vaga--depoimentos { right: -8px; top: -30px; width: 108px; height: 108px; --foco: 0.2; }
+  .fala blockquote { font-size: 18px; }
+}

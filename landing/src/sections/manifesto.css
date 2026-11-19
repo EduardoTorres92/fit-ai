@@ -1,0 +1,16 @@
+/* Manifesto: uma frase só, na display, com a peça 3D de capitular. As palavras acendem com a rolagem. */
+.manifesto { padding-top: calc(150 * var(--su)); }
+.manifesto__texto {
+  font: 800 calc(64 * var(--su)) / 1 var(--f-display); text-transform: uppercase; text-wrap: pretty;
+}
+.vaga--capitular {
+  float: left; width: calc(186 * var(--su)); height: calc(186 * var(--su));
+  margin: calc(3 * var(--su)) calc(26 * var(--su)) 0 0; shape-outside: circle(50%); --foco: 0.5;
+}
+.js .manifesto__texto .palavra { opacity: 0.2; transition: opacity 0.5s linear; }
+.js .manifesto__texto .palavra.is-acesa { opacity: 1; }
+@media (max-width: 760px) {
+  .manifesto { padding-top: 72px; }
+  .manifesto__texto { font-size: calc(38 * var(--su)); line-height: 1.02; }
+  .vaga--capitular { width: 112px; height: 112px; margin: 2px 16px 0 0; --foco: 0.4; }
+}

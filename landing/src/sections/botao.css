@@ -1,0 +1,49 @@
+/* Botões: retos, sem raio. No hover, a cor sobe de baixo como uma placa de peso entrando na pilha e a seta anda. */
+.botao {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+  height: 52px; padding: 0 22px;
+  font: 600 15px/1 var(--f-texto); white-space: nowrap;
+  transition: color 0.4s var(--entra), transform 0.2s var(--entra), box-shadow 0.4s var(--entra);
+}
+.botao::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  transform: translateY(101%); transition: transform 0.5s var(--entra);
+}
+.botao:active { transform: scale(0.97); }
+.botao .seta { width: 16px; height: 16px; flex: none; transition: transform 0.45s var(--entra); }
+.botao--cheio { background: var(--acento); color: var(--sobre-acento); }
+.botao--cheio::before { background: var(--tinta); }
+.botao--linha { box-shadow: inset 0 0 0 1.5px var(--fio); color: var(--tinta); }
+.botao--linha::before { background: var(--tinta); }
+.botao--largo { width: 100%; }
+
+@media (hover: hover) {
+  html:not(.is-scrolling) .botao:hover::before { transform: none; }
+  html:not(.is-scrolling) .botao:hover { color: var(--fundo); }
+  html:not(.is-scrolling) .botao:hover .seta { transform: translateX(5px); }
+}
+.botao:focus-visible::before { transform: none; }
+.botao:focus-visible { color: var(--fundo); }
+.botao:focus-visible .seta { transform: translateX(5px); }
+/* temas em que o acento é a própria tinta: o hover inverte para o fundo com contorno */
+html[data-tema='mono'] .botao--cheio::before, html[data-tema='brasa'] .botao--cheio::before { background: var(--fundo); box-shadow: inset 0 0 0 1.5px var(--tinta); }
+html[data-tema='mono'] .botao--cheio:focus-visible, html[data-tema='brasa'] .botao--cheio:focus-visible { color: var(--tinta); }
+@media (hover: hover) {
+  html[data-tema='mono']:not(.is-scrolling) .botao--cheio:hover, html[data-tema='brasa']:not(.is-scrolling) .botao--cheio:hover { color: var(--tinta); }
+}
+
+/* link de texto com seta (dentro das seções) */
+.elo { display: inline-flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 15px; font-weight: 600; }
+.elo span { position: relative; }
+.elo span::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 1.5px; background: currentColor;
+  transform-origin: 0 50%; transition: transform 0.45s var(--entra);
+}
+.elo .seta { width: 16px; height: 16px; transition: transform 0.45s var(--entra); }
+.elo:active { opacity: 0.7; }
+@media (hover: hover) {
+  html:not(.is-scrolling) .elo:hover span::after { transform: scaleX(0); transform-origin: 100% 50%; }
+  html:not(.is-scrolling) .elo:hover .seta { transform: translateX(5px); }
+}
+.elo:focus-visible .seta { transform: translateX(5px); }

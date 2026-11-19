@@ -3,66 +3,335 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#000000">
-  <title>FIT.AI — Seu personal com IA</title>
-  <meta name="description" content="FIT.AI: monte seu plano de treino, acompanhe sua evolução e tire dúvidas com um Coach AI disponível 24h.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@600&family=Inter+Tight:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="icon" href="assets/sparkles-blue.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <title>FIT.AI · Seu coach de treino com IA</title>
+  <meta name="description" content="Um coach de IA que monta o seu treino de academia, calistenia, corrida ou cross, acompanha cada série e transforma a sua constância em XP, níveis e conquistas.">
+  <meta name="theme-color" content="#070707">
+  <link rel="icon" href="./marca.svg" type="image/svg+xml">
+  <!-- Links antigos e retornos de login (/#/..., ?code=, #access_token=) seguem para o app em /app -->
+  <script>if(/^#\/|access_token|error_description/.test(location.hash)||/[?&](code|error)=/.test(location.search))location.replace("/app"+location.search+location.hash);</script>
+  <!-- Primeira pintura: a cor de fundo do tema e o estilo crítico do hero vêm aqui, antes da folha do site (que vem em
+       <link> e segura a pintura até chegar; nunca pelo JS). ?tema=osso|brasa|cobalto|mono troca a paleta.
+       Os textos que entram por marco só se escondem com o JS no ar (classe .js): se ele não subir em 4 s, a trava
+       cai e a página aparece inteira. -->
+  <script>
+    (function () {
+      var d = document.documentElement;
+      var FUNDOS = { carvao: '#070707', mono: '#070707', osso: '#e9e6df', brasa: '#f01810', cobalto: '#1b3bff' };
+      var tema = new URLSearchParams(location.search).get('tema');
+      if (!FUNDOS[tema]) tema = 'carvao';
+      d.dataset.tema = tema;
+      d.style.backgroundColor = FUNDOS[tema];
+      document.querySelector('meta[name="theme-color"]').content = FUNDOS[tema];
+      d.classList.add('js');
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) d.classList.add('reduzido');
+      setTimeout(function () { if (!window.__kiloViva) { d.classList.remove('js'); d.classList.add('sem-peca'); } }, 4000);
+    })();
+  </script>
+  <style>html{color:#f2f0ea;background:#070707}body{margin:0}.js .marco,.js .sobe{opacity:0}</style>
+  <!-- sem JavaScript: um anel desenhado no lugar do "O" que a peça 3D ocuparia -->
+  <noscript><style>.vaga--o,.vaga--rodape{border-radius:50%;box-shadow:inset 0 0 0 .24em}</style></noscript>
+  <script type="module" crossorigin src="./lp/index-CqJat1Mm.js"></script>
+  <link rel="stylesheet" crossorigin href="./lp/index-DwSC3zrW.css">
 </head>
 <body>
-  <div class="device">
-    <aside id="sidebar" class="sidebar" aria-label="Navegação principal" hidden>
-      <a class="sb-logo" href="#/home" aria-label="FIT.AI, início"><span class="logo-txt dark">Fit.ai</span></a>
-      <nav class="sb-links" id="sb-links"></nav>
-      <button type="button" class="sb-coach" data-open-chat><img src="assets/sparkles-white.svg" width="20" height="20" alt=""><span>Falar com o Coach AI</span></button>
-      <p class="sb-credit">Projeto de portfólio · desenvolvido por Eduardo</p>
-    </aside>
-    <main id="app" class="app" aria-live="polite"></main>
-    <nav id="toolbar" class="toolbar" aria-label="Navegação principal" hidden>
-      <button type="button" class="tb-menu" id="tb-menu" aria-haspopup="dialog" aria-expanded="false" aria-label="Abrir navegação">
-        <svg class="tb-menu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg>
-        <span id="tb-atual">Início</span>
-      </button>
-      <button type="button" class="tb-ai" data-open-chat aria-label="Abrir Coach AI">
-        <img src="assets/sparkles-white.svg" width="24" height="24" alt="">
-      </button>
-    </nav>
-    <div id="chat-layer" class="chat-layer" hidden>
-      <div class="chat-backdrop" data-close-chat></div>
-      <section class="chat-sheet" role="dialog" aria-modal="true" aria-label="Coach AI">
-        <header class="chat-head">
-          <div class="coach">
-            <span class="coach-avatar"><img src="assets/sparkles-blue.svg" width="18" height="18" alt=""></span>
-            <span class="coach-txt"><strong id="chat-nome">Coach AI</strong><span class="online"><img src="assets/dot-online.svg" width="8" height="8" alt="">Online</span></span>
-          </div>
-          <button type="button" class="icon-btn" data-close-chat aria-label="Fechar chat"><img src="assets/x.svg" width="24" height="24" alt=""></button>
-        </header>
-        <div class="chat-msgs" id="chat-msgs"></div>
-        <div class="chat-foot">
-          <div class="chips" id="chat-chips"></div>
-          <form class="composer" id="chat-form" autocomplete="off">
-            <input type="text" id="chat-input" placeholder="Digite sua mensagem" aria-label="Mensagem para o Coach AI">
-            <button type="submit" class="send" aria-label="Enviar"><img src="assets/arrow-up.svg" width="20" height="20" alt=""></button>
-          </form>
-        </div>
-      </section>
+  <a class="pular" href="#sobre">Pular para o conteúdo</a>
+
+  <header class="barra">
+  <a class="barra__marca" href="#topo" aria-label="FIT.AI, voltar ao início">
+    <span aria-hidden="true">Fit</span><svg class="barra__o barra__ponto" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" fill="currentColor"/></svg><span aria-hidden="true">AI</span>
+  </a>
+  <nav class="barra__links" aria-label="Seções">
+    <a href="#modalidades" data-secao="modalidades">Como funciona</a>
+    <a href="#estrutura" data-secao="estrutura">Trilhas</a>
+    <a href="#planos" data-secao="planos">Planos</a>
+    <a href="#horarios" data-secao="horarios">Sua semana</a>
+    <a href="#duvidas" data-secao="duvidas">Dúvidas</a>
+  </nav>
+  <a class="barra__cta" href="/app">Abrir o app</a>
+</header>
+
+
+  <main>
+    <section class="hero" id="topo">
+  <div class="hero__palco">
+    <h1 class="hero__titulo">
+      <span class="mascara"><span class="sobe hero__l1" style="--i:0"><span>Mais</span> <span>um</span></span></span>
+      <span class="mascara"><span class="sobe" style="--i:1">Trein<span class="vaga vaga--o" data-vaga="hero" data-forma="anilha" data-pose="-10 20 0"><span class="so-leitor">o</span></span></span></span>
+    </h1>
+    <div class="hero__pe">
+      <p class="hero__texto marco" style="--i:4">Um coach de IA que monta o seu treino de academia, calistenia, corrida ou cross, acompanha cada série e transforma a sua constância em XP, níveis e conquistas.</p>
+      <div class="hero__acoes marco" style="--i:5">
+        <a class="botao botao--cheio" href="/app">Começar agora<svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="botao botao--linha" href="#modalidades">Ver como funciona</a>
+      </div>
     </div>
   </div>
-  <p class="credit">FIT.AI · projeto de portfólio · desenvolvido por Eduardo</p>
-  <script src="vendor/supabase.js"></script>
-  <!-- Treino da Fera (calistenia); sem ele o app usa o programa de exemplo do app.js -->
-  <script src="programa-pessoal.js" onerror="this.remove()"></script>
-  <script src="insanity.js"></script>
-  <script src="insanity-estrutura.js"></script>
-  <script src="insanity60.js"></script>
-  <script src="academia.js"></script>
-  <script src="calistenia21.js"></script>
-  <script src="corrida.js"></script>
-  <script src="guia-alimentacao.js"></script>
-  <script src="circular-nav.js"></script>
-  <script src="app.js"></script>
+  <ul class="hero__fatos marco" style="--i:6">
+    <li>No celular e no computador <b>sem instalar nada</b></li>
+    <li>Coach de IA <b>a qualquer hora</b></li>
+  </ul>
+</section>
+
+
+    <section class="manifesto secao" id="sobre">
+  <div class="miolo">
+    <h2 class="manifesto__texto" data-acende>
+      <span class="vaga vaga--capitular" data-vaga="manifesto" data-forma="anilha" data-pose="-24 -34 10" data-voo="0.05 0.84"></span>O FIT.AI nasceu de um caderno de treino. Hoje ele tem um coach que conversa com você, monta a ficha, lê o quadro do box e o print da sua corrida, e conta cada série. Ninguém precisa de motivação todo dia: precisa só de mais um treino.
+    </h2>
+  </div>
+</section>
+
+
+    <section class="mod" id="modalidades" data-cena aria-labelledby="mod-titulo">
+  <div class="mod__palco" data-palco>
+    <div class="mod__quadro" data-passo-atual="0">
+      <h2 class="rotulo mod__rotulo" id="mod-titulo">Como funciona</h2>
+
+      <div class="mod__faixa" aria-hidden="true">
+        <div class="mod__nums">
+          <span class="mod__giga is-ativo"><span>01</span></span>
+          <span class="mod__giga"><span>02</span></span>
+          <span class="mod__giga"><span>03</span></span>
+        </div>
+        <div class="mod__nomes">
+          <span class="mod__giga is-ativo"><span>Coach</span></span>
+          <span class="mod__giga"><span>XP</span></span>
+          <span class="mod__giga"><span>Grupo</span></span>
+        </div>
+      </div>
+
+      <!-- a peça pousa aqui e troca de forma a cada modalidade (uma forma por passo, na ordem) -->
+      <span class="vaga vaga--mod" data-vaga="modalidades" data-formas="halter kettlebell saco" data-preso></span>
+
+      <div class="mod__baixo">
+        <div class="mod__textos">
+          <article class="mod__passo is-ativo">
+            <h3>Um treinador de IA no bolso</h3>
+            <p>O Coach faz uma entrevista rápida (objetivo, nível, dias, onde você treina) e monta o plano. Depois acompanha cada série, compara com o treino anterior e revisa a ficha toda semana.</p>
+          </article>
+          <article class="mod__passo">
+            <h3>Constância que vira nível</h3>
+            <p>Cada treino, recorde, meta de água e semana batida vale XP. Você sobe de nível, troca de classe (de Recruta a Imortal) e se forma em cada etapa da trilha.</p>
+          </article>
+          <article class="mod__passo">
+            <h3>Treinar junto, mesmo longe</h3>
+            <p>Monte um grupo com os amigos, veja quem treinou hoje e dispute o ranking de XP. Cole o link de um reel e o Coach transforma o vídeo no desafio da semana.</p>
+          </article>
+        </div>
+        <div class="mod__listas">
+          <ul class="mod__lista is-ativo">
+            <li style="--i:0">Ficha montada no chat</li>
+            <li style="--i:1">Animação dos exercícios</li>
+            <li style="--i:2">Foto do quadro do box vira WOD</li>
+            <li style="--i:3">Print da corrida vira treino</li>
+            <li style="--i:4">Revisão semanal do plano</li>
+          </ul>
+          <ul class="mod__lista">
+            <li style="--i:0">50 níveis e 10 classes</li>
+            <li style="--i:1">46 conquistas</li>
+            <li style="--i:2">Formatura por etapa</li>
+            <li style="--i:3">Recordes e Max Out</li>
+            <li style="--i:4">Meta da semana</li>
+          </ul>
+          <ul class="mod__lista">
+            <li style="--i:0">Ranking de XP</li>
+            <li style="--i:1">Desafio da semana</li>
+            <li style="--i:2">Feed com fotos</li>
+            <li style="--i:3">Bot no Telegram</li>
+            <li style="--i:4">Convite por link</li>
+          </ul>
+        </div>
+        <div class="mod__nav">
+          <button class="mod__ir" type="button" data-ir="-1" aria-label="Anterior" disabled>
+            <svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8H3M7 3.5 2.5 8 7 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Anterior</span>
+          </button>
+          <button class="mod__ir" type="button" data-ir="1" aria-label="Próxima">
+            <span>Próxima</span><svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+    <section class="estrutura secao" id="estrutura">
+  <div class="miolo">
+    <header class="secao__cabeca estrutura__cabeca">
+      <h2 class="titulo"><span class="mascara"><span class="sobe">Seis trilhas,</span></span><span class="mascara"><span class="sobe" style="--i:1">um XP só</span></span></h2>
+      <span class="vaga vaga--estrutura" data-vaga="estrutura" data-forma="bola"></span>
+    </header>
+    <div class="estrutura__fotos">
+      <figure class="foto marco" style="--i:0">
+        <div class="foto__quadro"><img src="./fotos/corrida.webp" alt="Corredor em treino de pista" width="900" height="1125" loading="lazy" decoding="async"></div>
+        <figcaption>Corrida e híbrido</figcaption>
+      </figure>
+      <figure class="foto foto--alta marco" style="--i:1">
+        <div class="foto__quadro"><img src="./fotos/academia.webp" alt="Treino de costas na academia" width="900" height="1200" loading="lazy" decoding="async"></div>
+        <figcaption>Academia</figcaption>
+      </figure>
+      <figure class="foto marco" style="--i:2">
+        <div class="foto__quadro"><img src="./fotos/calistenia.webp" alt="Barra fixa ao ar livre" width="900" height="1125" loading="lazy" decoding="async"></div>
+        <figcaption>Calistenia</figcaption>
+      </figure>
+    </div>
+    <dl class="estrutura__numeros">
+      <div class="marco" style="--i:0"><dt>6</dt><dd>trilhas: Insanos, Academia, Calistenia, Cross, Híbridos e Corrida</dd></div>
+      <div class="marco" style="--i:1"><dt>187</dt><dd>exercícios que o Coach usa para montar o seu plano</dd></div>
+      <div class="marco" style="--i:2"><dt>100+</dt><dd>animações de execução, muitas com o certo e o errado</dd></div>
+      <div class="marco" style="--i:3"><dt>46</dt><dd>conquistas, da primeira série à meia maratona</dd></div>
+    </dl>
+  </div>
+</section>
+
+
+    <section class="planos secao" id="planos">
+  <div class="miolo">
+    <header class="secao__cabeca planos__cabeca">
+      <h2 class="titulo"><span class="mascara"><span class="sobe">Três planos,</span></span><span class="mascara"><span class="sobe" style="--i:1">nenhuma pegadinha</span></span></h2>
+      <p class="secao__sub marco" style="--i:2">Comece pelo plano que cabe na sua rotina e troque quando quiser.</p>
+      <span class="vaga vaga--planos" data-vaga="planos" data-forma="cadeado"></span>
+    </header>
+    <div class="planos__grade">
+      <article class="plano marco" style="--i:0">
+        <h3 class="plano__nome">Essencial</h3>
+        <p class="plano__preco"><span>R$</span><b>[preencher]</b><span>/mês</span></p>
+        <p class="plano__nota">Para treinar sozinho, com o Coach do seu lado.</p>
+        <ul class="plano__lista">
+          <li>Uma trilha à sua escolha</li>
+          <li>Registro de treinos, XP e conquistas</li>
+          <li>Coach de IA no chat</li>
+        </ul>
+        <a class="botao botao--linha botao--largo" href="/app">Começar no Essencial</a>
+      </article>
+      <article class="plano plano--destaque marco" style="--i:1">
+        <p class="plano__selo">Mais escolhido</p>
+        <h3 class="plano__nome">Completo</h3>
+        <p class="plano__preco"><span>R$</span><b>[preencher]</b><span>/mês</span></p>
+        <p class="plano__nota">Todas as trilhas e o Coach montando cada fase.</p>
+        <ul class="plano__lista">
+          <li>Todas as trilhas e programas</li>
+          <li>Plano revisado toda semana</li>
+          <li>Foto do WOD e print da corrida</li>
+          <li>Grupos, ranking e desafios</li>
+        </ul>
+        <a class="botao botao--cheio botao--largo" href="/app">Começar no Completo</a>
+      </article>
+      <article class="plano marco" style="--i:2">
+        <h3 class="plano__nome">Anual</h3>
+        <p class="plano__preco"><span>R$</span><b>[preencher]</b><span>/mês</span></p>
+        <p class="plano__nota">O Completo com desconto, em 12 meses.</p>
+        <ul class="plano__lista">
+          <li>Tudo do plano Completo</li>
+          <li>Evolução por foto a cada 15 dias</li>
+          <li>Nutri AI com as suas metas</li>
+        </ul>
+        <a class="botao botao--linha botao--largo" href="/app">Começar no Anual</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+
+    <section class="horarios secao" id="horarios">
+  <div class="miolo horarios__miolo">
+    <header class="secao__cabeca horarios__cabeca">
+      <h2 class="titulo"><span class="mascara"><span class="sobe">A sua semana,</span></span><span class="mascara"><span class="sobe" style="--i:1">montada no chat</span></span></h2>
+      <p class="secao__sub marco" style="--i:2">Um exemplo de semana do programa Corrida e Híbrido: o Coach mistura corrida e força nos dias que você escolheu e ajusta tudo pela sua evolução.</p>
+      <span class="vaga vaga--horarios" data-vaga="horarios" data-forma="cronometro"></span>
+    </header>
+    <div class="grade marco" style="--i:2">
+      <div class="grade__dias" role="tablist" aria-label="Dia da semana">
+        <button class="grade__dia" type="button" role="tab" data-dia="seg">Seg</button>
+        <button class="grade__dia" type="button" role="tab" data-dia="ter">Ter</button>
+        <button class="grade__dia" type="button" role="tab" data-dia="qua">Qua</button>
+        <button class="grade__dia" type="button" role="tab" data-dia="qui">Qui</button>
+        <button class="grade__dia" type="button" role="tab" data-dia="sex">Sex</button>
+        <button class="grade__dia" type="button" role="tab" data-dia="sab">Sáb</button>
+      </div>
+      <ol class="grade__aulas" role="tabpanel" aria-live="polite"></ol>
+    </div>
+  </div>
+</section>
+
+
+    <section class="duvidas secao" id="duvidas">
+  <div class="miolo duvidas__miolo">
+    <header class="secao__cabeca duvidas__cabeca">
+      <h2 class="titulo"><span class="mascara"><span class="sobe">Antes</span></span><span class="mascara"><span class="sobe" style="--i:1">de começar</span></span></h2>
+      <span class="vaga vaga--duvidas" data-vaga="duvidas" data-forma="halter" data-pose="8 -22 -30"></span>
+    </header>
+    <div class="duvidas__lista">
+      <details class="duvida marco" style="--i:0" open>
+        <summary><span>Preciso instalar alguma coisa?</span><i aria-hidden="true"></i></summary>
+        <div class="duvida__corpo"><p>Não. O FIT.AI abre no navegador do celular ou do computador. Você entra com o Google ou com e-mail e senha, e os treinos ficam salvos na sua conta, em qualquer aparelho.</p></div>
+      </details>
+      <details class="duvida marco" style="--i:1">
+        <summary><span>Como o Coach monta o meu treino?</span><i aria-hidden="true"></i></summary>
+        <div class="duvida__corpo"><p>Ele faz uma entrevista curta no chat (objetivo, nível, dias, tempo, onde você treina e se tem alguma dor) e monta o plano com exercícios do catálogo, cada um com dica de execução. Toda semana ele revisa com base no que você registrou.</p></div>
+      </details>
+      <details class="duvida marco" style="--i:2">
+        <summary><span>Funciona com o Strava ou com o meu relógio?</span><i aria-hidden="true"></i></summary>
+        <div class="duvida__corpo"><p>Mande o print da corrida, da pedalada ou da caminhada (Strava, Garmin, Nike Run, relógio ou esteira). A IA lê distância, tempo e ritmo, você confere e a atividade vira treino e XP.</p></div>
+      </details>
+      <details class="duvida marco" style="--i:3">
+        <summary><span>Treino no box de CrossFit. Serve para mim?</span><i aria-hidden="true"></i></summary>
+        <div class="duvida__corpo"><p>Serve. Tire uma foto do quadro e o FIT.AI lança o WOD do dia, com cronômetro de For Time, AMRAP, EMOM e Tabata, resultado RX ou Scaled e os seus PRs.</p></div>
+      </details>
+      <details class="duvida marco" style="--i:4">
+        <summary><span>Quem vê os meus dados?</span><i aria-hidden="true"></i></summary>
+        <div class="duvida__corpo"><p>Os treinos aparecem para o seu grupo só se você entrar em um. As fotos de evolução corporal ficam só com você.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+
+    <section class="contato secao" id="contato" data-fecho>
+  <div class="miolo contato__miolo">
+    <header class="contato__cabeca">
+      <h2 class="titulo contato__titulo"><span class="mascara"><span class="sobe">O próximo treino</span></span><span class="mascara"><span class="sobe" style="--i:1">começa agora</span></span></h2>
+      <p class="secao__sub marco" style="--i:2">Abra o app, escolha a sua trilha e responda às perguntas do Coach. Em dois minutos o seu plano está pronto.</p>
+      <span class="vaga vaga--contato" data-vaga="contato" data-forma="anilha" data-pose="-12 24 0" data-voo="0.6 1"></span>
+    </header>
+    <div class="comecar marco" style="--i:2">
+      <ol class="comecar__passos">
+        <li><b>01</b><span>Entre com o Google ou com e-mail</span></li>
+        <li><b>02</b><span>Escolha a trilha: Insanos, Academia, Calistenia, Cross, Híbridos ou Corrida</span></li>
+        <li><b>03</b><span>Responda ao Coach e faça o primeiro treino</span></li>
+      </ol>
+      <a class="botao botao--cheio botao--largo" href="/app">Abrir o FIT.AI<svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    </div>
+  </div>
+</section>
+
+  </main>
+
+  <footer class="rodape">
+  <div class="rodape__colunas">
+    <div>
+      <p class="rotulo">O app</p>
+      <p>Coach de IA, trilhas com formatura,<br>XP, conquistas e grupos</p>
+    </div>
+    <div>
+      <p class="rotulo">Trilhas</p>
+      <p>Insanos · Academia · Calistenia<br>Cross · Híbridos · Corrida</p>
+    </div>
+    <div>
+      <p class="rotulo">Comece</p>
+      <p><a class="rodape__elo" href="/app">Abrir o app</a><br><a class="rodape__elo" href="#planos">Planos</a></p>
+    </div>
+    <nav aria-label="Rodapé">
+      <p class="rotulo">Na página</p>
+      <p><a class="rodape__elo" href="#modalidades">Como funciona</a><br><a class="rodape__elo" href="#estrutura">Trilhas</a><br><a class="rodape__elo" href="#duvidas">Dúvidas</a></p>
+    </nav>
+  </div>
+  <p class="rodape__nome" aria-hidden="true"><span>Fit</span><span class="vaga vaga--rodape" data-vaga="rodape" data-forma="anilha" data-pose="-6 14 0"></span><span>AI</span></p>
+  <p class="rodape__direitos">© 2026 FIT.AI · Feito por Eduardo Torres</p>
+</footer>
+
+
+  <!-- a peça 3D: um canvas só, por cima da página inteira, sem roubar clique -->
+  <canvas class="peca" aria-hidden="true"></canvas>
 </body>
 </html>

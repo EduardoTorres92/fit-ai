@@ -6,3 +6,5 @@ strava-completo.json
 public/insanity-videos.js
 videos-insanity.json
 videos-insanity-*.json
+landing/node_modules/
+landing/dist/

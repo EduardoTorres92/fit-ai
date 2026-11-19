@@ -1,0 +1,58 @@
+/* Tokens da Kilo. As cores são papéis (fundo, tinta, acento…), nunca nomes de cor: trocar a paleta é trocar este
+   bloco. ?tema=osso|brasa|cobalto|mono na URL prova as outras (o script do <head> põe data-tema no <html>). */
+:root {
+  --fundo: #070707;
+  --cartao: #121211;
+  --tinta: #f2f0ea;
+  --apoio: rgb(242 240 234 / 0.62);
+  --fio: rgb(242 240 234 / 0.2);
+  --acento: #d7ff3d;
+  --sobre-acento: #0a0a0a;
+  --destaque: #f2f0ea;        /* o cartão em destaque (plano mais escolhido) */
+  --sobre-destaque: #0a0a0a;
+
+  /* a peça 3D: o JS lê estes valores e passa para o shader */
+  --peca: #171718;            /* cor da borracha */
+  --peca-luz: #ffffff;        /* caixas de luz do estúdio */
+  --peca-contra: #ffffff;     /* contraluz que desenha a borda */
+  --peca-halo: 0.075;         /* luz no fundo, atrás da peça (0 desliga) */
+
+  --f-display: 'Big Shoulders L', 'Big Shoulders Stencil Variable', 'Arial Narrow', Impact, sans-serif;
+  --f-texto: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --entra: cubic-bezier(0.16, 1, 0.3, 1);
+  --vai: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* escala de site: 1 px de design até 1280 de largura, encolhe abaixo, nunca cresce */
+  --su: min(1px, 100vw / 1280);
+  /* escala de cena (hero, modalidades, rodapé): acompanha a tela */
+  --u: min(100vw / 1440, 100svh / 900);
+
+  --margem: calc(40 * var(--su));
+  --largura: 1200px;
+  --barra: 72px;
+}
+html[data-tema='mono'] { --acento: #f2f0ea; --sobre-acento: #0a0a0a; }
+html[data-tema='osso'] {
+  --fundo: #e9e6df; --cartao: #dedad1; --tinta: #0b0b0b; --apoio: rgb(11 11 11 / 0.64); --fio: rgb(11 11 11 / 0.22);
+  --acento: #f01810; --sobre-acento: #fff; --destaque: #0b0b0b; --sobre-destaque: #f2f0ea;
+  --peca-halo: 0;
+}
+html[data-tema='brasa'] {
+  --fundo: #f01810; --cartao: #e01208; --tinta: #0a0a0a; --apoio: rgb(10 10 10 / 0.84); --fio: rgb(10 10 10 / 0.3);
+  --acento: #0a0a0a; --sobre-acento: #f2f0ea; --destaque: #0a0a0a; --sobre-destaque: #f2f0ea;
+  --peca-halo: 0;
+}
+html[data-tema='cobalto'] {
+  --fundo: #1b3bff; --cartao: #1230e6; --tinta: #f4f3ee; --apoio: rgb(244 243 238 / 0.78); --fio: rgb(244 243 238 / 0.3);
+  --acento: #d7ff3d; --sobre-acento: #0a0a0a; --destaque: #f4f3ee; --sobre-destaque: #0a0a0a;
+  --peca-halo: 0;
+}
+@media (max-width: 760px) {
+  :root {
+    --su: min(1px, 100vw / 390);
+    --u: min(100vw / 390, 100svh / 760);
+    --margem: 20px;
+    --barra: 60px;
+  }
+}

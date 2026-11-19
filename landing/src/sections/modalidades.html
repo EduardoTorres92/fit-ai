@@ -1,0 +1,71 @@
+<section class="mod" id="modalidades" data-cena aria-labelledby="mod-titulo">
+  <div class="mod__palco" data-palco>
+    <div class="mod__quadro" data-passo-atual="0">
+      <h2 class="rotulo mod__rotulo" id="mod-titulo">Como funciona</h2>
+
+      <div class="mod__faixa" aria-hidden="true">
+        <div class="mod__nums">
+          <span class="mod__giga is-ativo"><span>01</span></span>
+          <span class="mod__giga"><span>02</span></span>
+          <span class="mod__giga"><span>03</span></span>
+        </div>
+        <div class="mod__nomes">
+          <span class="mod__giga is-ativo"><span>Coach</span></span>
+          <span class="mod__giga"><span>XP</span></span>
+          <span class="mod__giga"><span>Grupo</span></span>
+        </div>
+      </div>
+
+      <!-- a peça pousa aqui e troca de forma a cada modalidade (uma forma por passo, na ordem) -->
+      <span class="vaga vaga--mod" data-vaga="modalidades" data-formas="halter kettlebell saco" data-preso></span>
+
+      <div class="mod__baixo">
+        <div class="mod__textos">
+          <article class="mod__passo is-ativo">
+            <h3>Um treinador de IA no bolso</h3>
+            <p>O Coach faz uma entrevista rápida (objetivo, nível, dias, onde você treina) e monta o plano. Depois acompanha cada série, compara com o treino anterior e revisa a ficha toda semana.</p>
+          </article>
+          <article class="mod__passo">
+            <h3>Constância que vira nível</h3>
+            <p>Cada treino, recorde, meta de água e semana batida vale XP. Você sobe de nível, troca de classe (de Recruta a Imortal) e se forma em cada etapa da trilha.</p>
+          </article>
+          <article class="mod__passo">
+            <h3>Treinar junto, mesmo longe</h3>
+            <p>Monte um grupo com os amigos, veja quem treinou hoje e dispute o ranking de XP. Cole o link de um reel e o Coach transforma o vídeo no desafio da semana.</p>
+          </article>
+        </div>
+        <div class="mod__listas">
+          <ul class="mod__lista is-ativo">
+            <li style="--i:0">Ficha montada no chat</li>
+            <li style="--i:1">Animação dos exercícios</li>
+            <li style="--i:2">Foto do quadro do box vira WOD</li>
+            <li style="--i:3">Print da corrida vira treino</li>
+            <li style="--i:4">Revisão semanal do plano</li>
+          </ul>
+          <ul class="mod__lista">
+            <li style="--i:0">50 níveis e 10 classes</li>
+            <li style="--i:1">46 conquistas</li>
+            <li style="--i:2">Formatura por etapa</li>
+            <li style="--i:3">Recordes e Max Out</li>
+            <li style="--i:4">Meta da semana</li>
+          </ul>
+          <ul class="mod__lista">
+            <li style="--i:0">Ranking de XP</li>
+            <li style="--i:1">Desafio da semana</li>
+            <li style="--i:2">Feed com fotos</li>
+            <li style="--i:3">Bot no Telegram</li>
+            <li style="--i:4">Convite por link</li>
+          </ul>
+        </div>
+        <div class="mod__nav">
+          <button class="mod__ir" type="button" data-ir="-1" aria-label="Anterior" disabled>
+            <svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8H3M7 3.5 2.5 8 7 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Anterior</span>
+          </button>
+          <button class="mod__ir" type="button" data-ir="1" aria-label="Próxima">
+            <span>Próxima</span><svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -23,7 +23,7 @@ self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   if (e.action === "depois") return;
   if (e.notification.data?.aviso) {
-    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => (abas[0] && "focus" in abas[0] ? abas[0].focus() : self.clients.openWindow("./"))));
+    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => (abas[0] && "focus" in abas[0] ? abas[0].focus() : self.clients.openWindow("./app"))));
     return;
   }
   const ml = e.notification.data?.ml || 300, bebi = e.action === "bebi";
@@ -36,6 +36,6 @@ self.addEventListener("notificationclick", (e) => {
     for (const c of abas) {
       if ("focus" in c) { c.postMessage({ tipo: "agua", bebi, ml }); return c.focus(); }
     }
-    return self.clients.openWindow(bebi ? `./#/nutricao/bebi/${ml}` : "./#/nutricao");
+    return self.clients.openWindow(bebi ? `./app#/nutricao/bebi/${ml}` : "./app#/nutricao");
   })());
 });
