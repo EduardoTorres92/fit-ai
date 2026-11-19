@@ -593,7 +593,7 @@
     const ok = k && insFeito(p, k);
     const meta = t.ids.length ? `<span>${icon("timer.svg")}${min ? `${min} min` : "vídeo"}</span><span>${icon("zap.svg")}${t.ids.length} ${t.ids.length > 1 ? "vídeos" : "vídeo"}</span>` : `<span>${t.fim ? "Programa concluído" : "Recupere o corpo"}</span>`;
     return `<${tag} class="wcard${t.ids.length ? "" : " pending"}" ${link && t.ids.length ? `href="#/${p}/${w}/${d}"` : ""} aria-label="${esc(P.nome)}, semana ${w + 1}, ${DIAS[d]}: ${esc(t.titulo)}">
-      <img class="cover" src="${A(C(t.ids.length ? varia(INS_IMG[INSV[t.ids[0]].tipo] || ["cardio-1"], t.ids[0]) : "recuperacao-1"))}" alt="" loading="lazy">
+      <img class="cover" src="${A(C(t.ids.length ? (INS_IMG[INSV[t.ids[0]].tipo] || ["cardio-1"])[(Math.floor(d / 2) + w) % (INS_IMG[INSV[t.ids[0]].tipo] || ["cardio-1"]).length] : "recuperacao-1"))}" alt="" loading="lazy">
       <span class="pill glass">${icon("calendar-14.svg")}${DIAS[d]} · ${t.ids.length ? esc(INSV[t.ids[0]].tipo) : "Descanso"}${ok ? " · ✓" : ""}</span>
       <div class="bottom"><div class="info"><h3>${esc(t.titulo)}</h3><div class="meta">${meta}</div></div></div></${tag}>`;
   }

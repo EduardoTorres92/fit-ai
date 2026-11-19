@@ -65,7 +65,7 @@ window.FITAI_INSANITY = (() => {
     curto: "MAX:30",
     selo: "Ab Maximizer · 8 semanas",
     resumo: "Ab Maximizer · 8 semanas de vídeos · toque para começar",
-    banner: "cards/cardio-2.jpg",
+    banner: "cards/forca-1.jpg",
     maxOut: true,
     nivel: "Iniciante",
     ordem: 1,
