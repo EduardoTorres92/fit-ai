@@ -1,0 +1,42 @@
+/* Hero: o título em duas linhas de ponta a ponta, e a anilha 3D no lugar do "O" de QUILO. Escala de cena (--u). */
+.hero {
+  position: relative; min-height: 100svh; display: grid; grid-template-rows: auto 1fr; justify-items: center;
+  padding: calc(var(--barra) + 22 * var(--u)) calc(40 * var(--u)) calc(34 * var(--u));
+}
+.hero__palco { display: grid; width: 100%; max-width: 1760px; }
+.hero__titulo {
+  grid-area: 1 / 1;
+  font: 900 calc(352 * var(--u)) / 0.83 var(--f-display); text-transform: uppercase; white-space: nowrap;
+}
+.hero__l1, .js .sobe.hero__l1 { display: flex; justify-content: space-between; }
+.vaga--o { display: inline-block; position: relative; width: 0.9em; height: 0.9em; margin-left: 0.03em; vertical-align: -0.05em; }
+.hero__pe {
+  grid-area: 1 / 1; align-self: end; justify-self: end; position: relative; z-index: 6;
+  display: grid; gap: calc(22 * var(--u)); width: min(404px, 28vw); margin-bottom: calc(6 * var(--u));
+}
+.hero__texto { font-size: 18px; line-height: 1.45; }
+.hero__acoes { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero__fatos {
+  align-self: end; justify-self: start; width: 100%; max-width: 1760px; margin-inline: auto;
+  display: flex; gap: 34px; font-size: 13px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--apoio);
+}
+.hero__fatos b { font-weight: 500; color: var(--tinta); margin-left: 8px; }
+
+/* tablet em pé: a tela é alta e estreita, então o texto e os botões descem para baixo do título */
+@media (min-width: 761px) and (max-width: 1000px) {
+  .hero { min-height: 0; padding-bottom: 56px; row-gap: 44px; }
+  .hero__palco { row-gap: 32px; }
+  .hero__titulo, .hero__pe { grid-area: auto; }
+  .hero__pe { justify-self: start; width: min(480px, 100%); margin: 0; }
+}
+
+@media (max-width: 760px) {
+  .hero { padding: calc(var(--barra) + env(safe-area-inset-top) + 14 * var(--u)) var(--margem) 22px; row-gap: 18px; }
+  .hero__palco { row-gap: calc(22 * var(--u)); }
+  .hero__titulo { grid-area: auto; font-size: calc(134 * var(--u)); line-height: 0.84; }
+  .hero__l1, .js .sobe.hero__l1, .hero__l1 > span { display: block; }
+  .hero__pe { grid-area: auto; width: auto; justify-self: stretch; gap: 16px; margin: 0; }
+  .hero__texto { font-size: 16px; }
+  .hero__acoes .botao { flex: 1 1 auto; }
+  .hero__fatos { flex-direction: column; gap: 4px; font-size: 12px; }
+}

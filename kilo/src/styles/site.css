@@ -1,0 +1,19 @@
+/* Folha única do site, ligada no <head> do index.html (segura a primeira pintura até chegar). Nunca importada pelo
+   JS: no dev do Vite ela só entraria depois dos módulos e a página apareceria crua por um instante. */
+@import '@fontsource-variable/big-shoulders-stencil/wght.css';
+@import '@fontsource-variable/geist';
+@import './fontes.css';
+@import './tokens.css';
+@import './base.css';
+@import '../sections/botao.css';
+@import '../sections/barra.css';
+@import '../sections/hero.css';
+@import '../sections/manifesto.css';
+@import '../sections/modalidades.css';
+@import '../sections/estrutura.css';
+@import '../sections/planos.css';
+@import '../sections/horarios.css';
+@import '../sections/depoimentos.css';
+@import '../sections/duvidas.css';
+@import '../sections/contato.css';
+@import '../sections/rodape.css';

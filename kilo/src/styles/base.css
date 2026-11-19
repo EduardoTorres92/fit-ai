@@ -1,0 +1,94 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: clip; overscroll-behavior-x: none; }
+html { -webkit-text-size-adjust: 100%; scrollbar-width: none; -webkit-tap-highlight-color: transparent; background: var(--fundo); }
+html::-webkit-scrollbar { display: none; }
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--tinta);
+  font-family: var(--f-texto);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+img { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+h1, h2, h3, p, figure, blockquote, dl, dd, ol, ul { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; }
+::selection { background: var(--acento); color: var(--sobre-acento); }
+
+.miolo { width: min(100% - 2 * var(--margem), var(--largura)); margin-inline: auto; }
+.so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* título de seção: a display em caixa alta, com os cortes de estêncil */
+.titulo {
+  font: 800 calc(64 * var(--su)) / 0.94 var(--f-display);
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.rotulo {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--apoio);
+}
+.secao { padding-block: calc(140 * var(--su)); }
+.secao__cabeca { display: grid; gap: calc(18 * var(--su)); margin-bottom: calc(52 * var(--su)); }
+.secao__sub { max-width: 46ch; font-size: 18px; color: var(--apoio); }
+
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .titulo { font-size: calc(40 * var(--su)); }
+  .secao { padding-block: 88px; }
+  .secao__cabeca { margin-bottom: 32px; gap: 14px; }
+  .secao__sub { font-size: 16px; }
+}
+
+/* textos que entram por marco (motion/marcos.js): por tempo, nunca presos à rolagem */
+.js .marco { opacity: 0; transform: translateY(18px); transition: opacity 0.7s var(--entra), transform 0.9s var(--entra); transition-delay: calc(var(--i, 0) * 70ms); }
+.js .marco.is-visto { opacity: 1; transform: none; }
+/* linha de título que sobe por trás de uma máscara; a folga de cima guarda os acentos (Ê, É, Ã) e a de baixo, a
+   cedilha e a perna do Q: sem elas a máscara corta a letra */
+.mascara { display: block; overflow: clip; padding: 0.24em 0 0.16em; margin: -0.24em 0 -0.16em; }
+.js .sobe { display: block; opacity: 1; transform: translateY(150%); transition: transform 1.05s var(--entra); transition-delay: calc(var(--i, 0) * 90ms); }
+.js .is-visto .sobe, .js .sobe.is-visto { transform: none; }
+
+/* a vaga: o lugar onde a peça 3D pousa em cada seção (motion/percurso.js mede e leva a peça até lá) */
+.vaga { display: block; pointer-events: none; --foco: 0.5; }
+
+/* sem WebGL2: um anel desenhado no lugar do "O" do título e do rodapé; as outras vagas ficam vazias */
+.sem-peca .vaga--o, .sem-peca .vaga--rodape { border-radius: 50%; box-shadow: inset 0 0 0 0.24em currentColor; }
+
+/* a peça 3D: por cima da página, transparente, sem roubar clique */
+.peca {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100lvh; z-index: 5; pointer-events: none;
+  opacity: 0; transition: opacity 0.5s linear;
+}
+.peca.is-pronta { opacity: 1; }
+
+/* link para pular a navegação (aparece só no foco do teclado) */
+.pular {
+  position: fixed; left: 12px; top: 12px; z-index: 100; padding: 10px 16px;
+  background: var(--tinta); color: var(--fundo); font-size: 14px; transform: translateY(-160%); transition: transform 0.25s var(--entra);
+}
+.pular:focus-visible { transform: none; }
+
+/* barra de rolagem própria (motion/scrollbar.js) */
+.sbar { position: fixed; top: 6px; right: 3px; bottom: 6px; width: 10px; z-index: 60; pointer-events: none; }
+.sbar__thumb {
+  position: absolute; right: 0; width: 3px; background: var(--tinta);
+  opacity: 0; transition: opacity 0.5s, width 0.25s var(--entra); pointer-events: auto; cursor: grab;
+}
+.sbar.is-on .sbar__thumb { opacity: 0.5; }
+.sbar.is-none { display: none; }
+.sbar.is-drag .sbar__thumb { cursor: grabbing; }
+@media (hover: hover) { .sbar__thumb:hover, .sbar.is-drag .sbar__thumb { width: 6px; opacity: 0.9; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; transition-delay: 0s !important; animation: none !important; scroll-behavior: auto !important; }
+}

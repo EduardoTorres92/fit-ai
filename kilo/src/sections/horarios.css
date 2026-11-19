@@ -1,0 +1,44 @@
+/* Horários: o título e o cronômetro 3D à esquerda; à direita, os dias em abas e as aulas do dia em linhas. */
+.horarios__miolo { display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr); column-gap: calc(80 * var(--su)); align-items: start; }
+.horarios__cabeca { position: relative; margin-bottom: 0; }
+.vaga--horarios { width: calc(300 * var(--su)); height: calc(300 * var(--su)); margin-top: calc(26 * var(--su)); margin-left: calc(-8 * var(--su)); }
+.grade__dias { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: 1px solid var(--fio); }
+.grade__dia {
+  position: relative; height: 52px; font-size: 13px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--apoio); transition: color 0.3s linear;
+}
+.grade__dia::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--acento);
+  transform: scaleX(0); transition: transform 0.5s var(--entra);
+}
+.grade__dia[aria-selected='true'] { color: var(--tinta); }
+.grade__dia[aria-selected='true']::after { transform: scaleX(1); }
+.grade__dia:active { opacity: 0.6; }
+@media (hover: hover) { html:not(.is-scrolling) .grade__dia:hover { color: var(--tinta); } }
+html[data-tema='brasa'] .grade__dia::after { background: var(--tinta); }
+.grade__aulas { min-height: calc(5 * 73px); }
+.aula {
+  display: grid; grid-template-columns: 96px 1fr auto; align-items: center; column-gap: 18px;
+  min-height: 73px; padding: 12px 0; border-bottom: 1px solid var(--fio);
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.5s linear calc(var(--i) * 55ms), transform 0.8s var(--entra) calc(var(--i) * 55ms);
+}
+.aula.is-vista { opacity: 1; transform: none; }
+.aula__hora { font: 800 34px/1 var(--f-display); }
+.aula__nome { font-size: 18px; font-weight: 600; line-height: 1.2; }
+.aula__prof { font-size: 14px; color: var(--apoio); }
+.aula__dur { font-size: 13px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase; color: var(--apoio); }
+@media (max-width: 900px) {
+  .horarios__miolo { grid-template-columns: 1fr; row-gap: 30px; }
+  .horarios__cabeca { padding-right: 112px; }
+  .vaga--horarios { position: absolute; right: -6px; top: -22px; width: 112px; height: 112px; margin: 0; --foco: 0.2; }
+}
+@media (max-width: 760px) {
+  .grade__dia { height: 48px; font-size: 12px; letter-spacing: 0.06em; }
+  .grade__aulas { min-height: calc(5 * 66px); }
+  .aula { grid-template-columns: 74px 1fr auto; column-gap: 12px; min-height: 66px; padding: 10px 0; }
+  .aula__hora { font-size: 28px; }
+  .aula__nome { font-size: 16px; }
+  .aula__prof { font-size: 13px; }
+  .aula__dur { font-size: 12px; letter-spacing: 0.05em; }
+}

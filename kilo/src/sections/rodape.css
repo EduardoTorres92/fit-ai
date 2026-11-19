@@ -1,0 +1,27 @@
+/* Rodapé: as colunas de contato e o nome de ponta a ponta, com a anilha 3D pousando no lugar do "O". */
+.rodape { position: relative; padding: calc(56 * var(--su)) var(--margem) 22px; border-top: 1px solid var(--fio); overflow: clip; }
+.rodape__colunas { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(24 * var(--su)); }
+.rodape__colunas .rotulo { margin-bottom: 10px; }
+.rodape__colunas p:not(.rotulo) { font-size: 16px; line-height: 1.6; }
+.rodape__elo { position: relative; display: inline-block; }
+.rodape__elo::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 3px; height: 1.5px; background: currentColor;
+  transform: scaleX(0); transform-origin: 100% 50%; transition: transform 0.45s var(--entra);
+}
+.rodape__elo:active { opacity: 0.6; }
+@media (hover: hover) { html:not(.is-scrolling) .rodape__elo:hover::after { transform: scaleX(1); transform-origin: 0 50%; } }
+.rodape__elo:focus-visible::after { transform: scaleX(1); }
+.rodape__nome {
+  display: flex; align-items: center; justify-content: center; margin-top: calc(36 * var(--su));
+  font: 900 46.4vw / 0.8 var(--f-display); text-transform: uppercase; white-space: nowrap;
+}
+.vaga--rodape { display: block; flex: none; width: 0.84em; height: 0.84em; margin-left: 0.04em; }
+.rodape__direitos { margin-top: 14px; font-size: 13px; color: var(--apoio); }
+@media (max-width: 760px) {
+  .rodape { padding-top: 40px; }
+  .rodape__colunas { grid-template-columns: 1fr 1fr; gap: 26px 16px; }
+  .rodape__colunas p:not(.rotulo) { font-size: 15px; }
+  .rodape__elo { padding: 11px 0; }
+  .rodape__colunas p:has(.rodape__elo) { line-height: 1.2; }
+  .rodape__nome { margin-top: 30px; font-size: 43.6vw; }
+}

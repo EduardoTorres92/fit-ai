@@ -1,0 +1,71 @@
+<section class="mod" id="modalidades" data-cena aria-labelledby="mod-titulo">
+  <div class="mod__palco" data-palco>
+    <div class="mod__quadro" data-passo-atual="0">
+      <h2 class="rotulo mod__rotulo" id="mod-titulo">Modalidades</h2>
+
+      <div class="mod__faixa" aria-hidden="true">
+        <div class="mod__nums">
+          <span class="mod__giga is-ativo"><span>01</span></span>
+          <span class="mod__giga"><span>02</span></span>
+          <span class="mod__giga"><span>03</span></span>
+        </div>
+        <div class="mod__nomes">
+          <span class="mod__giga is-ativo"><span>Força</span></span>
+          <span class="mod__giga"><span>Cross</span></span>
+          <span class="mod__giga"><span>Luta</span></span>
+        </div>
+      </div>
+
+      <!-- a peça pousa aqui e troca de forma a cada modalidade (uma forma por passo, na ordem) -->
+      <span class="vaga vaga--mod" data-vaga="modalidades" data-formas="halter kettlebell saco" data-preso></span>
+
+      <div class="mod__baixo">
+        <div class="mod__textos">
+          <article class="mod__passo is-ativo">
+            <h3>Musculação</h3>
+            <p>Máquinas articuladas, cabos e uma área de peso livre de verdade. O professor monta a sua ficha na primeira semana e revisa a cada dois meses.</p>
+          </article>
+          <article class="mod__passo">
+            <h3>Cross e funcional</h3>
+            <p>Turmas pequenas de 50 minutos, com kettlebell, corda, caixa e barra. Todo treino tem a versão de quem começa e a de quem já compete.</p>
+          </article>
+          <article class="mod__passo">
+            <h3>Boxe, muay thai e jiu-jítsu</h3>
+            <p>Tatame de 90 m², oito sacos de pancada e ringue de treino. As aulas vão do primeiro soco ao sparring, com equipamento da casa.</p>
+          </article>
+        </div>
+        <div class="mod__listas">
+          <ul class="mod__lista is-ativo">
+            <li style="--i:0">Ficha individual</li>
+            <li style="--i:1">Avaliação física</li>
+            <li style="--i:2">Peso livre até 50 kg</li>
+            <li style="--i:3">Máquinas articuladas</li>
+            <li style="--i:4">Professor no salão</li>
+          </ul>
+          <ul class="mod__lista">
+            <li style="--i:0">Turmas de até 14 alunos</li>
+            <li style="--i:1">Kettlebells de 4 a 32 kg</li>
+            <li style="--i:2">Levantamento olímpico</li>
+            <li style="--i:3">Treino do dia no painel</li>
+            <li style="--i:4">Aula de técnica aos sábados</li>
+          </ul>
+          <ul class="mod__lista">
+            <li style="--i:0">Boxe</li>
+            <li style="--i:1">Muay thai</li>
+            <li style="--i:2">Jiu-jítsu</li>
+            <li style="--i:3">Luvas e caneleiras da casa</li>
+            <li style="--i:4">Turmas só de mulheres</li>
+          </ul>
+        </div>
+        <div class="mod__nav">
+          <button class="mod__ir" type="button" data-ir="-1" aria-label="Modalidade anterior" disabled>
+            <svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8H3M7 3.5 2.5 8 7 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Anterior</span>
+          </button>
+          <button class="mod__ir" type="button" data-ir="1" aria-label="Próxima modalidade">
+            <span>Próxima</span><svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

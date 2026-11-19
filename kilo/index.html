@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kilo · Academia de musculação, cross e lutas</title>
+  <meta name="description" content="Musculação, cross e lutas com professor no salão do primeiro ao último horário. Agende a sua aula experimental, por nossa conta.">
+  <meta name="theme-color" content="#070707">
+  <link rel="icon" href="./marca.svg" type="image/svg+xml">
+  <!-- Primeira pintura: a cor de fundo do tema e o estilo crítico do hero vêm aqui, antes da folha do site (que vem em
+       <link> e segura a pintura até chegar; nunca pelo JS). ?tema=osso|brasa|cobalto|mono troca a paleta.
+       Os textos que entram por marco só se escondem com o JS no ar (classe .js): se ele não subir em 4 s, a trava
+       cai e a página aparece inteira. -->
+  <script>
+    (function () {
+      var d = document.documentElement;
+      var FUNDOS = { carvao: '#070707', mono: '#070707', osso: '#e9e6df', brasa: '#f01810', cobalto: '#1b3bff' };
+      var tema = new URLSearchParams(location.search).get('tema');
+      if (!FUNDOS[tema]) tema = 'carvao';
+      d.dataset.tema = tema;
+      d.style.backgroundColor = FUNDOS[tema];
+      document.querySelector('meta[name="theme-color"]').content = FUNDOS[tema];
+      d.classList.add('js');
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) d.classList.add('reduzido');
+      setTimeout(function () { if (!window.__kiloViva) { d.classList.remove('js'); d.classList.add('sem-peca'); } }, 4000);
+    })();
+  </script>
+  <style>
+    html { background: #070707; color: #f2f0ea; }
+    body { margin: 0; }
+    .js .marco, .js .sobe { opacity: 0; }
+  </style>
+  <link rel="stylesheet" href="/src/styles/site.css">
+  <!-- sem JavaScript: um anel desenhado no lugar do "O" que a peça 3D ocuparia -->
+  <noscript><style>.vaga--o, .vaga--rodape { border-radius: 50%; box-shadow: inset 0 0 0 0.24em currentColor; }</style></noscript>
+</head>
+<body>
+  <a class="pular" href="#sobre">Pular para o conteúdo</a>
+
+  <!-- @secao barra -->
+
+  <main>
+    <!-- @secao hero -->
+
+    <!-- @secao manifesto -->
+
+    <!-- @secao modalidades -->
+
+    <!-- @secao estrutura -->
+
+    <!-- @secao planos -->
+
+    <!-- @secao horarios -->
+
+    <!-- @secao depoimentos -->
+
+    <!-- @secao duvidas -->
+
+    <!-- @secao contato -->
+  </main>
+
+  <!-- @secao rodape -->
+
+  <!-- a peça 3D: um canvas só, por cima da página inteira, sem roubar clique -->
+  <canvas class="peca" aria-hidden="true"></canvas>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+/* Estrutura: o título, três fotos da casa (a peça 3D passa na frente do canto de uma delas) e quatro números. */
+.estrutura__cabeca { position: relative; margin-bottom: calc(44 * var(--su)); }
+.vaga--estrutura {
+  position: absolute; right: calc(8 * var(--su)); top: calc(-34 * var(--su));
+  width: calc(292 * var(--su)); height: calc(292 * var(--su)); --foco: 0.27;
+}
+.estrutura__fotos { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: calc(20 * var(--su)); align-items: end; }
+.foto { display: grid; gap: 10px; }
+.foto__quadro { overflow: clip; aspect-ratio: 4 / 3.5; background: var(--cartao); }
+.foto--alta .foto__quadro { aspect-ratio: 4 / 4.1; }
+.foto img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.08); transform: scale(1.04); transition: transform 1.2s var(--entra), filter 0.6s linear; }
+.foto figcaption { font-size: 13px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase; color: var(--apoio); }
+@media (hover: hover) {
+  html:not(.is-scrolling) .foto:hover img { transform: scale(1.1); filter: grayscale(1) contrast(1.2) brightness(1.08); }
+}
+.estrutura__numeros {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(20 * var(--su));
+  margin-top: calc(44 * var(--su)); padding-top: calc(22 * var(--su)); border-top: 1px solid var(--fio);
+}
+.estrutura__numeros dt { font: 800 calc(52 * var(--su)) / 1 var(--f-display); text-transform: uppercase; }
+.estrutura__numeros dd { margin-top: 6px; font-size: 15px; color: var(--apoio); max-width: 22ch; }
+@media (max-width: 760px) {
+  .estrutura__cabeca { margin-bottom: 26px; padding-right: 96px; }
+  .vaga--estrutura { right: -8px; top: -30px; width: 112px; height: 112px; --foco: 0.2; }
+  .estrutura__fotos { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .estrutura__fotos .foto:first-child { grid-column: 1 / -1; }
+  .estrutura__fotos .foto:first-child .foto__quadro { aspect-ratio: 16 / 10; }
+  .foto__quadro, .foto--alta .foto__quadro { aspect-ratio: 4 / 4.6; }
+  .foto figcaption { font-size: 12px; letter-spacing: 0.06em; }
+  .estrutura__numeros { grid-template-columns: 1fr 1fr; gap: 22px 14px; margin-top: 30px; padding-top: 20px; }
+  .estrutura__numeros dt { font-size: 38px; }
+  .estrutura__numeros dd { font-size: 14px; }
+}

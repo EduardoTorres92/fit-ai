@@ -1,0 +1,45 @@
+<section class="contato secao" id="contato" data-fecho>
+  <div class="miolo contato__miolo">
+    <header class="contato__cabeca">
+      <h2 class="titulo contato__titulo"><span class="mascara"><span class="sobe">A primeira aula</span></span><span class="mascara"><span class="sobe" style="--i:1">é por nossa conta</span></span></h2>
+      <p class="secao__sub marco" style="--i:2">Escolha a modalidade e o período. A gente confirma o horário pelo WhatsApp no mesmo dia.</p>
+      <span class="vaga vaga--contato" data-vaga="contato" data-forma="anilha" data-pose="-12 24 0" data-voo="0.6 1"></span>
+    </header>
+    <form class="pedido marco" style="--i:2" novalidate>
+      <div class="pedido__campos">
+        <label class="campo">
+          <span class="campo__rotulo">Seu nome</span>
+          <input type="text" name="nome" autocomplete="name" required placeholder="Como a gente chama você">
+          <span class="campo__erro" aria-live="polite"></span>
+        </label>
+        <label class="campo">
+          <span class="campo__rotulo">WhatsApp</span>
+          <input type="tel" name="whatsapp" autocomplete="tel" inputmode="tel" required placeholder="(00) 00000-0000">
+          <span class="campo__erro" aria-live="polite"></span>
+        </label>
+        <fieldset class="escolha">
+          <legend class="campo__rotulo">Modalidade</legend>
+          <div class="escolha__opcoes">
+            <label><input type="radio" name="modalidade" value="Musculação" checked><span>Musculação</span></label>
+            <label><input type="radio" name="modalidade" value="Cross"><span>Cross</span></label>
+            <label><input type="radio" name="modalidade" value="Luta"><span>Luta</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="escolha">
+          <legend class="campo__rotulo">Período</legend>
+          <div class="escolha__opcoes">
+            <label><input type="radio" name="periodo" value="Manhã" checked><span>Manhã</span></label>
+            <label><input type="radio" name="periodo" value="Tarde"><span>Tarde</span></label>
+            <label><input type="radio" name="periodo" value="Noite"><span>Noite</span></label>
+          </div>
+        </fieldset>
+        <button class="botao botao--cheio botao--largo" type="submit">Agendar aula experimental<svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      </div>
+      <div class="pedido__feito" role="status" aria-hidden="true">
+        <p class="pedido__feito-titulo">Pedido anotado</p>
+        <p class="pedido__feito-texto">A gente chama você no WhatsApp para confirmar o horário.</p>
+        <button class="elo pedido__de-novo" type="button"><span>Fazer outro pedido</span></button>
+      </div>
+    </form>
+  </div>
+</section>
