@@ -2454,7 +2454,8 @@
     if (!titulo) { toast("Dê um título ao desafio."); return; }
     if (link && !/^https:\/\//i.test(link)) { toast("O link precisa começar com https://"); return; }
     const btn = ev.target.querySelector("button[type=submit]"); btn.disabled = true;
-    const { error } = await sb.from("desafios").insert({ grupo_id: G.sel, semana: semanaAtual(), titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito", criado_por: uid });
+    const capa = formDesafio === "link" && desafioRascunho?.capa ? await subirCapa(desafioRascunho.capa, G.sel) : null;
+    const { error } = await sb.from("desafios").insert({ grupo_id: G.sel, semana: semanaAtual(), titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito", criado_por: uid, ...(capa ? { capa } : {}) });
     btn.disabled = false;
     if (error) { toast(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana." : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
     formDesafio = null; desafioRascunho = null; await carregarGrupos(true);
@@ -3358,10 +3359,13 @@
     ]);
     const ag = await sb.from("agua").select("usuario_id, data, ml, meta, atualizado_em").in("usuario_id", ids).gte("data", desde);
     G.agua = ag.data || [];
-    const ds = await sb.from("desafios").select("id, semana, titulo, descricao, link, medida, criado_por, criado_em").eq("grupo_id", id).gte("semana", keyOf(addDays(mondayOf(hoje), -7 * 11))).order("semana", { ascending: false });
+    const ds = await sb.from("desafios").select("id, semana, titulo, descricao, link, medida, capa, criado_por, criado_em").eq("grupo_id", id).gte("semana", keyOf(addDays(mondayOf(hoje), -7 * 11))).order("semana", { ascending: false });
     const dids = (ds.data || []).map((d) => d.id);
     const fs = dids.length ? await sb.from("desafio_feitos").select("desafio_id, usuario_id, resultado, prova, feito_em").in("desafio_id", dids) : { data: [] };
     G.desafios = ds.data || []; G.feitos = fs.data || [];
+    const capas = G.desafios.filter((d) => d.capa).slice(0, 6).map((d) => d.capa); // capa do vídeo (bucket "posts", só o grupo vê)
+    G.capas = {};
+    if (capas.length) { const { data } = await sb.storage.from("posts").createSignedUrls(capas, 6 * 3600); (data || []).forEach((x) => x.signedUrl && (G.capas[x.path] = x.signedUrl)); }
     G.membros = ids;
     G.perfis = Object.fromEntries((pf.data || []).map((p) => [p.id, p]));
     G.linhas = tr.data || [];
@@ -3770,6 +3774,19 @@
   let desafioRascunho = null; // { titulo, descricao, medida, link, nota, duvida }
   const LINK_VIDEO = /(?:https?:\/\/)?(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
   const linkCompleto = (l) => (/^https?:\/\//i.test(l) ? l.replace(/^http:/i, "https:") : `https://${l}`);
+  // Capa do vídeo: vira JPEG (até 720 px de largura) e vai para o bucket "posts" na pasta do grupo
+  async function subirCapa(dataUrl, gid) {
+    try {
+      const img = await new Promise((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = erro; i.src = dataUrl; });
+      const k = Math.min(1, 720 / img.naturalWidth), c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.82));
+      const caminho = `${gid}/${uid}/desafio-${Date.now().toString(36)}.jpg`;
+      const { error } = await sb.storage.from("posts").upload(caminho, blob, { contentType: "image/jpeg", cacheControl: "86400" });
+      return error ? null : caminho;
+    } catch { return null; }
+  }
   // O Coach lê a legenda e a capa do vídeo (o servidor busca) e devolve título, regra e medida
   async function desafioDoLink(link, nota = "") {
     const token = await tokenSB();
@@ -3788,6 +3805,7 @@
       return `<form class="desafio form-desafio" id="form-desafio">
         <div class="sec-head"><h2>Lançar desafio da semana</h2></div>
         <div class="chips">${MODELOS.map((x, i) => `<button type="button" class="chip${String(i) === String(formDesafio) ? " primary" : ""}" data-modelo="${i}">${esc(x.titulo)}</button>`).join("")}<button type="button" class="chip${formDesafio === "" ? " primary" : ""}" data-modelo="">Em branco</button></div>
+        ${m.capa ? `<div class="dsf-capa prev"><img src="${esc(m.capa)}" alt="Capa do vídeo"></div>` : ""}
         <div class="dsf-link"><label>Tem um reel? Cole o link e o Coach monta o desafio<input name="link" type="url" inputmode="url" maxlength="300" value="${esc(m.link || "")}" placeholder="https://www.instagram.com/reel/..."></label>
           <details${m.nota ? " open" : ""}><summary>A legenda não explica o exercício? Descreva o vídeo</summary><textarea name="nota" maxlength="600" rows="2" placeholder="Ex.: 10 burpees + 20 agachamentos, 5 rodadas, contra o relógio">${esc(m.nota || "")}</textarea></details>
           <button type="button" class="btn btn-outline" id="desafio-link">✨ Montar pelo link</button>
@@ -3803,11 +3821,13 @@
       <button class="btn btn-blue" id="desafio-novo">Lançar desafio</button></div>`;
     const fs = feitosDe(d), eu = fs.find((f) => f.usuario_id === uid), med = ["🥇", "🥈", "🥉"];
     const podeApagar = d.criado_por === uid || g.dono === uid;
-    return `<div class="desafio${fs.length ? " ok" : ""}">
+    const capa = d.capa && G.capas?.[d.capa];
+    return `<div class="desafio${fs.length ? " ok" : ""}${capa ? " com-capa" : ""}">
+      ${capa ? `<a class="dsf-capa" ${d.link ? `href="${esc(d.link)}" target="_blank" rel="noopener"` : ""}><img src="${esc(capa)}" alt="Capa do vídeo do desafio" loading="lazy"><span>${d.link ? "▶ Ver o vídeo" : ""}</span></a>` : ""}
       <div class="sec-head"><h2>⚔️ ${esc(d.titulo)}</h2><span>${prazo}</span></div>
       ${d.descricao ? `<p class="d-desc">${esc(d.descricao)}</p>` : ""}
       <div class="ex-tags"><span class="pill gray">${esc(MEDIDAS[d.medida].split(" (")[0])}</span><span class="pill gray">por ${esc((G.perfis[d.criado_por]?.nome || "alguém").split(" ")[0])}</span></div>
-      ${d.link ? `<a class="btn btn-outline" href="${esc(d.link)}" target="_blank" rel="noopener">▶ Ver o desafio</a>` : ""}
+      ${d.link && !capa ? `<a class="btn btn-outline" href="${esc(d.link)}" target="_blank" rel="noopener">▶ Ver o desafio</a>` : ""}
       <p class="d-status">${fs.length ? `🏅 <b>Conquista da semana garantida!</b> ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}.` : "Ninguém cumpriu ainda. Bora ser o primeiro? 💪"}</p>
       ${fs.length ? `<ol class="rank">${fs.map((f, i) => `<li class="${f.usuario_id === uid ? "eu" : ""}"><span class="pos">${d.medida !== "feito" && i < 3 ? med[i] : "✓"}</span>${avatar(G.perfis[f.usuario_id], 32)}
         <span class="nome">${esc(G.perfis[f.usuario_id]?.nome || "Atleta")}</span>${f.prova ? `<a class="lnk-btn" href="${esc(f.prova)}" target="_blank" rel="noopener">prova</a>` : ""}<strong>${esc(fmtRes(d, f.resultado))}</strong></li>`).join("")}</ol>` : ""}
@@ -3881,6 +3901,9 @@
         const j = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p2.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0))));
         desafioRascunho = { titulo: String(j.t || "").slice(0, 80), descricao: String(j.d || "").slice(0, 500), medida: MEDIDAS[j.m] ? j.m : "feito", link: /^https:\/\//.test(j.l || "") ? String(j.l).slice(0, 300) : "" };
         formDesafio = "link";
+        const r0 = desafioRascunho;
+        if (r0.link) tokenSB().then((tk) => tk && fetch("/api/desafio", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ link: r0.link, soCapa: true }) }))
+          .then((r) => r?.json()).then((j) => { if (j?.capa && desafioRascunho === r0 && formDesafio === "link") { r0.capa = j.capa; if (location.hash.startsWith("#/grupo")) render(); } }).catch(() => {});
       } catch {}
       p1 = p2 = undefined;
     }
@@ -4276,7 +4299,7 @@
       const f = t.closest("form"), link = linkCompleto(f.elements.link.value.trim()), nota = f.elements.nota.value.trim();
       if (!LINK_VIDEO.test(link)) { toast("Cole o link de um reel do Instagram, TikTok ou YouTube."); return; }
       t.disabled = true; t.textContent = "Assistindo ao vídeo…";
-      desafioDoLink(link, nota).then((j) => { desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida }; formDesafio = "link"; render(); toast(j.entendeu ? "Desafio montado. Confira e lance! ⚔️" : "Montei com o que deu para entender. Confira a regra.", 3500); })
+      desafioDoLink(link, nota).then((j) => { desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida, capa: j.capa || "" }; formDesafio = "link"; render(); toast(j.entendeu ? "Desafio montado. Confira e lance! ⚔️" : "Montei com o que deu para entender. Confira a regra.", 3500); })
         .catch((e) => { t.disabled = false; t.textContent = "✨ Montar pelo link"; toast(e.message, 5000); });
     }
     else if (t.id === "desafio-cumpri") cumprirDesafio(t.dataset.id);
@@ -4285,7 +4308,8 @@
       sb.from("desafio_feitos").delete().eq("desafio_id", t.dataset.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui desfazer."); else { G.meusDesafios = Math.max(0, (G.meusDesafios || 1) - 1); carregarGrupos(true); } });
     } else if (t.id === "desafio-apagar") {
       if (!confirm("Apagar o desafio desta semana? Os cumprimentos dele também somem.")) return;
-      sb.from("desafios").delete().eq("id", t.dataset.id).then(({ error }) => { if (error) toast("Não consegui apagar."); else carregarGrupos(true); });
+      const capaDel = G.desafios.find((x) => x.id === t.dataset.id)?.capa;
+      sb.from("desafios").delete().eq("id", t.dataset.id).then(({ error }) => { if (error) toast("Não consegui apagar."); else { if (capaDel) sb.storage.from("posts").remove([capaDel]); carregarGrupos(true); } });
     }
     else if (t.id === "g-codigo") entrarComCodigo(prompt("Código do grupo:") || "");
     else if (t.dataset.gSel) { G.sel = t.dataset.gSel; G.carregadoEm = 0; carregarGrupos(true); }
@@ -4517,7 +4541,8 @@
     if (/^editar antes de lançar$/i.test(texto)) { formDesafio = "link"; busy = false; closeChat(); location.hash = "#/grupo"; render(); return; }
     if (/^lançar no grupo$/i.test(texto)) {
       const d = desafioRascunho;
-      const { error } = await sb.from("desafios").insert({ grupo_id: g.id, semana: semanaAtual(), titulo: d.titulo, descricao: d.descricao, link: d.link, medida: d.medida, criado_por: uid });
+      const capa = d.capa ? await subirCapa(d.capa, g.id) : null;
+      const { error } = await sb.from("desafios").insert({ grupo_id: g.id, semana: semanaAtual(), titulo: d.titulo, descricao: d.descricao, link: d.link, medida: d.medida, criado_por: uid, ...(capa ? { capa } : {}) });
       if (error) return fala(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana. Ele fica guardado: toque em <b>Editar antes de lançar</b> na semana que vem." : "Não consegui lançar agora. Tente de novo.");
       desafioRascunho = null; formDesafio = null; carregarGrupos(true);
       return fala(`Desafio lançado no grupo <b>${esc(g.nome)}</b>! ⚔️ Avise a galera.`, ["Abrir o grupo"]);
@@ -4527,9 +4552,9 @@
     try {
       const j = await desafioDoLink(link, nota);
       stop();
-      desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida };
+      desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida, capa: j.capa || "" };
       const ja = desafioDaSemana();
-      addMsg(msgsEl, `Montei o desafio a partir do vídeo${j.fonte?.leu ? "" : " (não consegui ler a legenda, usei a capa e o que você escreveu)"}:<br><br><b>${esc(j.desafio.titulo)}</b><br>${esc(j.desafio.descricao)}<br><small>Como medir: ${esc(MEDIDAS[j.desafio.medida])}</small>${j.duvida ? `<br><br>⚠️ ${esc(j.duvida)}` : ""}${ja ? `<br><br>O grupo <b>${esc(g.nome)}</b> já tem o desafio desta semana (<b>${esc(ja.titulo)}</b>).` : ""}`, false, chatLog);
+      addMsg(msgsEl, `${j.capa ? `<img class="dsf-capa-chat" src="${esc(j.capa)}" alt="Capa do vídeo">` : ""}Montei o desafio a partir do vídeo${j.fonte?.leu ? "" : " (não consegui ler a legenda, usei a capa e o que você escreveu)"}:<br><br><b>${esc(j.desafio.titulo)}</b><br>${esc(j.desafio.descricao)}<br><small>Como medir: ${esc(MEDIDAS[j.desafio.medida])}</small>${j.duvida ? `<br><br>⚠️ ${esc(j.duvida)}` : ""}${ja ? `<br><br>O grupo <b>${esc(g.nome)}</b> já tem o desafio desta semana (<b>${esc(ja.titulo)}</b>).` : ""}`, false, chatLog);
       setChips(chipsEl, ja ? ["Editar antes de lançar"] : ["Lançar no grupo", "Editar antes de lançar"], true);
     } catch (e) { stop(); addMsg(msgsEl, esc(e.message), false, chatLog); setChips(chipsEl, CHIPS_PADRAO); }
     busy = false;

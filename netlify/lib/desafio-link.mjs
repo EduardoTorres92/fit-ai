@@ -113,10 +113,19 @@ export async function montarDesafio(linkTxt, notaTxt = "") {
       desafio: { titulo: txt(d.titulo, 80), descricao: txt(d.descricao, 500), medida: MEDIDAS.includes(d.medida) ? d.medida : "feito" },
       entendeu: d.entendeu !== false, duvida: d.entendeu === false ? txt(d.duvida, 200) : "",
       fonte: { site: fonte?.site || "", leu: !!fonte?.legenda, capa: !!img },
+      capa: img && img.data.length < 1_900_000 ? `data:${img.media_type};base64,${img.data}` : "",
     };
   } catch (e) {
     const status = e instanceof Anthropic.APIError ? e.status : 0;
     console.error("desafio erro", status, e?.message);
     return { erro: status === 429 ? "ocupado" : "ia" };
   }
+}
+// Só a capa (link aberto pelo Telegram: o desafio veio pronto no link, falta a imagem). Sem IA.
+export async function capaDoLink(linkTxt) {
+  const link = linkAceito(linkTxt);
+  if (!link) return "";
+  const fonte = await lerLink(link.href).catch(() => null);
+  const img = fonte?.imagem ? await imagemBase64(fonte.imagem) : null;
+  return img && img.data.length < 1_900_000 ? `data:${img.media_type};base64,${img.data}` : "";
 }

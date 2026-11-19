@@ -3,7 +3,7 @@
 import { cabeNoLimite, LIMITE_MEMBRO_DIA } from "../lib/limite.mjs";
 import { emailDoToken } from "../lib/dono.mjs";
 import { donoNaReq } from "../lib/sessao.mjs";
-import { montarDesafio, linkAceito } from "../lib/desafio-link.mjs";
+import { montarDesafio, linkAceito, capaDoLink } from "../lib/desafio-link.mjs";
 
 const json = (status, obj) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
@@ -16,6 +16,7 @@ export default async (req) => {
   let c; try { c = await req.json(); } catch { return json(400, { erro: "json" }); }
   try { new URL(String(c.link || "").trim()); } catch { return json(400, { erro: "link" }); }
   if (!linkAceito(c.link)) return json(400, { erro: "site" });
+  if (c.soCapa) return json(200, { capa: await capaDoLink(c.link) }); // sem IA: não conta no limite
   if (!donoNaReq(email, req)) {
     try { if (!(await cabeNoLimite(`conta:${email}`, LIMITE_MEMBRO_DIA, 2))) return json(429, { erro: "limite" }); }
     catch (e) { console.error("limite indisponível", e?.message); return json(503, { erro: "limite_indisponivel" }); }
