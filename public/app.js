@@ -2457,7 +2457,7 @@
     const { error } = await sb.from("desafios").insert({ grupo_id: G.sel, semana: semanaAtual(), titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito", criado_por: uid });
     btn.disabled = false;
     if (error) { toast(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana." : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
-    formDesafio = null; await carregarGrupos(true);
+    formDesafio = null; desafioRascunho = null; await carregarGrupos(true);
     toast("Desafio lançado! Avise a galera. ⚔️");
   });
   document.addEventListener("submit", (ev) => {
@@ -3766,18 +3766,33 @@
   const melhorPrimeiro = (d) => (a, b) => d.medida === "tempo" ? (a.resultado ?? 1e9) - (b.resultado ?? 1e9) : d.medida === "feito" ? String(a.feito_em).localeCompare(String(b.feito_em)) : (b.resultado ?? 0) - (a.resultado ?? 0);
   const feitosDe = (d) => G.feitos.filter((f) => f.desafio_id === d.id).sort(melhorPrimeiro(d));
   const desafioDaSemana = () => G.desafios.find((d) => d.semana === semanaAtual()) || null;
-  let formDesafio = null; // null | índice do modelo ("" = em branco)
+  let formDesafio = null; // null | índice do modelo ("" = em branco) | "link" (montado pelo Coach a partir de um vídeo)
+  let desafioRascunho = null; // { titulo, descricao, medida, link, nota, duvida }
+  const LINK_VIDEO = /https:\/\/(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
+  // O Coach lê a legenda e a capa do vídeo (o servidor busca) e devolve título, regra e medida
+  async function desafioDoLink(link, nota = "") {
+    const token = await tokenSB();
+    if (!token) throw new Error("Entre na sua conta para montar desafios.");
+    const r = await fetch("/api/desafio", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ link, nota }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.desafio) return j;
+    throw new Error({ site: "Por enquanto leio links do Instagram, TikTok e YouTube.", link: "Esse link não parece válido.", sem_conteudo: "Não consegui ler esse vídeo (pode ser privado). Descreva o que acontece nele e toque de novo.",
+      limite: "Você chegou ao limite de hoje do Coach. Tente amanhã.", ocupado: "O Coach está ocupado. Tente de novo em um minuto.", login: "Entre na sua conta para montar desafios." }[j.erro] || "Não consegui montar o desafio agora.");
+  }
   function cardDesafio(g) {
     const d = desafioDaSemana();
     const fim = 6 - hojeDia, prazo = fim === 0 ? "termina hoje" : `${fim} ${fim === 1 ? "dia" : "dias"} para acabar`;
     if (formDesafio !== null) {
-      const m = MODELOS[formDesafio] || { titulo: "", descricao: "", medida: "feito" };
+      const m = formDesafio === "link" && desafioRascunho ? desafioRascunho : MODELOS[formDesafio] || { titulo: "", descricao: "", medida: "feito" };
       return `<form class="desafio form-desafio" id="form-desafio">
         <div class="sec-head"><h2>Lançar desafio da semana</h2></div>
         <div class="chips">${MODELOS.map((x, i) => `<button type="button" class="chip${String(i) === String(formDesafio) ? " primary" : ""}" data-modelo="${i}">${esc(x.titulo)}</button>`).join("")}<button type="button" class="chip${formDesafio === "" ? " primary" : ""}" data-modelo="">Em branco</button></div>
+        <div class="dsf-link"><label>Tem um reel? Cole o link e o Coach monta o desafio<input name="link" type="url" inputmode="url" maxlength="300" value="${esc(m.link || "")}" placeholder="https://www.instagram.com/reel/..."></label>
+          <details${m.nota ? " open" : ""}><summary>A legenda não explica o exercício? Descreva o vídeo</summary><textarea name="nota" maxlength="600" rows="2" placeholder="Ex.: 10 burpees + 20 agachamentos, 5 rodadas, contra o relógio">${esc(m.nota || "")}</textarea></details>
+          <button type="button" class="btn btn-outline" id="desafio-link">✨ Montar pelo link</button>
+          ${m.duvida ? `<p class="note small dsf-duvida">⚠️ ${esc(m.duvida)}</p>` : ""}</div>
         <label>Título<input name="titulo" required maxlength="80" value="${esc(m.titulo)}" placeholder="Ex.: Desafio do reel"></label>
         <label>Como fazer<textarea name="descricao" maxlength="500" rows="3" placeholder="Explique a regra do desafio">${esc(m.descricao)}</textarea></label>
-        <label>Link do vídeo (opcional)<input name="link" type="url" inputmode="url" maxlength="300" placeholder="https://www.instagram.com/reel/..."></label>
         <label>Como medir<select name="medida">${Object.entries(MEDIDAS).map(([k, n]) => `<option value="${k}"${k === m.medida ? " selected" : ""}>${n}</option>`).join("")}</select></label>
         <div class="row2"><button type="button" class="btn btn-outline" id="desafio-cancelar">Cancelar</button><button type="submit" class="btn btn-blue">Lançar</button></div>
       </form>`;
@@ -4247,7 +4262,14 @@
     else if (t.id === "g-criar") criarGrupo();
     else if (t.id === "desafio-novo") { formDesafio = 0; render(); }
     else if (t.dataset.modelo !== undefined) { formDesafio = t.dataset.modelo === "" ? "" : Number(t.dataset.modelo); render(); }
-    else if (t.id === "desafio-cancelar") { formDesafio = null; render(); }
+    else if (t.id === "desafio-cancelar") { formDesafio = null; desafioRascunho = null; render(); }
+    else if (t.id === "desafio-link") {
+      const f = t.closest("form"), link = f.elements.link.value.trim(), nota = f.elements.nota.value.trim();
+      if (!LINK_VIDEO.test(link)) { toast("Cole o link de um reel do Instagram, TikTok ou YouTube."); return; }
+      t.disabled = true; t.textContent = "Assistindo ao vídeo…";
+      desafioDoLink(link, nota).then((j) => { desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida }; formDesafio = "link"; render(); toast(j.entendeu ? "Desafio montado. Confira e lance! ⚔️" : "Montei com o que deu para entender. Confira a regra.", 3500); })
+        .catch((e) => { t.disabled = false; t.textContent = "✨ Montar pelo link"; toast(e.message, 5000); });
+    }
     else if (t.id === "desafio-cumpri") cumprirDesafio(t.dataset.id);
     else if (t.id === "desafio-desfazer") {
       if (!confirm("Desfazer seu cumprimento do desafio?")) return;
@@ -4457,6 +4479,7 @@
     if (!texto || busy) return;
     const coach = chatPapel === "coach";
     if (coach && iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
+    if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar no grupo|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
     if (coach && atalhoHoje(texto)) return;
     busy = true;
     addMsg(msgsEl, esc(texto), true, chatLog);
@@ -4473,11 +4496,41 @@
     setChips(chipsEl, r.chips || CHIPS_PADRAO);
     busy = false;
   }
+  // Link de reel no chat do Coach: monta o desafio do grupo e oferece lançar ou editar
+  async function desafioNoChat(texto) {
+    busy = true;
+    addMsg(msgsEl, esc(texto), true, chatLog);
+    const fala = async (html, chips = CHIPS_PADRAO) => { const stop = typing(msgsEl); await wait(500); stop(); addMsg(msgsEl, html, false, chatLog); setChips(chipsEl, chips); busy = false; };
+    if (!uid) return fala("Desafio é coisa de grupo: entre na sua conta e entre num grupo para lançar. 🤝");
+    if (!G.grupos) await carregarGrupos(true);
+    const g = grupoSel();
+    if (!g) return fala("Você ainda não está em nenhum grupo. Crie um ou entre com um código na aba <b>Grupo</b> e me mande o link de novo. 🤝", ["Abrir o grupo"]);
+    if (/^editar antes de lançar$/i.test(texto)) { formDesafio = "link"; busy = false; closeChat(); location.hash = "#/grupo"; render(); return; }
+    if (/^lançar no grupo$/i.test(texto)) {
+      const d = desafioRascunho;
+      const { error } = await sb.from("desafios").insert({ grupo_id: g.id, semana: semanaAtual(), titulo: d.titulo, descricao: d.descricao, link: d.link, medida: d.medida, criado_por: uid });
+      if (error) return fala(/duplicate|unique/i.test(error.message) ? "Alguém já lançou o desafio desta semana. Ele fica guardado: toque em <b>Editar antes de lançar</b> na semana que vem." : "Não consegui lançar agora. Tente de novo.");
+      desafioRascunho = null; formDesafio = null; carregarGrupos(true);
+      return fala(`Desafio lançado no grupo <b>${esc(g.nome)}</b>! ⚔️ Avise a galera.`, ["Abrir o grupo"]);
+    }
+    const link = texto.match(LINK_VIDEO)[0], nota = texto.replace(link, "").trim();
+    const stop = typing(msgsEl);
+    try {
+      const j = await desafioDoLink(link, nota);
+      stop();
+      desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida };
+      const ja = desafioDaSemana();
+      addMsg(msgsEl, `Montei o desafio a partir do vídeo${j.fonte?.leu ? "" : " (não consegui ler a legenda, usei a capa e o que você escreveu)"}:<br><br><b>${esc(j.desafio.titulo)}</b><br>${esc(j.desafio.descricao)}<br><small>Como medir: ${esc(MEDIDAS[j.desafio.medida])}</small>${j.duvida ? `<br><br>⚠️ ${esc(j.duvida)}` : ""}${ja ? `<br><br>O grupo <b>${esc(g.nome)}</b> já tem o desafio desta semana (<b>${esc(ja.titulo)}</b>).` : ""}`, false, chatLog);
+      setChips(chipsEl, ja ? ["Editar antes de lançar"] : ["Lançar no grupo", "Editar antes de lançar"], true);
+    } catch (e) { stop(); addMsg(msgsEl, esc(e.message), false, chatLog); setChips(chipsEl, CHIPS_PADRAO); }
+    busy = false;
+  }
   // Chips "O que vamos fazer hoje?": abrem o treino do programa escolhido (ou a entrevista do Hipertrofia)
   function atalhoHoje(texto) {
     const t = norm(texto);
     const fera = norm(NOME_PROG);
     if (t === "nutricao") { openChat(null, "nutri"); return true; }
+    if (t === "abrir o grupo") { closeChat(); location.hash = "#/grupo"; return true; }
     if (t === "evolucao por foto" || t === "ver ultima analise" || t === "apagar minhas fotos") { evoChip(t, texto); return true; }
     if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);

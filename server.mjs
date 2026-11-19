@@ -1,6 +1,6 @@
 // Servidor Node.js para hospedar o FIT.AI fora da Netlify (ex.: Hostinger).
 // - Entrega os arquivos da pasta public/.
-// - /api/auth, /api/coach, /api/videos, /api/hiper, /api/agua (lembrete de água por push) e /api/wod (CrossFit: foto do quadro), /api/evolucao (evolução por foto), /api/telegram (bot do Telegram): as mesmas funções da pasta netlify/functions, chamadas daqui.
+// - /api/auth, /api/coach, /api/videos, /api/hiper, /api/agua (lembrete de água por push) e /api/wod (CrossFit: foto do quadro), /api/evolucao (evolução por foto), /api/telegram (bot do Telegram), /api/desafio (desafio do grupo a partir de um reel): as mesmas funções da pasta netlify/functions, chamadas daqui.
 // - Contas, segredo de sessão e limites do Coach ficam em arquivos (ver netlify/lib/blobs.mjs).
 // Variáveis: ANTHROPIC_API_KEY (obrigatória para o Coach), ALLOWED_EMAIL, FITAI_INSANITY_VIDEOS, FITAI_VIDEOS_INSANITY, LIMITE_VISITANTE_DIA,
 // LIMITE_GERAL_DIA, DADOS_DIR, PORT, TELEGRAM_TOKEN (opcional: o dono também pode colar no app), FITAI_URL. Iniciar: npm start.
@@ -20,12 +20,13 @@ const { default: agua } = await import("./netlify/functions/agua.mjs");
 const { default: wod } = await import("./netlify/functions/wod.mjs");
 const { default: evolucao } = await import("./netlify/functions/evolucao.mjs");
 const { default: telegram } = await import("./netlify/functions/telegram.mjs");
+const { default: desafio } = await import("./netlify/functions/desafio.mjs");
 const { iniciarTelegram } = await import("./netlify/lib/telegram.mjs");
 const { iniciarAgendador } = await import("./netlify/lib/agua.mjs");
 
 const RAIZ = fileURLToPath(new URL("./public/", import.meta.url));
 const PORTA = Number(process.env.PORT) || 3000;
-const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua, "/api/wod": wod, "/api/evolucao": evolucao, "/api/telegram": telegram };
+const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua, "/api/wod": wod, "/api/evolucao": evolucao, "/api/telegram": telegram, "/api/desafio": desafio };
 const MAX_CORPO = 1600 * 1024; // o Coach manda programa + contexto; a foto do WOD vai em base64 (até ~1,4 MB)
 
 const TIPOS = {

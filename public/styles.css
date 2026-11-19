@@ -1063,3 +1063,8 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .etapas li { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: #fff; color: var(--muted); }
 .etapas li.on { background: var(--blue); color: #fff; font-weight: 600; }
 .etapas li.ok { background: #dff5e6; color: #146c34; }
+.msg .bubble { overflow-wrap: anywhere; min-width: 0; }
+.dsf-link { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--blue-08); }
+.dsf-link details summary { font-size: 13px; color: var(--blue); cursor: pointer; }
+.dsf-link details textarea { margin-top: 6px; width: 100%; }
+.dsf-duvida { color: #8a5a00; }
