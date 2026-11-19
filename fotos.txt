@@ -1,0 +1,17 @@
+cardio-1 https://www.figma.com/api/mcp/asset/0cabe8b2-2fea-4766-93ab-e6ff4ebe6ef1.png
+cardio-2 https://www.figma.com/api/mcp/asset/f3b918c1-5a9a-410f-90e1-67318209530f.png
+potencia-1 https://www.figma.com/api/mcp/asset/3b456df9-5680-46a2-9bfc-fc9367fe76d1.png
+potencia-2 https://www.figma.com/api/mcp/asset/9d6f5893-b07a-4227-935e-f36b71202d95.png
+luta-1 https://www.figma.com/api/mcp/asset/9e7fda1f-bd70-495f-bf82-b30b24a8c0d4.png
+forca-1 https://www.figma.com/api/mcp/asset/0e2796e6-e26b-4ea8-9ed2-b00e22913773.png
+core-1 https://www.figma.com/api/mcp/asset/7e9c6bca-052f-42c0-ae11-acf8a5a030ba.png
+core-2 https://www.figma.com/api/mcp/asset/812a8f37-82c3-44e2-9f7d-0beb4d4ea20d.png
+recuperacao-1 https://www.figma.com/api/mcp/asset/a74c22d7-cee8-4bef-857c-83611b8b4a27.png
+teste-1 https://www.figma.com/api/mcp/asset/90ef5a3b-9890-4585-85f1-fb11b34a2fbe.png
+academia-peito https://www.figma.com/api/mcp/asset/a3128e1e-2b57-470d-bb02-9f974dbd7d17.png
+academia-costas https://www.figma.com/api/mcp/asset/9b616201-8380-4043-ac41-0b3d3bee67d9.png
+academia-pernas https://www.figma.com/api/mcp/asset/9015c536-3d1d-4239-b29f-bcbfd1d66fe2.png
+academia-bracos https://www.figma.com/api/mcp/asset/4740620a-f807-48f9-9825-db6a02471763.png
+calistenia-barra https://www.figma.com/api/mcp/asset/1cbd639d-6214-47ee-befc-7cbe5270682f.png
+calistenia-paralelas https://www.figma.com/api/mcp/asset/c016749c-d098-469e-93c7-42e1f6dbed53.png
+cross-1 https://www.figma.com/api/mcp/asset/7514f9eb-cf78-4946-a247-df88dd8b6ec3.png

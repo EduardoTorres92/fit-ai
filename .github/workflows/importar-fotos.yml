@@ -1,0 +1,45 @@
+name: importar-fotos
+on:
+  push:
+    branches: [fotos-import]
+permissions:
+  contents: write
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: deploy-hostinger, path: app }
+      - uses: actions/checkout@v4
+        with: { ref: fotos-import, path: imp }
+      - name: Baixar e converter
+        run: |
+          python3 -m pip install -q pillow
+          mkdir -p app/public/assets/cards
+          python3 - <<'PY'
+          import urllib.request, io
+          from PIL import Image
+          log = []
+          for linha in open("imp/fotos.txt"):
+              p = linha.split()
+              if len(p) != 2: continue
+              nome, url = p
+              try:
+                  dados = urllib.request.urlopen(url, timeout=60).read()
+                  im = Image.open(io.BytesIO(dados)).convert("RGB")
+                  im.thumbnail((1200, 1200))
+                  im.save(f"app/public/assets/cards/{nome}.jpg", "JPEG", quality=80, optimize=True, progressive=True)
+                  log.append(f"ok {nome} {im.size}")
+              except Exception as e:
+                  log.append(f"erro {nome} {e}")
+          open("app/public/assets/cards/importacao.log", "w").write("\n".join(log) + "\n")
+          print("\n".join(log))
+          PY
+      - name: Commit
+        working-directory: app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/cards
+          git commit -m "Fotos novas dos cards (importadas do Figma)" || exit 0
+          git push origin deploy-hostinger
