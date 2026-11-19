@@ -62,7 +62,7 @@ window.FITAI_INSANITY60 = (() => {
     curto: "Insanity",
     selo: "60 dias · 9 semanas",
     resumo: "O original · 60 dias de vídeos · toque para começar",
-    banner: "login.jpg",
+    banner: "cards/potencia-2.jpg",
     maxOut: false,
     nivel: "Intermediário",
     ordem: 2,

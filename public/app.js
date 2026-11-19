@@ -59,9 +59,12 @@
   // Calistenia no catálogo de programas (nível e descrição podem vir do programa pessoal)
   const CALI = { k: "plano", nome: NOME_PROG, curto: NOME_PROG, nivel: P.nivel || "Avançado", ordem: P.ordem || 3,
     sobre: P.sobre || "Calistenia com barra: flexões, barras, agachamentos e core, anotando as repetições de cada série com progressão semana a semana. Pede força de base (conseguir fazer algumas barras ajuda muito)." };
-  const IMG = { Empurrar: "login.jpg", Superior: "login.jpg", Puxar: "treino-superiores-2.jpg", Pernas: "treino-inferiores-1.jpg",
-    Perna: "treino-inferiores-1.jpg", Inferior: "treino-inferiores-1.jpg", Core: "treino-inferiores-2.jpg", Tiro: "treino-inferiores-1.jpg" };
-  const imgDe = (t) => A(IMG[t.foco] || "banner-home.jpg");
+  // Fotos dos cards (assets/cards): várias por tipo; a variante sai de um hash do nome, para não repetir a mesma foto em todo card
+  const C = (n) => `cards/${n}.jpg`;
+  const varia = (lista, chave) => { let h = 0; for (const ch of String(chave)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return lista[h % lista.length]; };
+  const IMG = { Empurrar: ["calistenia-paralelas"], Superior: ["calistenia-paralelas", "calistenia-barra"], Puxar: ["calistenia-barra"], Pernas: ["forca-1", "potencia-1"],
+    Perna: ["forca-1", "potencia-1"], Inferior: ["forca-1", "potencia-1"], Core: ["core-1", "core-2"], Tiro: ["cardio-2", "cardio-1"] };
+  const imgDe = (t) => A(C(varia(IMG[t.foco] || ["forca-1", "calistenia-barra", "core-2"], t.titulo)));
   const TODOS_EX = [...new Map(PROGRAMA.flatMap((s) => s.dias).concat([EMERGENCIA]).flatMap((d) => d.ex || []).reverse().map((e) => [e.id, e])).values()].reverse();
   const EXI = Object.fromEntries(TODOS_EX.map((e) => [e.id, e]));
   const UN = { reps: "", s: "s", min: "min", tiro: "s" };
@@ -575,7 +578,8 @@
   }
 
   /* Insanity: componentes */
-  const INS_IMG = { Cardio: "banner-home.jpg", Tabata: "login.jpg", Potência: "login.jpg", Pliometria: "login.jpg", Teste: "banner-plano.jpg", Intervalos: "banner-home.jpg", Core: "treino-inferiores-2.jpg", Força: "treino-superiores-2.jpg", Luta: "treino-inferiores-1.jpg", Recuperação: "treino-inferiores-2.jpg", Abdômen: "treino-inferiores-2.jpg" };
+  const INS_IMG = { Cardio: ["cardio-1", "cardio-2"], Intervalos: ["cardio-2", "cardio-1"], Tabata: ["potencia-1", "potencia-2"], Potência: ["potencia-2", "potencia-1"], Pliometria: ["potencia-1"],
+    Teste: ["teste-1"], Core: ["core-2", "core-1"], Abdômen: ["core-1", "core-2"], Força: ["forca-1"], Luta: ["luta-1"], Recuperação: ["recuperacao-1"] };
   const progSwitch = (on) => {
     const abas = [["plano", NOME_PROG], ...VPROGS.map((p) => [p.k, VPROGS.length > 1 ? p.curto : p.nome]), ...IAK.map((k) => [k, progDe(k)?.curto || IA[k].nome]), ["cf", "CrossFit"]].filter(([k]) => liberado(k));
     const rolar = abas.length > 4; // muitas abas: vira uma faixa que rola para o lado
@@ -589,7 +593,7 @@
     const ok = k && insFeito(p, k);
     const meta = t.ids.length ? `<span>${icon("timer.svg")}${min ? `${min} min` : "vídeo"}</span><span>${icon("zap.svg")}${t.ids.length} ${t.ids.length > 1 ? "vídeos" : "vídeo"}</span>` : `<span>${t.fim ? "Programa concluído" : "Recupere o corpo"}</span>`;
     return `<${tag} class="wcard${t.ids.length ? "" : " pending"}" ${link && t.ids.length ? `href="#/${p}/${w}/${d}"` : ""} aria-label="${esc(P.nome)}, semana ${w + 1}, ${DIAS[d]}: ${esc(t.titulo)}">
-      <img class="cover" src="${A(INS_IMG[t.ids.length ? INSV[t.ids[0]].tipo : ""] || "banner-plano.jpg")}" alt="" loading="lazy">
+      <img class="cover" src="${A(C(t.ids.length ? varia(INS_IMG[INSV[t.ids[0]].tipo] || ["cardio-1"], t.ids[0]) : "recuperacao-1"))}" alt="" loading="lazy">
       <span class="pill glass">${icon("calendar-14.svg")}${DIAS[d]} · ${t.ids.length ? esc(INSV[t.ids[0]].tipo) : "Descanso"}${ok ? " · ✓" : ""}</span>
       <div class="bottom"><div class="info"><h3>${esc(t.titulo)}</h3><div class="meta">${meta}</div></div></div></${tag}>`;
   }
@@ -852,7 +856,7 @@
   const ACAD = window.FITAI_ACADEMIA || [], CAL21 = window.FITAI_CAL21 || [];
   const IA = {};
   if (ACAD.length) IA.hiper = {
-    k: "hiper", nome: "Hipertrofia", rotulo: "Academia", cat: ACAD, banner: "treino-superiores-2.jpg", semanas: 0, carga: true,
+    k: "hiper", nome: "Hipertrofia", rotulo: "Academia", cat: ACAD, banner: "cards/academia-costas.jpg", semanas: 0, carga: true,
     convite: "Treino de academia feito para você", resumoConvite: "O Coach AI faz {n} perguntas rápidas (objetivo, dias, experiência, peso…) e monta seu plano semanal. Depois ele acompanha suas cargas e ajusta o treino toda semana. Cada exercício tem vídeo de execução.",
     intro: "Bora montar seu treino de academia", oQue: "seu plano semanal, com vídeo de execução em cada exercício",
     passos: [
@@ -872,7 +876,7 @@
     ],
   };
   if (CAL21.length) IA.c21 = {
-    k: "c21", nome: "Calistenia 21 dias", rotulo: "Calistenia 21 dias", cat: CAL21, banner: "login.jpg", semanas: 3, carga: false,
+    k: "c21", nome: "Calistenia 21 dias", rotulo: "Calistenia 21 dias", cat: CAL21, banner: "cards/calistenia-barra.jpg", semanas: 3, carga: false,
     convite: "Calistenia em 21 dias, montada para você", resumoConvite: "O Coach AI faz {n} perguntas (nível, objetivo, equipamento, dias…) e monta 3 semanas com base no material do treinador: circuitos de 21 dias, Roteiro de Fortalecimento (para chegar às primeiras barras e flexões) e Calendário Calistênico (habilidades). Você marca cada série ou volta, o tempo das isometrias e vê a evolução.",
     intro: "Bora montar sua Calistenia 21 dias", oQue: "3 semanas de circuitos no seu nível, baseadas nos treinos do treinador",
     passos: [
@@ -964,15 +968,17 @@
     return { kg, txt: `Mantenha ${fmtKg(kg)} kg e busque ${mx} reps em todas as séries.` };
   }
   const iaSessFeita = (pk, t) => Object.entries(S[pk].logs).some(([k, l]) => l.done && l.d === t.dia && (t.semana != null ? (l.w ?? 0) === t.semana : k >= keyOf(mondayOf(hoje))));
-  const IA_IMG = [[/costa|puxar|pull|barra/i, "treino-superiores-2.jpg"], [/perna|inferior|gl[uú]te|lower|leg/i, "treino-inferiores-1.jpg"], [/abd|core/i, "treino-inferiores-2.jpg"],
-    [/bra[çc]|b[ií]ceps|tr[ií]ceps/i, "treino-superiores-2.jpg"], [/peito|ombro|superior|push|upper|empurr/i, "login.jpg"], [/cardio|corpo|full|circuito/i, "banner-home.jpg"]];
-  const iaImg = (foco) => A((IA_IMG.find(([re]) => re.test(foco)) || [0, "banner-home.jpg"])[1]);
+  const IA_IMG = { // [academia, calistenia]
+    costas: [/costa|puxar|pull|barra|remada/i, ["academia-costas"], ["calistenia-barra"]], pernas: [/perna|inferior|gl[uú]te|lower|leg|agach/i, ["academia-pernas"], ["forca-1", "potencia-1"]],
+    core: [/abd|core/i, ["core-1", "core-2"], ["core-2", "core-1"]], bracos: [/bra[çc]|b[ií]ceps|tr[ií]ceps/i, ["academia-bracos"], ["calistenia-paralelas"]],
+    peito: [/peito|ombro|superior|push|upper|empurr|flex/i, ["academia-peito"], ["calistenia-paralelas"]], cardio: [/cardio|corpo|full|circuito|hiit/i, ["cross-1", "cardio-1"], ["potencia-2", "cardio-2"]] };
+  const iaImg = (foco, pk = "hiper") => { const g = Object.values(IA_IMG).find(([re]) => re.test(foco)); const lista = g ? g[pk === "hiper" ? 1 : 2] : pk === "hiper" ? ["academia-peito", "academia-costas"] : ["calistenia-barra", "forca-1"]; return A(C(varia(lista, foco))); };
 
   function iaCard(pk, t, { link = true } = {}) {
     const tag = link ? "a" : "div", ok = iaSessFeita(pk, t), w = t.semana ?? 0, n = t.exercicios.length;
     const quando = t.semana != null ? `Dia ${w * 7 + t.dia + 1} · ${DIAS[t.dia]}` : DIAS[t.dia];
     return `<${tag} class="wcard" ${link ? `href="${iaLink(pk, t.dia, w)}"` : ""} aria-label="${quando}: ${esc(t.titulo)}">
-      <img class="cover" src="${iaImg(t.foco + " " + t.titulo)}" alt="" loading="lazy">
+      <img class="cover" src="${iaImg(t.foco + " " + t.titulo, pk)}" alt="" loading="lazy">
       <span class="pill glass">${icon("calendar-14.svg")}${quando} · ${esc(t.foco)}${ok ? " · ✓" : ""}</span>
       <div class="bottom"><div class="info"><h3>${esc(t.titulo)}</h3><div class="meta"><span>${icon("timer.svg")}~${minSess(pk, t)} min</span>
         <span>${icon("zap.svg")}${t.rodadas ? `${t.rodadas} voltas · ` : ""}${n} ${n === 1 ? "exercício" : "exercícios"}</span></div></div></div></${tag}>`;
