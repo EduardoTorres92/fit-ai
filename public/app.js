@@ -3768,7 +3768,8 @@
   const desafioDaSemana = () => G.desafios.find((d) => d.semana === semanaAtual()) || null;
   let formDesafio = null; // null | índice do modelo ("" = em branco) | "link" (montado pelo Coach a partir de um vídeo)
   let desafioRascunho = null; // { titulo, descricao, medida, link, nota, duvida }
-  const LINK_VIDEO = /https:\/\/(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
+  const LINK_VIDEO = /(?:https?:\/\/)?(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
+  const linkCompleto = (l) => (/^https?:\/\//i.test(l) ? l.replace(/^http:/i, "https:") : `https://${l}`);
   // O Coach lê a legenda e a capa do vídeo (o servidor busca) e devolve título, regra e medida
   async function desafioDoLink(link, nota = "") {
     const token = await tokenSB();
@@ -4272,7 +4273,7 @@
     else if (t.dataset.modelo !== undefined) { formDesafio = t.dataset.modelo === "" ? "" : Number(t.dataset.modelo); render(); }
     else if (t.id === "desafio-cancelar") { formDesafio = null; desafioRascunho = null; render(); }
     else if (t.id === "desafio-link") {
-      const f = t.closest("form"), link = f.elements.link.value.trim(), nota = f.elements.nota.value.trim();
+      const f = t.closest("form"), link = linkCompleto(f.elements.link.value.trim()), nota = f.elements.nota.value.trim();
       if (!LINK_VIDEO.test(link)) { toast("Cole o link de um reel do Instagram, TikTok ou YouTube."); return; }
       t.disabled = true; t.textContent = "Assistindo ao vídeo…";
       desafioDoLink(link, nota).then((j) => { desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida }; formDesafio = "link"; render(); toast(j.entendeu ? "Desafio montado. Confira e lance! ⚔️" : "Montei com o que deu para entender. Confira a regra.", 3500); })
@@ -4521,7 +4522,7 @@
       desafioRascunho = null; formDesafio = null; carregarGrupos(true);
       return fala(`Desafio lançado no grupo <b>${esc(g.nome)}</b>! ⚔️ Avise a galera.`, ["Abrir o grupo"]);
     }
-    const link = texto.match(LINK_VIDEO)[0], nota = texto.replace(link, "").trim();
+    const bruto = texto.match(LINK_VIDEO)[0], link = linkCompleto(bruto), nota = texto.replace(bruto, "").trim();
     const stop = typing(msgsEl);
     try {
       const j = await desafioDoLink(link, nota);
