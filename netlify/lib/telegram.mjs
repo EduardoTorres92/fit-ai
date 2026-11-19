@@ -16,6 +16,7 @@ import { cabeNoLimite, LIMITE_MEMBRO_DIA } from "./limite.mjs";
 import { ehEmailDono } from "./sessao.mjs";
 import { rpc } from "./admin.mjs";
 import { avisoTodos } from "./agua.mjs";
+import { montarDesafio } from "./desafio-link.mjs";
 
 const PASTA = join(process.env.DADOS_DIR || join(homedir(), "fitai-dados"), "telegram");
 const ARQ = join(PASTA, "dados.json"), CFG = join(PASTA, "config.json");
@@ -125,6 +126,27 @@ export async function configurar(email, c) {
   if (c.noite === null || c.noite === "") conta.noite = null; else { const n = hhmm(c.noite); if (n != null) conta.noite = n; }
   salvar();
   return { ok: true, ...(await estado(email)) };
+}
+// Link de reel (Instagram, TikTok, YouTube) no Telegram: o Coach monta o desafio do grupo e o botão abre o app com o formulário preenchido
+// (quem lança é o app, com a conta da pessoa; o desafio vai no próprio link, sem guardar nada aqui)
+const LINK_VIDEO = /https:\/\/(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
+const MEDIDA_TXT = { feito: "só cumprir", reps: "repetições (mais é melhor)", tempo: "tempo para completar (menor é melhor)", duracao: "tempo aguentando (mais é melhor)" };
+async function desafioPeloLink(c, chat, email, link, nota, dono) {
+  if (!dono) {
+    const cabe = await cabeNoLimite(`conta:${email}`, LIMITE_MEMBRO_DIA, 2).catch(() => false);
+    if (!cabe) { await enviar(chat, { text: "Você chegou ao limite de hoje do Coach. Amanhã eu monto esse desafio. 💪" }); return; }
+  }
+  await api("sendChatAction", { chat_id: chat, action: "typing" }).catch(() => {});
+  const r = await montarDesafio(link, nota);
+  if (r.erro) {
+    await enviar(chat, { text: r.erro === "sem_conteudo" ? "Não consegui ler esse vídeo (pode ser privado). Mande o link de novo com uma frase dizendo o que acontece nele, ex.: <i>link + 10 burpees e 20 agachamentos, 5 rodadas</i>." : "Não consegui montar o desafio agora. Tente de novo em um minuto." });
+    return;
+  }
+  const d = r.desafio, pac = Buffer.from(JSON.stringify({ t: d.titulo, d: d.descricao, m: d.medida, l: link.slice(0, 300) })).toString("base64url");
+  await enviar(chat, {
+    text: `⚔️ <b>Desafio montado a partir do vídeo</b>\n\n<b>${esc(d.titulo)}</b>\n${esc(d.descricao)}\n<i>Como medir: ${MEDIDA_TXT[d.medida]}</i>${r.duvida ? `\n\n⚠️ ${esc(r.duvida)}` : ""}\n\nToque no botão: o FIT.AI abre o formulário do grupo já preenchido para você conferir e lançar.`,
+    reply_markup: { inline_keyboard: [[{ text: "⚔️ Lançar no grupo", url: `${SITE}/#/grupo/novo/${pac}` }]] },
+  });
 }
 // /nivel: nível, classe, XP e a formatura do MAX:30 (o app calcula e manda junto com a agenda)
 function textoNivel(c) {
@@ -315,6 +337,8 @@ export async function processar(u, permitido) {
     await enviar(chat, { text: cmd === "nutri" ? "🥗 Agora quem responde é a <b>Nutri AI</b>. Mande sua dúvida ou a foto do prato. /coach volta para o treino." : "💪 Agora quem responde é o <b>Coach AI</b>. /nutri para falar de alimentação." });
     return;
   }
+  const linkVideo = (texto.match(LINK_VIDEO) || [])[0];
+  if (!cmd && linkVideo) { naFila(chat, () => desafioPeloLink(c, chat, email, linkVideo, texto.replace(linkVideo, "").trim(), ehDono(email) && !c.comoMembro)); return; }
   if (!cmd && (texto || msg.photo || msg.voice || msg.audio || msg.video_note) && !/^(hoje|treino)$/i.test(texto)) {
     if (msg.voice || msg.audio || msg.video_note) { await enviar(chat, { text: "Ainda não entendo áudio 🙉 Manda por texto que eu respondo." }); return; }
     naFila(chat, () => responderCoach(c, chat, msg, email, ehDono(email) && !c.comoMembro));

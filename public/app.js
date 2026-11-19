@@ -3875,6 +3875,14 @@
   function render() {
     let [, rota = "", p1, p2] = location.hash.split("/");
     if (rota === "grupo" && p1 === "entrar" && /^[A-Za-z0-9]{4,12}$/.test(p2 || "") && !uid) { S.convite = p2.toUpperCase(); save(); }
+    if (rota === "grupo" && p1 === "novo" && p2) { // desafio montado no Telegram: abre o formulário preenchido
+      try {
+        const j = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p2.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0))));
+        desafioRascunho = { titulo: String(j.t || "").slice(0, 80), descricao: String(j.d || "").slice(0, 500), medida: MEDIDAS[j.m] ? j.m : "feito", link: /^https:\/\//.test(j.l || "") ? String(j.l).slice(0, 300) : "" };
+        formDesafio = "link";
+      } catch {}
+      p1 = p2 = undefined;
+    }
     if (!S.logado) rota = "login";
     else if (!S.onboarded && rota !== "login") rota = "onboarding";
     else if (!telas[rota] || rota === "login" || rota === "onboarding") rota = "home";
