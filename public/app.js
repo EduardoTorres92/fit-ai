@@ -942,7 +942,11 @@
       flexao: "flexao", barra: "barra-fixa", "barra-australiana": "barra-australiana", dips: "paralelas", "triceps-banco": "triceps-banco", crunch: "abdominal-supra" },
   };
   ANIM.c21 = ANIM._c21; delete ANIM._c21;
-  ANIM.run = { ...ANIM.hiper, ...ANIM.c21 }; // no Corrida e Híbrido, a calistenia tem prioridade nos ids repetidos (o catálogo também)
+  ANIM.run = { ...ANIM.hiper, ...ANIM.c21, // no Corrida e Híbrido, a calistenia tem prioridade nos ids repetidos (o catálogo também)
+    ...Object.fromEntries("regenerativo rodagem longao progressivo tempo fartlek tiro-100 tiro-200 tiro-400 tiro-800 tiro-1000 teste-5k strides".split(" ").map((x) => [`run-${x}`, "corr-corrida"])),
+    "run-aquecimento": "corr-corrida-estacionaria", "run-caminhada-corrida": "corr-caminhada-rapida", "run-educativos": "corr-joelhos-altos", "run-wall-ball": "corr-wall-ball",
+    "run-elevacao-pelvica-unilateral": "corr-ponte-unilateral", "run-stiff-unilateral": "corr-stiff-unilateral", "run-panturrilha-excentrica": "corr-panturrilha-uma-perna",
+    "run-afundo-caminhando": "corr-afundo-caminhando", "run-bike": "bike", "run-esteira-inclinada": "esteira" };
   const animDe = (pk, id) => ANIM[pk]?.[id] || null;
   const fmtKg = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
   const faixa = (r) => { const n = String(r).match(/\d+/g) || []; const a = +n[0] || 0; return [a, +(n[1] || a)]; };
@@ -1328,7 +1332,7 @@
       ${meta && editavel ? `<p class="hx-meta">🎯 ${esc(meta.txt)}</p>` : ""}
       ${ex.obs ? `<p class="ex-obs">${esc(ex.obs)}</p>` : ""}
       ${animDe(pk, ex.id) ? `<button class="hx-anim" data-ia-anim="${animDe(pk, ex.id)}" aria-label="Ver a animação de ${esc(c.nome)}">
-        <img src="assets/anim/${animDe(pk, ex.id)}.jpg" alt="" loading="lazy"><span class="hx-anim-tag">${/^(cal-|mesa-flexora|cadeira-flexora|cadeira-adutora|panturrilha-sentado|esteira|bike|prancha|abdominal-infra)/.test(animDe(pk, ex.id)) ? "▶ Ver o movimento" : "▶ Certo × errado"}</span></button>` : ""}
+        <img src="assets/anim/${animDe(pk, ex.id)}.jpg" alt="" loading="lazy"><span class="hx-anim-tag">${/^(cal-|corr-|mesa-flexora|cadeira-flexora|cadeira-adutora|panturrilha-sentado|esteira|bike|prancha|abdominal-infra)/.test(animDe(pk, ex.id)) ? "▶ Ver o movimento" : "▶ Certo × errado"}</span></button>` : ""}
       <div class="hx-video">${c.yt ? `<button class="btn btn-outline hx-play" data-ia-play="${ex.id}" data-pk="${pk}">▶ Ver como fazer</button>` : ""}
         <a class="lnk-btn" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${c.yt ? "Mais vídeos no YouTube" : "▶ Ver vídeos de execução no YouTube"}</a></div>
       ${c.exec ? `<details class="musc hx-como"><summary><span>📋 Como fazer</span></summary>
