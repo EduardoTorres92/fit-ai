@@ -15,25 +15,29 @@ jobs:
       - name: Baixar e converter
         run: |
           python3 -m pip install -q pillow
-          mkdir -p app/public/assets/cards
+          mkdir -p app/public/assets/cards /tmp/f
+          : > /tmp/log
+          while read nome url; do
+            [ -z "$nome" ] && continue
+            code=$(curl -sS -L -A "curl/8.5.0" -o "/tmp/f/$nome.bin" -w "%{http_code} %{content_type}" "$url" || echo "curl-falhou")
+            echo "$nome $code $(head -c 120 /tmp/f/$nome.bin | tr -dc '[:print:]')" >> /tmp/log
+          done < imp/fotos.txt
           python3 - <<'PY'
-          import urllib.request, io
+          import os
           from PIL import Image
-          log = []
-          for linha in open("imp/fotos.txt"):
-              p = linha.split()
-              if len(p) != 2: continue
-              nome, url = p
+          log = open("/tmp/log").read().splitlines()
+          out = []
+          for linha in log:
+              nome = linha.split()[0]
               try:
-                  dados = urllib.request.urlopen(url, timeout=60).read()
-                  im = Image.open(io.BytesIO(dados)).convert("RGB")
+                  im = Image.open(f"/tmp/f/{nome}.bin").convert("RGB")
                   im.thumbnail((1200, 1200))
                   im.save(f"app/public/assets/cards/{nome}.jpg", "JPEG", quality=80, optimize=True, progressive=True)
-                  log.append(f"ok {nome} {im.size}")
+                  out.append(f"ok {nome} {im.size}")
               except Exception as e:
-                  log.append(f"erro {nome} {e}")
-          open("app/public/assets/cards/importacao.log", "w").write("\n".join(log) + "\n")
-          print("\n".join(log))
+                  out.append(f"erro {linha[:300]}")
+          open("app/public/assets/cards/importacao.log", "w").write("\n".join(out) + "\n")
+          print("\n".join(out))
           PY
       - name: Commit
         working-directory: app
