@@ -1,7 +1,7 @@
 import re, json, urllib.request, html as H
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36"}
 import sys
-RAIZES = {"reais": "1yHYksKDfDHGz5yBXj1h59froD8SZ3Ayy"}
+RAIZES = {"videos": "1WHGAWoRj7zhdRB44C8CDN91onZrjsYl1"}
 def pasta(fid):
     h = urllib.request.urlopen(urllib.request.Request(f"https://drive.google.com/embeddedfolderview?id={fid}#list", headers=UA), timeout=60).read().decode("utf-8", "replace")
     out = []
@@ -16,6 +16,6 @@ def andar(fid, caminho):
         if "/folders/" in href: andar(i, caminho + [nome])
         else: lista.append({"id": i, "pasta": "/".join(caminho), "nome": nome})
 for k, fid in RAIZES.items(): andar(fid, [k])
-json.dump(lista, open("lista2.json", "w"), ensure_ascii=False, indent=0)
+json.dump(lista, open("lista3.json", "w"), ensure_ascii=False, indent=0)
 print(len(lista))
 from collections import Counter; print(Counter(x["pasta"] for x in lista))
