@@ -1,0 +1,18 @@
+name: importar-kilo
+on:
+  push:
+    branches: [kilo-import]
+    paths: [url.txt]
+permissions:
+  contents: write
+jobs:
+  baixar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p /tmp/k && curl -sSL "$(cat url.txt)" -o /tmp/k/k.zip && cd /tmp/k && unzip -q -o k.zip && ls -R arquivos | head -80
+          cd "$GITHUB_WORKSPACE" && rm url.txt && mkdir -p kilo
+          cp -R /tmp/k/arquivos/src /tmp/k/arquivos/public /tmp/k/arquivos/index.html /tmp/k/arquivos/vite.config.js kilo/
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A; git commit -m "Código do template Kilo (só o necessário para o site)"; git push origin HEAD:kilo-import
