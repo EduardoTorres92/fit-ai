@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#070707">
   <link rel="icon" href="./marca.svg" type="image/svg+xml">
   <!-- Links antigos e retornos de login (/#/..., ?code=, #access_token=) seguem para o app em /app -->
-  <script>if(/^#\/|access_token|error_description/.test(location.hash)||/[?&](code|error)=/.test(location.search))location.replace("/app"+location.search+location.hash);</script>
+  <script>if(/^#\/|access_token|error_description/.test(location.hash)||/[?&](code|error)=/.test(location.search))location.replace("/app"+location.search+location.hash);else try{if(!/[?&]lp\b/.test(location.search)&&/"logado":true/.test(localStorage.getItem("fitai-state-v1")||""))location.replace("/app")}catch(e){}</script>
   <!-- Primeira pintura: a cor de fundo do tema e o estilo crítico do hero vêm aqui, antes da folha do site (que vem em
        <link> e segura a pintura até chegar; nunca pelo JS). ?tema=osso|brasa|cobalto|mono troca a paleta.
        Os textos que entram por marco só se escondem com o JS no ar (classe .js): se ele não subir em 4 s, a trava
