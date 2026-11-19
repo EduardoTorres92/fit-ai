@@ -1,0 +1,27 @@
+name: importar-animacoes
+on:
+  push:
+    branches: [animacoes-import]
+    paths: [.github/workflows/importar-animacoes.yml, tools/**]
+permissions:
+  contents: write
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Baixar
+        run: python3 tools/baixar.py 2>&1 | tee baixar.log
+      - name: Converter
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y ffmpeg fonts-dejavu-core >/dev/null
+          ./tools/converter.sh 2>&1 | tee converter.log
+          mkdir -p anim && mv baixar.log converter.log anim/ && cp /tmp/lista.json anim/
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add anim
+          git commit -m "Animações importadas do Drive" || exit 0
+          git push origin HEAD:animacoes-import
