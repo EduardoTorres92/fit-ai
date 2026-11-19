@@ -2,7 +2,7 @@ name: converter-gifs
 on:
   push:
     branches: [gifs-import]
-    paths: [tools/escolhidos2.txt, tools/converter.py]
+    paths: [tools/escolhidos3.txt, tools/converter.py]
 permissions:
   contents: write
 jobs:
@@ -13,8 +13,8 @@ jobs:
       - run: sudo apt-get -qq update && sudo apt-get -qq install -y ffmpeg >/dev/null
       - run: python3 tools/converter.py
       - run: |
-          ls out2/*.jpg | head -48 > /tmp/l.txt
-          ffmpeg -v error -y $(sed 's/^/-i /' /tmp/l.txt | tr '\n' ' ') -filter_complex "$(n=$(wc -l < /tmp/l.txt); for i in $(seq 0 $((n-1))); do printf "[$i]scale=180:180:force_original_aspect_ratio=decrease,pad=180:180:(ow-iw)/2:(oh-ih)/2:white[a$i];"; done; for i in $(seq 0 $((n-1))); do printf "[a$i]"; done; echo "xstack=inputs=$n:layout=$(python3 -c "n=$(wc -l < /tmp/l.txt);print('|'.join(f'{(i%8)*180}_{(i//8)*180}' for i in range(n)))")")" out2/folha.jpg || true
+          ls out3/*.jpg | head -48 > /tmp/l.txt
+          ffmpeg -v error -y $(sed 's/^/-i /' /tmp/l.txt | tr '\n' ' ') -filter_complex "$(n=$(wc -l < /tmp/l.txt); for i in $(seq 0 $((n-1))); do printf "[$i]scale=180:180:force_original_aspect_ratio=decrease,pad=180:180:(ow-iw)/2:(oh-ih)/2:white[a$i];"; done; for i in $(seq 0 $((n-1))); do printf "[a$i]"; done; echo "xstack=inputs=$n:layout=$(python3 -c "n=$(wc -l < /tmp/l.txt);print('|'.join(f'{(i%8)*180}_{(i//8)*180}' for i in range(n)))")")" out3/folha.jpg || true
       - run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add out2; git commit -m "GIFs convertidos" || exit 0; git push origin HEAD:gifs-import
+          git add out3; git commit -m "GIFs convertidos" || exit 0; git push origin HEAD:gifs-import

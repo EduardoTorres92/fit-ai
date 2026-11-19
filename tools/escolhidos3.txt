@@ -1,0 +1,11 @@
+run:corrida 65
+run:caminhada-rapida 47
+run:corrida-estacionaria 62
+run:joelhos-altos 57
+run:wall-ball 41
+run:ponte-unilateral 154
+run:stiff-unilateral 140
+run:panturrilha-uma-perna 79
+run:afundo-caminhando 37
+run:saltos-potentes 187
+run:snap-jumps 188
