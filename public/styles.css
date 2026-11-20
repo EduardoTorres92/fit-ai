@@ -1113,3 +1113,30 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .desafio.form-desafio label.dsf-todos { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; text-align: left; font-weight: 600; }
 .desafio.form-desafio label.dsf-todos input { flex: none; width: 20px; height: 20px; min-height: 0; margin: 0; padding: 0; accent-color: #2b54ff; }
 .dsf-acoes { display: flex; justify-content: center; gap: 18px; }
+
+/* Músculos do WOD (CrossFit) */
+.cf-musc { border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.cf-musc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cf-musc-head strong { font-size: 15px; }
+.cf-musc-head span { font-size: 12px; color: var(--muted); }
+.cf-musc-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cf-musc-figs figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cf-musc-figs svg { width: 100%; max-width: 150px; height: auto; display: block; }
+.cf-musc-figs figcaption { font-size: 12px; color: var(--muted); }
+.cf-musc svg .m-corpo { fill: #eef0f5; }
+.cf-musc svg .m0 { fill: #dde1ea; }
+.cf-musc svg .m1 { fill: #c3cfff; }
+.cf-musc svg .m2 { fill: #7690ff; }
+.cf-musc svg .m3 { fill: #2b54ff; }
+.cf-musc svg [data-g] { stroke: #fff; stroke-width: .8; }
+.cf-musc-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.cf-musc-lista li { display: flex; align-items: baseline; gap: 8px; }
+.cf-musc-n { flex: none; min-width: 66px; text-align: center; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px; }
+.cf-musc-n.m3 { background: #2b54ff; color: #fff; }
+.cf-musc-n.m2 { background: #7690ff; color: #fff; }
+.cf-musc-n.m1 { background: #dfe6ff; color: #2b54ff; }
+.cf-musc-movs summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--blue); }
+.cf-musc-movs ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.cf-musc-movs li { display: flex; flex-direction: column; }
+.cf-musc-movs li span { color: var(--muted); }
+.cf-musc-fora { margin: 0; font-size: 12px; color: var(--muted); }

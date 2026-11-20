@@ -1592,6 +1592,114 @@
     return `<button class="btn btn-outline cf-iniciar" data-cf-timer="${i}">⏱ Iniciar ${p.tipo === "amrap" ? `AMRAP ${p.minutos}'` : p.tipo === "emom" ? `EMOM ${p.minutos}'` : p.tipo === "tabata" ? "Tabata" : p.minutos ? `(cap ${p.minutos}')` : "cronômetro"}</button>`;
   }
 
+  /* ---------- Músculos do WOD ----------
+     Cada movimento (nome livre: foto, digitado ou Coach) vira pesos por grupo muscular: 3 principal, 2 secundário, 1 apoio.
+     A soma do WOD é normalizada pelo maior valor e pinta um mapa de frente e costas. O primeiro padrão que bate vence. */
+  const CF_MG = { quadriceps: "Quadríceps", gluteos: "Glúteos", posteriores: "Posteriores da coxa", panturrilha: "Panturrilhas", ombros: "Ombros",
+    peito: "Peitoral", triceps: "Tríceps", biceps: "Bíceps", dorsais: "Dorsais", trapezio: "Trapézio", lombar: "Lombar", abdomen: "Abdômen", obliquos: "Oblíquos", antebraco: "Antebraços e pegada" };
+  const MPESO = (s) => Object.fromEntries(s.split(" ").map((x) => [x.slice(0, -1), +x.slice(-1)]));
+  const CF_MOV = [
+    [/clean (and|e|n) jerk|\bc j\b|arremesso/, "posteriores3 gluteos3 quadriceps3 ombros3 trapezio2 triceps2 lombar2 abdomen1 panturrilha1 antebraco1"],
+    [/devil press/, "gluteos3 posteriores2 ombros3 peito2 triceps2 quadriceps2 abdomen2 trapezio1"],
+    [/man ?maker/, "peito2 ombros3 triceps2 dorsais2 quadriceps2 gluteos2 abdomen2"],
+    [/(db|dumbbell|halter|kb|kettlebell).*snatch|snatch.*(db|dumbbell|halter|kb)/, "gluteos3 posteriores3 ombros3 trapezio2 quadriceps2 abdomen2 obliquos1 antebraco1"],
+    [/snatch|arranco/, "posteriores3 gluteos3 quadriceps3 ombros3 trapezio3 lombar2 abdomen2 triceps1 panturrilha1"],
+    [/clean|cargada/, "posteriores3 gluteos3 quadriceps3 trapezio3 lombar2 antebraco2 abdomen1 biceps1 panturrilha1"],
+    [/thruster|cluster/, "quadriceps3 gluteos3 ombros3 triceps2 abdomen2 posteriores1"],
+    [/wall ?ball/, "quadriceps3 gluteos3 ombros3 triceps2 abdomen1 peito1"],
+    [/ball slam|slam ball|\bslam/, "abdomen3 dorsais2 ombros2 gluteos1 triceps1"],
+    [/jerk/, "ombros3 triceps3 quadriceps2 gluteos1 abdomen1 trapezio1"],
+    [/push press/, "ombros3 triceps3 quadriceps1 gluteos1 abdomen1 trapezio1"],
+    [/hspu|handstand push|flexao (de|em) parada|parada.*flexao/, "ombros3 triceps3 trapezio2 abdomen1"],
+    [/handstand|wall walk|parada de mao|caminhada de mao/, "ombros3 triceps2 abdomen2 trapezio2 antebraco1"],
+    [/strict press|shoulder press|military|overhead press|desenvolvimento|press militar/, "ombros3 triceps3 trapezio1 abdomen1"],
+    [/sdhp|sumo deadlift high pull|high pull/, "posteriores3 gluteos3 trapezio3 ombros2 lombar2 quadriceps1 biceps1"],
+    [/deadlift|levantamento terra|\bterra\b|\brdl\b|stiff/, "posteriores3 gluteos3 lombar3 trapezio2 antebraco2 quadriceps1 dorsais1"],
+    [/overhead squat|\bohs\b|agachamento (overhead|acima)/, "quadriceps3 gluteos3 ombros2 abdomen2 trapezio2 lombar1"],
+    [/front squat|agachamento frontal/, "quadriceps3 gluteos2 abdomen2 lombar1 posteriores1"],
+    [/pistol/, "quadriceps3 gluteos3 abdomen1 panturrilha1"],
+    [/squat|agachamento/, "quadriceps3 gluteos3 posteriores2 lombar1 abdomen1"],
+    [/lunge|afundo|passada|avanco/, "quadriceps3 gluteos3 posteriores1 panturrilha1 abdomen1"],
+    [/step ?up|box step|subida no (caixote|box)/, "quadriceps3 gluteos3 panturrilha1"],
+    [/burpee/, "peito2 triceps2 ombros2 quadriceps2 gluteos2 abdomen2 panturrilha1"],
+    [/box jump|jump over|broad jump|salto|pulo|tuck jump/, "quadriceps3 gluteos3 panturrilha3 posteriores1"],
+    [/double ?under|single ?under|\bdus?\b|pular corda|corda (dupla|simples)|jump rope|\bsu\b/, "panturrilha3 quadriceps1 ombros1 antebraco1"],
+    [/rope climb|legless|(subida|escalada) (na|de) corda/, "dorsais3 biceps3 antebraco3 abdomen2 ombros1"],
+    [/muscle ?up|\bb?mu\b|\brmu\b/, "dorsais3 triceps3 biceps2 peito2 ombros2 abdomen2 antebraco2"],
+    [/toes ?to ?bar|\bt ?2 ?b\b|\bttb\b|knees ?to ?elbow|\bk ?2 ?e\b|knee raise|elevacao de (pernas|joelhos)/, "abdomen3 dorsais2 antebraco2 obliquos1"],
+    [/chest ?to ?bar|\bc ?2 ?b\b|\bctb\b|pull ?up|chin ?up|barra fixa|\bbarra\b/, "dorsais3 biceps3 antebraco2 ombros1 abdomen1 trapezio1"],
+    [/dip|mergulho|paralela/, "triceps3 peito3 ombros2"],
+    [/ring row|remada/, "dorsais3 trapezio2 biceps2 ombros1"],
+    [/bench|supino/, "peito3 triceps3 ombros2"],
+    [/push ?up|flexao|flexoes/, "peito3 triceps2 ombros2 abdomen1"],
+    [/swing/, "gluteos3 posteriores3 lombar2 ombros1 abdomen1 antebraco1"],
+    [/ghd sit/, "abdomen3 quadriceps1"],
+    [/ghd|hip extension|back extension|extensao (lombar|de quadril)|superman|good ?morning/, "lombar3 gluteos2 posteriores2"],
+    [/russian twist|side plank|prancha lateral|windmill|obliqu/, "obliquos3 abdomen2"],
+    [/sit ?up|abdominal|crunch|v ?up|hollow|l ?sit|plank|prancha|abmat/, "abdomen3 obliquos1"],
+    [/farmer|carry|carregamento|suitcase/, "antebraco3 trapezio3 abdomen2 obliquos2 gluteos1"],
+    [/sled|treno|prowler/, "quadriceps3 gluteos3 panturrilha2"],
+    [/turkish|get ?up|levantamento turco/, "ombros3 abdomen2 obliquos2 gluteos2 quadriceps1"],
+    [/mountain climber|escalador/, "abdomen2 ombros2 quadriceps1"],
+    [/bear crawl|urso/, "ombros2 abdomen2 quadriceps1"],
+    [/jumping jack|polichinelo/, "panturrilha2 ombros1 quadriceps1"],
+    [/\bski\b|skierg/, "dorsais3 triceps2 abdomen2 ombros1"],
+    [/\brow\b|rower|\bremo\b|concept/, "quadriceps2 gluteos2 posteriores2 dorsais2 biceps1 lombar1"],
+    [/bike|assault|echo|bicicleta|ciclismo/, "quadriceps3 gluteos2 panturrilha1 posteriores1 ombros1"],
+    [/\brun\b|running|corrida|correr|shuttle|sprint|trote|^\d+ ?(m|km)$/, "panturrilha3 quadriceps2 posteriores2 gluteos2"],
+  ].map(([re, s]) => [re, MPESO(s)]);
+  const cfMovMusc = (nome) => CF_MOV.find(([re]) => re.test(cfNome(nome)))?.[1] || null;
+  function cfMusculos(wod) {
+    const tot = {}, movs = [], fora = [];
+    for (const p of wod?.partes || []) for (const m of p.movimentos || []) {
+      const w = cfMovMusc(m.nome);
+      if (!w) { if (!fora.includes(m.nome)) fora.push(m.nome); continue; }
+      for (const [g, v] of Object.entries(w)) tot[g] = (tot[g] || 0) + v;
+      if (!movs.some((x) => cfNome(x.nome) === cfNome(m.nome))) movs.push({ nome: m.nome, w });
+    }
+    const max = Math.max(0, ...Object.values(tot));
+    const nivel = Object.fromEntries(Object.entries(tot).map(([g, v]) => [g, v / max >= 0.67 ? 3 : v / max >= 0.34 ? 2 : 1]));
+    return { nivel, tot, movs, fora };
+  }
+  // Mapa estilizado (frente e costas). Cada forma tem o grupo em data-g; as sem grupo são o "corpo" neutro.
+  const CF_CORPO = {
+    frente: [["c", 60, 16, 11], ["r", 55, 25, 10, 9, 3], ["E", 27, 109, 4.5, 5.5, 0], ["E", 52, 168, 5, 5, 0], ["E", 52, 213, 6.5, 3.5, 0], ["p", "M45 100L75 100L70 114L60 119L50 114Z"],
+      ["E", 38, 44, 9.5, 8, -25, "ombros"], ["P", "M59 37L45 39Q39 49 44 58Q52 63 59 59Z", "peito"], ["E", 34, 64, 5.5, 11, 10, "biceps"], ["E", 30, 90, 5, 13, 12, "antebraco"],
+      ["r", 52.5, 62, 15, 37, 5, "abdomen"], ["P", "M50.5 62L44.5 63Q42 80 46 98L50.5 98Z", "obliquos"], ["E", 51, 141, 8.5, 24, 4, "quadriceps"], ["E", 52, 191, 5.5, 17, 0, "panturrilha"]],
+    costas: [["c", 60, 16, 11], ["E", 27, 109, 4.5, 5.5, 0], ["E", 52, 166, 5, 4, 0], ["E", 52, 213, 6.5, 3.5, 0],
+      ["p", "M60 26L69 33L79 40L66 47L60 66L54 47L41 40L51 33Z", "trapezio"], ["E", 38, 44, 9.5, 8, -25, "ombros"], ["P", "M57.5 50L46 46Q41 62 47 80L57.5 87Z", "dorsais"],
+      ["r", 54, 84, 12, 17, 4, "lombar"], ["E", 34, 64, 5.5, 11, 10, "triceps"], ["E", 30, 90, 5, 13, 12, "antebraco"],
+      ["E", 52, 112, 9, 10, 0, "gluteos"], ["E", 51, 143, 8, 21, 4, "posteriores"], ["E", 52, 188, 7, 16, 0, "panturrilha"]],
+  };
+  function cfCorpoSvg(lado, nivel) {
+    const at = (g) => (g ? ` class="m${nivel[g] || 0}" data-g="${g}"` : ` class="m-corpo"`);
+    const f = (n) => +n.toFixed(1), mx = (x) => f(120 - x);
+    const espelho = (d) => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, x, y) => `${mx(+x)} ${y}`);
+    const s = CF_CORPO[lado].map(([t, ...a]) => {
+      if (t === "c") return `<circle cx="${a[0]}" cy="${a[1]}" r="${a[2]}"${at()}/>`;
+      if (t === "r") return `<rect x="${a[0]}" y="${a[1]}" width="${a[2]}" height="${a[3]}" rx="${a[4]}"${at(a[5])}/>`;
+      if (t === "p") return `<path d="${a[0]}"${at(a[1])}/>`;
+      if (t === "P") return `<path d="${a[0]}"${at(a[1])}/><path d="${espelho(a[0])}"${at(a[1])}/>`;
+      const [cx, cy, rx, ry, r, g] = a; // elipse dos dois lados
+      return [[cx, r], [mx(cx), -r]].map(([x, rr]) => `<ellipse cx="${x}" cy="${cy}" rx="${rx}" ry="${ry}"${rr ? ` transform="rotate(${rr} ${x} ${cy})"` : ""}${at(g)}/>`).join("");
+    }).join("");
+    return `<figure><svg viewBox="22 2 76 218" role="img" aria-label="Músculos trabalhados, ${lado === "frente" ? "frente" : "costas"}">${s}</svg><figcaption>${lado === "frente" ? "Frente" : "Costas"}</figcaption></figure>`;
+  }
+  function cfMuscHtml(wod) {
+    const { nivel, movs, fora } = cfMusculos(wod);
+    const gs = Object.keys(nivel).sort((a, b) => nivel[b] - nivel[a] || Object.keys(CF_MG).indexOf(a) - Object.keys(CF_MG).indexOf(b));
+    if (!gs.length) return "";
+    const rot = { 3: "Foco", 2: "Bastante", 1: "Apoio" };
+    const linha = (n) => { const x = gs.filter((g) => nivel[g] === n); return x.length ? `<li><span class="cf-musc-n m${n}">${rot[n]}</span>${x.map((g) => CF_MG[g]).join(", ")}</li>` : ""; };
+    return `<section class="cf-musc" aria-label="Músculos trabalhados no WOD">
+      <div class="cf-musc-head"><strong>💪 Músculos do WOD</strong><span>${movs.length} ${movs.length === 1 ? "movimento" : "movimentos"}</span></div>
+      <div class="cf-musc-figs">${cfCorpoSvg("frente", nivel)}${cfCorpoSvg("costas", nivel)}</div>
+      <ul class="cf-musc-lista">${linha(3)}${linha(2)}${linha(1)}</ul>
+      <details class="cf-musc-movs"><summary>Por movimento</summary><ul>${movs.map((m) => `<li><strong>${esc(m.nome)}</strong><span>${Object.entries(m.w).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 2).map(([g]) => CF_MG[g]).join(", ")}</span></li>`).join("")}</ul></details>
+      ${fora.length ? `<p class="cf-musc-fora">Fora do mapa: ${fora.map(esc).join(", ")}</p>` : ""}
+    </section>`;
+  }
+
   /* ---------- Telas ---------- */
   function cfWodHtml(l, editavel) {
     const w = l.wod;
@@ -1603,6 +1711,7 @@
         ${p.movimentos.length ? `<ul class="cf-movs">${p.movimentos.map((m) => `<li>${m.reps ? `<b>${esc(m.reps)}</b> ` : ""}${esc(m.nome)}${m.carga ? ` <span>${esc(m.carga)}</span>` : ""}</li>`).join("")}</ul>` : ""}
         ${editavel && !l.done ? cfTimerHtml(i, p) : ""}
       </div>`).join("")}
+      ${cfMuscHtml(w)}
       ${w.obs ? `<p class="note">${esc(w.obs)}</p>` : ""}
       ${l.msg ? `<div class="note-box"><p>✨ ${esc(l.msg)}</p></div>` : ""}
     </div>`;
