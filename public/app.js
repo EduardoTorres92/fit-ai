@@ -1661,41 +1661,24 @@
     const nivel = Object.fromEntries(Object.entries(tot).map(([g, v]) => [g, v / max >= 0.67 ? 3 : v / max >= 0.34 ? 2 : 1]));
     return { nivel, tot, movs, fora };
   }
-  // Mapa estilizado (frente e costas). Cada forma tem o grupo em data-g; as sem grupo são o "corpo" neutro.
-  const CF_CORPO = {
-    frente: [["c", 60, 16, 11], ["r", 55, 25, 10, 9, 3], ["E", 27, 109, 4.5, 5.5, 0], ["E", 52, 168, 5, 5, 0], ["E", 52, 213, 6.5, 3.5, 0], ["p", "M45 100L75 100L70 114L60 119L50 114Z"],
-      ["E", 38, 44, 9.5, 8, -25, "ombros"], ["P", "M59 37L45 39Q39 49 44 58Q52 63 59 59Z", "peito"], ["E", 34, 64, 5.5, 11, 10, "biceps"], ["E", 30, 90, 5, 13, 12, "antebraco"],
-      ["r", 52.5, 62, 15, 37, 5, "abdomen"], ["P", "M50.5 62L44.5 63Q42 80 46 98L50.5 98Z", "obliquos"], ["E", 51, 141, 8.5, 24, 4, "quadriceps"], ["E", 52, 191, 5.5, 17, 0, "panturrilha"]],
-    costas: [["c", 60, 16, 11], ["E", 27, 109, 4.5, 5.5, 0], ["E", 52, 166, 5, 4, 0], ["E", 52, 213, 6.5, 3.5, 0],
-      ["p", "M60 26L69 33L79 40L66 47L60 66L54 47L41 40L51 33Z", "trapezio"], ["E", 38, 44, 9.5, 8, -25, "ombros"], ["P", "M57.5 50L46 46Q41 62 47 80L57.5 87Z", "dorsais"],
-      ["r", 54, 84, 12, 17, 4, "lombar"], ["E", 34, 64, 5.5, 11, 10, "triceps"], ["E", 30, 90, 5, 13, 12, "antebraco"],
-      ["E", 52, 112, 9, 10, 0, "gluteos"], ["E", 51, 143, 8, 21, 4, "posteriores"], ["E", 52, 188, 7, 16, 0, "panturrilha"]],
-  };
-  function cfCorpoSvg(lado, nivel) {
-    const at = (g) => (g ? ` class="m${nivel[g] || 0}" data-g="${g}"` : ` class="m-corpo"`);
-    const f = (n) => +n.toFixed(1), mx = (x) => f(120 - x);
-    const espelho = (d) => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, x, y) => `${mx(+x)} ${y}`);
-    const s = CF_CORPO[lado].map(([t, ...a]) => {
-      if (t === "c") return `<circle cx="${a[0]}" cy="${a[1]}" r="${a[2]}"${at()}/>`;
-      if (t === "r") return `<rect x="${a[0]}" y="${a[1]}" width="${a[2]}" height="${a[3]}" rx="${a[4]}"${at(a[5])}/>`;
-      if (t === "p") return `<path d="${a[0]}"${at(a[1])}/>`;
-      if (t === "P") return `<path d="${a[0]}"${at(a[1])}/><path d="${espelho(a[0])}"${at(a[1])}/>`;
-      const [cx, cy, rx, ry, r, g] = a; // elipse dos dois lados
-      return [[cx, r], [mx(cx), -r]].map(([x, rr]) => `<ellipse cx="${x}" cy="${cy}" rx="${rx}" ry="${ry}"${rr ? ` transform="rotate(${rr} ${x} ${cy})"` : ""}${at(g)}/>`).join("");
-    }).join("");
-    return `<figure><svg viewBox="22 2 76 218" role="img" aria-label="Músculos trabalhados, ${lado === "frente" ? "frente" : "costas"}">${s}</svg><figcaption>${lado === "frente" ? "Frente" : "Costas"}</figcaption></figure>`;
-  }
-  function cfMuscHtml(wod) {
+  // Mesmo desenho dos mapas do Insanity: a base cinza e uma camada azul por grupo (assets/musculos/cf/<grupo>.webp),
+  // empilhadas com a opacidade do nível (foco, bastante, apoio).
+  const CF_OPAC = { 3: 1, 2: 0.62, 1: 0.3 };
+  const cfMapaHtml = (nivel, nome) => `<div class="cf-mapa" role="img" aria-label="Mapa muscular de ${esc(nome)}">
+    <img src="${A("musculos/cf/base.webp")}" alt="" loading="lazy" width="900" height="672">
+    ${Object.entries(nivel).map(([g, n]) => `<img src="${A(`musculos/cf/${g}.webp`)}" alt="" loading="lazy" width="900" height="672" style="opacity:${CF_OPAC[n]}">`).join("")}</div>`;
+  function cfMuscHtml(wod, compacto = false) {
     const { nivel, movs, fora } = cfMusculos(wod);
     const gs = Object.keys(nivel).sort((a, b) => nivel[b] - nivel[a] || Object.keys(CF_MG).indexOf(a) - Object.keys(CF_MG).indexOf(b));
     if (!gs.length) return "";
     const rot = { 3: "Foco", 2: "Bastante", 1: "Apoio" };
     const linha = (n) => { const x = gs.filter((g) => nivel[g] === n); return x.length ? `<li><span class="cf-musc-n m${n}">${rot[n]}</span>${x.map((g) => CF_MG[g]).join(", ")}</li>` : ""; };
-    return `<section class="cf-musc" aria-label="Músculos trabalhados no WOD">
-      <div class="cf-musc-head"><strong>💪 Músculos do WOD</strong><span>${movs.length} ${movs.length === 1 ? "movimento" : "movimentos"}</span></div>
-      <div class="cf-musc-figs">${cfCorpoSvg("frente", nivel)}${cfCorpoSvg("costas", nivel)}</div>
+    return `<section class="cf-musc${compacto ? " compacto" : ""}" aria-label="Músculos trabalhados no WOD">
+      ${compacto ? "" : `<div class="cf-musc-head"><strong>💪 Músculos do WOD</strong><span>${movs.length} ${movs.length === 1 ? "movimento" : "movimentos"}</span></div>`}
+      ${cfMapaHtml(nivel, wod.titulo || "WOD")}
+      <div class="cf-musc-leg"><span>Frente</span><span>Costas</span></div>
       <ul class="cf-musc-lista">${linha(3)}${linha(2)}${linha(1)}</ul>
-      <details class="cf-musc-movs"><summary>Por movimento</summary><ul>${movs.map((m) => `<li><strong>${esc(m.nome)}</strong><span>${Object.entries(m.w).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 2).map(([g]) => CF_MG[g]).join(", ")}</span></li>`).join("")}</ul></details>
+      ${compacto ? "" : `<details class="cf-musc-movs"><summary>Por movimento</summary><ul>${movs.map((m) => `<li><strong>${esc(m.nome)}</strong><span>${Object.entries(m.w).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 2).map(([g]) => CF_MG[g]).join(", ")}</span></li>`).join("")}</ul></details>`}
       ${fora.length ? `<p class="cf-musc-fora">Fora do mapa: ${fora.map(esc).join(", ")}</p>` : ""}
     </section>`;
   }
@@ -1987,9 +1970,10 @@
   function cfTelaBenchmarks() {
     const linha = (b) => {
       const ant = cfAnteriores(b.titulo, "9999-12-31"), m = ant.filter((x) => x.val).sort((a, c) => c.val.v - a.val.v)[0], p = b.wod.partes[0];
-      return `<details class="cf-bench"><summary><span><strong>${esc(b.titulo)}</strong><small>${esc(cfParteTxt(p))}</small></span>${m ? `<b>🏆 ${esc(m.val.txt)}</b>` : ant.length ? "<b>✅</b>" : ""}</summary>
+      return `<details class="cf-bench"><summary><span><strong>${esc(b.titulo)}</strong><small>${esc(cfParteTxt(p))}${(() => { const n = cfMusculos(b.wod).nivel, f = Object.keys(n).filter((g) => n[g] === 3).map((g) => CF_MG[g]); return f.length ? ` · 💪 ${esc(f.slice(0, 3).join(", "))}${f.length > 3 ? ` +${f.length - 3}` : ""}` : ""; })()}</small></span>${m ? `<b>🏆 ${esc(m.val.txt)}</b>` : ant.length ? "<b>✅</b>" : ""}</summary>
         <ul class="cf-movs">${p.movimentos.map((x) => `<li>${x.reps ? `<b>${esc(x.reps)}</b> ` : ""}${esc(x.nome)}${x.carga ? ` <span>${esc(x.carga)}</span>` : ""}</li>`).join("")}</ul>
         ${p.descricao ? `<p class="cf-desc">${esc(p.descricao)}</p>` : ""}
+        ${cfMuscHtml(b.wod, true)}
         ${ant.length ? `<p class="note">Você já fez ${ant.length} ${ant.length === 1 ? "vez" : "vezes"}: ${ant.slice(-4).map((x) => `${ddmm(x.k)} ${x.val ? x.val.txt : "feito"}`).join(" · ")}</p>` : ""}
         <button class="btn btn-blue" data-cf-bench="${esc(b.titulo)}">Fazer hoje</button></details>`;
     };
