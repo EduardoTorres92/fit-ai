@@ -3996,9 +3996,9 @@
     let dlg = $("#post-dlg");
     if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "post-dlg"; dlg.className = "post-dlg"; $(".device").appendChild(dlg); }
     dlg.innerHTML = `<form class="post-form" id="post-form">
-      <div class="post-form-head"><strong>Postar no grupo</strong><button type="button" class="icon-btn" data-post-fechar aria-label="Fechar">${icon("x.svg", 22)}</button></div>
+      <div class="post-form-head"><strong>${G.grupos.length > 1 ? "Postar nos grupos" : "Postar no grupo"}</strong><button type="button" class="icon-btn" data-post-fechar aria-label="Fechar">${icon("x.svg", 22)}</button></div>
       ${msg ? `<p class="note">${msg}</p>` : ""}
-      ${G.grupos.length > 1 ? `<label>Grupo<select name="grupo">${G.grupos.map((g) => `<option value="${g.id}"${g.id === G.sel ? " selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>` : `<input type="hidden" name="grupo" value="${G.grupos[0].id}">`}
+      ${G.grupos.length > 1 ? `<label>Grupo<select name="grupo"><option value="*"${S.postTodos ? " selected" : ""}>Todos os meus grupos (${G.grupos.length})</option>${G.grupos.map((g) => `<option value="${g.id}"${!S.postTodos && g.id === G.sel ? " selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>` : `<input type="hidden" name="grupo" value="${G.grupos[0].id}">`}
       <label>Treino<select name="treino"><option value="">Sem treino</option>${tr.map((r, i) => `<option value="${i}"${i === 0 ? " selected" : ""}>${r.data === hojeKey ? "Hoje" : "Ontem"} · ${esc(r.titulo)}${r.concluido ? "" : " (em andamento)"}</option>`).join("")}</select></label>
       <textarea name="texto" maxlength="500" rows="3" placeholder="Como foi? Bateu recorde? Sofreu? 😅"></textarea>
       <div class="post-foto-prev" id="post-prev"></div>
@@ -4013,19 +4013,29 @@
     if (!texto && !postFoto) { toast("Escreva algo ou escolha uma foto."); return; }
     const btn = f.querySelector("button[type=submit]"); btn.disabled = true; btn.textContent = "Postando…";
     try {
-      const gid = d.grupo, r = d.treino !== "" ? $("#post-dlg")._treinos[Number(d.treino)] : null;
-      let foto = null;
-      if (postFoto) {
-        foto = `${gid}/${uid}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.jpg`;
-        const up = await sb.storage.from("posts").upload(foto, postFoto, { contentType: "image/jpeg", cacheControl: "86400" });
-        if (up.error) throw up.error;
-      }
+      const todos = d.grupo === "*", alvos = todos ? G.grupos.map((g) => g.id) : [d.grupo];
+      const r = d.treino !== "" ? $("#post-dlg")._treinos[Number(d.treino)] : null;
       const treino = r ? { data: r.data, programa: r.programa, titulo: r.titulo, minutos: r.minutos, concluido: r.concluido } : null;
-      const { error } = await sb.from("posts").insert({ grupo_id: gid, usuario_id: uid, texto, foto, treino });
-      if (error) throw error;
+      if ((G.grupos || []).length > 1 && !!S.postTodos !== todos) { S.postTodos = todos; save(); } // lembra a escolha para a próxima
+      // Um post por grupo; a foto vai para a pasta de cada grupo (só os membros de um grupo veem as fotos dele)
+      let ok = 0, primeiro = null;
+      for (const gid of alvos) {
+        try {
+          let foto = null;
+          if (postFoto) {
+            foto = `${gid}/${uid}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.jpg`;
+            const up = await sb.storage.from("posts").upload(foto, postFoto, { contentType: "image/jpeg", cacheControl: "86400" });
+            if (up.error) throw up.error;
+          }
+          const { error } = await sb.from("posts").insert({ grupo_id: gid, usuario_id: uid, texto, foto, treino });
+          if (error) throw error;
+          ok++; primeiro = primeiro || gid;
+        } catch (e) { console.error("post", gid, e); }
+      }
+      if (!ok) throw new Error("nenhum grupo");
       $("#post-dlg").close(); postFoto = null;
-      G.sel = gid; G.carregadoEm = 0; await carregarGrupos(true);
-      toast("Postado no grupo! 📣");
+      G.sel = alvos.includes(G.sel) ? G.sel : primeiro; G.carregadoEm = 0; await carregarGrupos(true);
+      toast(!todos ? "Postado no grupo! 📣" : ok === alvos.length ? `Postado nos ${ok} grupos! 📣` : `Postado em ${ok} de ${alvos.length} grupos. Os outros falharam; tente de novo neles.`, 4000);
       if (!location.hash.startsWith("#/grupo")) location.hash = "#/grupo";
     } catch (e) { console.error("post", e); toast("Não consegui postar agora. Tente de novo."); btn.disabled = false; btn.textContent = "Postar"; }
   }
