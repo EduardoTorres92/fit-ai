@@ -5595,6 +5595,7 @@
     if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
     { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
       out.push(`Chefes (metas de recorde): ${cs.filter((c) => c.derrotado).length} de ${cs.length} derrotados.${vivos.length ? ` Mais perto: ${vivos.map((c) => `${c.nome} (${c.desc}; marco ${fmtMarca(c.met, c.melhor)}, HP ${c.hp}%)`).join("; ")}.` : ""} Missões de hoje: ${missoesDe(hojeKey).map((m) => `${m.t} ${m.ok ? "(feita)" : `(${m.fmt(m.valor, m.alvoV)})`}`).join("; ")}.`); }
+    out.push(temporadaContexto());
     { const e = estiloAtual(); out.push(`Estilo de treino (últimos 28 dias): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
     if (S.ficha) { const f = fichaAtual(); out.push(`Ficha de atleta: rank ${f.rank} (meta ${S.ficha.meta} até ${ddmm(keyOf(addDays(parseKey(S.ficha.metaIni), 30)))}), ${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(", ")} (0 a 100). Use os atributos mais baixos para sugerir o que treinar.`); }
     { const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, T = TRILHAS[trilha()];
@@ -6063,6 +6064,23 @@
         <button class="btn btn-blue" data-tp-ir>${uid ? "Ver ranking da temporada" : "Ver a temporada"}</button>
         <button class="lnk-btn" data-tp-fechar>Agora não</button></div></div>`;
     d.showModal();
+  }
+  // Contexto da temporada para o Coach: liga, pontos, posição, Sr. Q, desafio da semana e as insígnias mais perto de subir
+  function temporadaContexto() {
+    const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t), o = meuOpts(), out = [];
+    out.push(`${t.nome} · ${t.sub} (${ddmm(t.ini)} a ${ddmm(t.fim)}): ${t.fase === "antes" ? `começa em ${t.faltam} dias` : t.fase === "fim" ? "encerrada" : `semana ${t.semana} de 8, faltam ${t.faltam} dias`}.`);
+    if (liga) {
+      const p = pontosTemporada(rows, liga, o, t);
+      let pos = ""; if (uid && G.membros?.length) { const l = tabelaTemporada(t).filter((x) => x.liga === liga).sort((a, b) => b.total - a.total), i = l.findIndex((x) => x.id === uid); if (i >= 0) pos = ` · ${i + 1}º de ${l.length}${i > 0 ? `, ${l[i - 1].total - p.total} pontos atrás de quem está na frente` : ""}`; }
+      out.push(`Liga ${LIGA_T[liga].nome} (chefe: ${LIGA_T[liga].rot}): ${p.total} pontos (${p.treinos} treinos, +${p.ins} de insígnias, ${p.chefes} chefes, ${p.max} Max Out melhorados)${pos}.`);
+      const ins = LIGAS.filter((L) => liga === "hibrido" ? L.vis() : L.k === liga).flatMap((L) => L.ins(rows, o).map((x) => ({ ...x, liga: L.nome })))
+        .filter((x) => x.tier < 3).sort((a, b) => (b.tier - a.tier) || ((b.pct || 0) - (a.pct || 0))).slice(0, 5);
+      if (ins.length) out.push(`Insígnias mais perto de subir (cada faixa nova vale +10 a +30 pontos): ${ins.map((x) => `${x.nome} [${x.liga}] (${x.tier ? `hoje ${TIER_TXT[x.tier]}` : "ainda não tem"}${x.det ? `; ${x.det}` : ""})`).join("; ")}.`);
+    } else out.push("Ainda sem liga: precisa treinar na temporada para entrar numa.");
+    const q = chefes().find((c) => c.k === "sr-q"), d = desafioDaSemana();
+    if (q) out.push(`Sr. Q (chefe da temporada): ${q.melhor}/8 desafios do grupo cumpridos.${d ? ` Desafio desta semana: "${d.titulo}" (${(G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid) ? "já cumprido" : `ainda não cumprido, ${faltaDesafio(d)}`}).` : ""}`);
+    out.push("Quando fizer sentido (ou se a pessoa perguntar como vencer a temporada), dê 1 ou 2 dicas concretas tiradas daqui: o desafio da semana pendente, a insígnia mais fácil de subir, o movimento a melhorar. Sem inventar números que não estão aqui.");
+    return out.join("\n");
   }
   function temporadaHome() {
     const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t);
