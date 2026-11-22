@@ -663,19 +663,7 @@
 
     onboarding() {
       setToolbar(null);
-      return `<section class="screen onboarding">
-        <header class="chat-head"><div class="coach">
-          <span class="coach-avatar">${icon("sparkles-blue.svg", 18)}</span>
-          <span class="coach-txt"><strong>Coach AI</strong><span class="online">${icon("dot-online.svg", 8)}Online</span></span>
-        </div></header>
-        <div class="chat-msgs" id="ob-msgs"></div>
-        <div class="chat-foot">
-          <div class="chips" id="ob-chips"></div>
-          <form class="composer" id="ob-form" autocomplete="off">
-            <input type="text" id="ob-input" placeholder="Digite sua mensagem" aria-label="Mensagem">
-            <button type="submit" class="send" aria-label="Enviar">${icon("arrow-up.svg", 20)}</button>
-          </form>
-        </div></section>`;
+      return `<section class="screen quiz" id="quiz"></section>`;
     },
 
     home() {
@@ -779,6 +767,7 @@
             <div class="streak-num"><strong>${seq} ${seq === 1 ? "dia" : "dias"}</strong><span>Sequência Atual</span></div>
           </div>
         </div>
+        ${fichaMini()}
         <button type="button" class="evo-card" data-evo-foto><span class="stat-ico">${icon("camera.svg", 18)}</span>
           <span><strong>Evolução por foto</strong><span class="t">Check-in de frente e de lado a cada 15 dias. Só você vê.</span></span></button>
         <div class="section evo-dash">
@@ -1105,7 +1094,9 @@
     return (p.op || []).map((o) => (p.fmt ? p.fmt(o) : o));
   };
   async function iaPergunta(pk, ms = 500) {
-    const I = IA[pk], et = S[pk].etapa || 0, p = I.passos[et];
+    const I = IA[pk];
+    while (I.passos[S[pk].etapa || 0] && S[pk].pre?.[I.passos[S[pk].etapa || 0].k]) S[pk].etapa = (S[pk].etapa || 0) + 1; // já respondido no quiz
+    const et = S[pk].etapa || 0, p = I.passos[et];
     const stop = typing(msgsEl); await wait(ms); stop();
     if (!p) {
       addMsg(msgsEl, "Tudo pronto! Posso montar seu treino? 💪", false, chatLog);
@@ -1124,11 +1115,11 @@
     if (!IA[pk] || (!layer.hidden && iaChat === pk && chatPapel === "coach")) return;
     if (layer.hidden || chatPapel !== "coach") openChat();
     iaChat = pk;
-    if (refazer) S[pk].etapa = 0;
-    const I = IA[pk], et = S[pk].etapa || 0;
+    if (refazer) { S[pk].etapa = 0; S[pk].pre = {}; }
+    const I = IA[pk], et = S[pk].etapa || 0, ja = I.passos.length - coachFaltam(pk);
     const stop = typing(msgsEl); await wait(500); stop();
     addMsg(msgsEl, et && et < I.passos.length ? `Vamos continuar a montar seu <b>${esc(I.nome)}</b> de onde paramos. 💪`
-      : `${refazer ? `Vamos montar um <b>${esc(I.nome)}</b> novo!` : `${esc(I.intro)}, ${esc(primeiroNome())}! 💪`} São ${I.passos.length} perguntas rápidas e depois eu monto ${esc(I.oQue)}.`, false, chatLog);
+      : `${refazer ? `Vamos montar um <b>${esc(I.nome)}</b> novo!` : `${esc(I.intro)}, ${esc(primeiroNome())}! 💪`} ${ja ? `Já usei ${ja} respostas do seu quiz: faltam só ${I.passos.length - ja} perguntas` : `São ${I.passos.length} perguntas rápidas`} e depois eu monto ${esc(I.oQue)}.`, false, chatLog);
     iaPergunta(pk, 600);
   }
   function iaSairChat(msg) {
@@ -1142,7 +1133,12 @@
   async function iaChatResposta(texto) {
     const pk = iaChat, t = norm(texto), et = S[pk].etapa || 0;
     if (t === "cancelar") return iaSairChat("Tudo bem! Suas respostas ficam salvas. Quando quiser continuar, é só me chamar e escolher <b>{nome}</b>.");
-    if (t === "voltar" || t === "mudar a ultima resposta") { S[pk].etapa = Math.max(0, et - 1); save(); return iaPergunta(pk); }
+    if (t === "voltar" || t === "mudar a ultima resposta") {
+      const pre = S[pk].pre || {}, ps = IA[pk].passos; let e = Math.max(0, et - 1);
+      while (e > 0 && pre[ps[e].k]) e--;
+      if (pre[ps[e]?.k]) delete pre[ps[e].k]; // voltou até uma resposta do quiz: agora ela é perguntada
+      S[pk].etapa = e; save(); return iaPergunta(pk);
+    }
     if (!IA[pk].passos[et]) return /montar|sim|pode|bora|manda/.test(t) ? iaGerar(pk) : iaPergunta(pk);
     const erro = iaResponder(pk, texto);
     if (erro) { const stop = typing(msgsEl); await wait(400); stop(); addMsg(msgsEl, erro, false, chatLog); return; }
@@ -2929,7 +2925,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })() };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3167,7 +3163,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3339,7 +3335,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde;
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -4603,7 +4599,8 @@
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
     app.innerHTML = telas[rota](p1, p2);
-    if (rota === "onboarding") startOnboarding();
+    if (rota === "onboarding") startQuiz("onboarding");
+    if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
     const tab = document.querySelector(".wtab.on");
     if (tab) tab.scrollIntoView({ inline: "center", block: "nearest" });
     const aba = document.querySelector(".seg.prog.rolar a.on");
@@ -4711,6 +4708,8 @@
       if (perfil.config.formaturas && typeof perfil.config.formaturas === "object") S.formaturas = { ...perfil.config.formaturas, ...(S.formaturas || {}) };
       if (perfil.config.trilha && !S.trilha) S.trilha = perfil.config.trilha;
       if (perfil.config.forca && !S.forca) S.forca = perfil.config.forca;
+      if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
+      if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
@@ -5530,6 +5529,8 @@
     out.push(`Hoje: ${DIAS[hojeDia]}, ${hojeKey}. ${nomeSemana(w)}, ciclo ${cicloDe(hoje)}. Treino de hoje: ${t ? t.titulo : "—"}.`);
     out.push(`Perfil: ${P.peso || "?"} kg, ${P.altura || "?"} cm, ${P.idade || "?"} anos. Sequência atual: ${sequencia()} dias. Treinos concluídos: ${treinosFeitos()}.`);
     out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
+    if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
+    if (S.ficha) { const f = fichaAtual(); out.push(`Ficha de atleta: rank ${f.rank} (meta ${S.ficha.meta} até ${ddmm(keyOf(addDays(parseKey(S.ficha.metaIni), 30)))}), ${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(", ")} (0 a 100). Use os atributos mais baixos para sugerir o que treinar.`); }
     { const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, T = TRILHAS[trilha()];
       const libs = CATALOGO.filter((x) => liberado(x.k)).map((x) => x.nome).join(", ");
       out.push(`Gamificação: nível ${n.nivel} (${n.classe}), ${n.xp} XP, faltam ${Math.max(0, n.fim - n.xp)} XP para o próximo nível. Trilha: ${T.nome}${trilha() === "hibrido" ? ` (força: ${progDe(forcaHibrido())?.nome})` : ""}. Etapa ${at.i + 1} de ${at.n}: ${at.nome}${g ? ` (${g.feitas}/${g.precisa} sessões para a formatura; teste de saída: ${g.teste}${g.final ? ", feito" : ", ainda não feito"})` : " (etapa contínua)"}. Meta da semana: ${metaSemana()} treinos. ${donoAtivo() ? "Conta do dono: todos os programas liberados." : `Programas liberados: ${libs}. Não recomende programas travados; se a pessoa quiser outro estilo, diga que dá para trocar de trilha no Perfil sem perder o XP.`}`); }
@@ -5638,99 +5639,257 @@
   }
 
   /* ---------- Onboarding ---------- */
-  async function startOnboarding() {
-    const box = $("#ob-msgs"), chips = $("#ob-chips"), form = $("#ob-form");
-    let etapa = "inicio";
-    const falar = async (html, ms = 700) => { const stop = typing(box); await wait(ms); stop(); addMsg(box, html); };
-    const SEMANAS = PROGRAMA.map((s, i) => `Semana ${i + 1} · ${s.nome}`);
-    const intro = [
-      S.user ? `Bem-vindo ao FIT.AI, ${esc(primeiroNome())}! 🎉` : "Bem-vindo ao FIT.AI! 🎉",
-      `Aqui tem ${TRILHA.length} programas, do mais acessível ao mais puxado: <b>${esc(caminhoTxt())}</b>, e dois montados pelo Coach para você: <b>${esc(HIPER.nome)}</b> (academia) e <b>${esc(C21.nome)}</b>. Você registra cada treino, acompanha a evolução e tem uma IA disponível 24h para te guiar.`,
-      "Vou te indicar por onde começar. Como está seu condicionamento hoje?",
-    ];
-    for (const [i, m] of intro.entries()) await falar(m, i === 1 ? 1000 : 600);
-    setChips(chips, NIVEIS.map(([, txt]) => txt));
-    etapa = "nivel";
-
-    async function iniciarTrilha() {
-      const at = etapaAtual(), T = TRILHAS[trilha()];
-      await falar(at.p ? `Trilha <b>${T.ic} ${esc(T.nome)}</b>! Etapa 1: <b>${esc(at.nome)}</b>. Para se formar: 80% das sessões e um teste de saída. Isso vale +${XP.formatura} XP e libera a próxima etapa. O <b>Treino da Fera</b> fica sempre aberto como apoio para as barras.`
-        : `Trilha <b>${T.ic} ${esc(T.nome)}</b>! Cada WOD concluído vale <b>${XP.cf} XP</b>, cada PR +${XP.recorde}, e bater ${metaSemana()} treinos na semana dá +${XP.semana}. O <b>Treino da Fera</b> fica aberto se quiser treinar barras.`, 1000);
-      if (trilha() === "hibrido") await falar(`Nos dias de vídeo, você segue o <b>MAX:30</b>; nos de força, a <b>${esc(progDe(forcaHibrido())?.nome || "")}</b>, que eu monto depois de umas perguntas (o card fica na tela inicial).`);
-      await escolhido(progDe(at.prog));
-    }
-    async function escolhido(x) {
-      chips.innerHTML = "";
-      if (x.k === "plano") {
-        S.principal = "plano"; save();
-        etapa = "semana";
-        await falar(`Fechado: <b>${esc(x.nome)}</b>! Em qual semana dele você está agora?`);
-        setChips(chips, SEMANAS);
-        return;
-      }
-      escolherPrograma(x.k);
-      etapa = "fim";
-      if (x.k === "cf") {
-        await falar(`Fechado: <b>CrossFit</b>! No box, é só tirar uma foto do quadro: eu leio o WOD e lanço o treino. Depois você anota o tempo ou as voltas. 📷🔥`, 1000);
-        setChips(chips, ["Ver meu programa"], true);
-        return;
-      }
-      if (IA[x.k]) {
-        await falar(`Fechado: <b>${esc(x.nome)}</b>! Agora eu te faço umas perguntas rápidas (nível, objetivo, dias, peso…) e monto seu treino. 💪`, 1000);
-        setChips(chips, ["Montar meu treino"], true);
-        return;
-      }
-      const w = insSemanaDe(x.k, hoje);
-      await falar(w < 0
-        ? `Fechado: <b>${esc(x.nome)}</b>! Sua semana 1 começa na <b>segunda, ${ddmm(S[x.k].inicio)}</b>. Até lá, dá para conhecer os vídeos e fazer um extra: tudo conta. 💪`
-        : `Fechado: <b>${esc(x.nome)}</b>! Você está na <b>semana 1</b>. Abra o treino de hoje, toque em Assistir e marque cada vídeo como feito. ${VP[x.k].maxOut ? "Anote também o seu <b>Max Out</b>: é ele que mostra a sua evolução." : "Nos dias de <b>Fit Test</b>, anote as repetições de cada movimento."} 🔥`, 1100);
-      setChips(chips, ["Ver meu programa"], true);
-    }
-
-    async function responder(txt) {
-      const t = norm(txt);
-      if (etapa === "nivel") {
-        addMsg(box, esc(txt), true);
-        const n = NIVEIS.find(([, frase]) => norm(frase) === t) || NIVEIS.find(([nv]) => t.includes(norm(nv)));
-        if (!n) return falar("Toque numa das opções abaixo. 😉");
-        S.nivel = n[0]; save();
-        etapa = "trilha"; chips.innerHTML = "";
-        await falar(`Agora escolha a sua <b>trilha</b>, o jeito que você quer treinar. Cada trilha tem etapas com formatura, e tudo vale <b>XP</b>: você sobe de nível e de classe (Recruta → Escudeiro → Guerreiro…). Dá para trocar de trilha depois, sem perder o XP. 🛡️`, 1100);
-        await falar(Object.values(TRILHAS).map((x) => `${x.ic} <b>${esc(x.nome)}</b>: ${esc(x.desc)}`).join("<br>"), 900);
-        setChips(chips, Object.values(TRILHAS).map((x) => `${x.ic} ${x.nome}`));
-      } else if (etapa === "trilha") {
-        addMsg(box, esc(txt), true);
-        const k = Object.keys(TRILHAS).find((x) => t.includes(norm(TRILHAS[x].nome)));
-        if (!k) return falar("Toque numa das trilhas abaixo. 😉");
-        S.trilha = k; save(); chips.innerHTML = "";
-        if (k === "hibrido" && IA.c21) { etapa = "forca"; await falar("Boa! Nos dias de força, você prefere academia ou calistenia?"); setChips(chips, ["Academia", "Calistenia"]); return; }
-        await iniciarTrilha();
-      } else if (etapa === "forca") {
-        addMsg(box, esc(txt), true);
-        S.forca = t.includes("calist") ? "c21" : "hiper"; save(); chips.innerHTML = "";
-        await iniciarTrilha();
-      } else if (etapa === "programa") {
-        addMsg(box, esc(txt), true);
-        const x = CATALOGO.find((p) => t.endsWith(norm(p.nome)) && liberado(p.k));
-        if (!x) return falar("Toque numa das opções abaixo. 😉");
-        await escolhido(x);
-      } else if (etapa === "semana") {
-        addMsg(box, esc(txt), true);
-        const n = Number((t.match(/[1-9]/) || [])[0]);
-        if (!n || n > PROGRAMA.length) return falar("Toque em uma das semanas abaixo. 😉");
-        S.inicio = keyOf(addDays(mondayOf(hoje), -(n - 1) * 7));
-        etapa = "fim"; chips.innerHTML = "";
-        const tr = treino(n - 1, hojeDia);
-        await falar(`Perfeito! Hoje é <b>${DIAS[hojeDia]} da Semana ${n}</b>: <b>${esc(tr.titulo)}</b>. Em cada exercício, anote as repetições de cada série. Eu comparo com o treino anterior e te mostro a evolução. 🔥`, 1100);
-        setChips(chips, ["Ver treino de hoje"], true);
-      } else if (etapa === "fim") {
-        S.onboarded = true; save(); location.hash = principal() === "plano" ? "#/home" : `#/${principal()}`;
-        if (IA[principal()] && !S[principal()].plano) setTimeout(() => iaIniciarChat(principal()), 500);
-      }
-    }
-    chips.addEventListener("click", (e) => { const c = e.target.closest("[data-chip]"); if (c) responder(c.dataset.chip); });
-    form.addEventListener("submit", (e) => { e.preventDefault(); const i = $("#ob-input"); if (i.value.trim()) responder(i.value.trim()); i.value = ""; });
+  /* ==========================================================
+     Quiz de entrada (uma pergunta por tela, XP por resposta) e Ficha de atleta.
+     A ficha começa estimada pelas respostas e passa a usar os treinos reais dos últimos 28 dias:
+     FOR (séries de força), AGI (core e treinos metabólicos: WODs e vídeos), RES (cardio), DIS (constância).
+     As respostas também preenchem a entrevista do Coach (Hipertrofia, Calistenia 21 dias, Corrida).
+     ========================================================== */
+  const QZ_XP = 15;
+  const QUIZ = [
+    { k: "objetivo", kicker: "Objetivo", q: "O que você quer conquistar?", op: [["massa", "💪", "Ganhar massa muscular"], ["gordura", "🔥", "Perder gordura"], ["forca", "🏋️", "Ganhar força"], ["saude", "❤️", "Condicionamento e saúde"], ["correr", "🏃", "Correr mais e melhor"]] },
+    { k: "nivel", kicker: "Condicionamento", q: "Como está o seu condicionamento hoje?", op: NIVEIS.map(([v, t], i) => [v, ["🌱", "⚡", "🦾"][i], v, t]) },
+    { k: "local", kicker: "Campo de treino", q: "Onde você vai treinar?", op: [["casa", "🏠", "Em casa, sem equipamento"], ["barra", "🤸", "Em casa, com barra fixa"], ["halteres", "🏋️", "Em casa, com halteres"], ["academia", "🏢", "Na academia"], ["box", "⏱️", "Num box de CrossFit"], ["rua", "🌳", "Ao ar livre, correndo"]] },
+    { k: "dias", kicker: "Frequência", q: "Quantos dias por semana dá para treinar?", op: ["2", "3", "4", "5", "6"].map((n) => [n, "📅", `${n} dias por semana`]) },
+    { k: "tempo", kicker: "Tempo", q: "Quanto tempo você tem por treino?", op: [["20", "⏱️", "Até 20 min"], ["30", "⏱️", "30 min"], ["45", "⏱️", "45 min"], ["60", "⏱️", "1 hora ou mais"]] },
+    { k: "obst", kicker: "Seus inimigos", q: "O que mais atrapalha o seu treino?", sub: "Pode marcar mais de um.", multi: true, op: [["tempo", "⏳", "Falta de tempo"], ["ritmo", "📉", "Começo e paro"], ["saber", "🤔", "Não sei o que fazer"], ["chato", "😴", "Enjoo do treino"], ["dor", "🩹", "Dor ou lesão"], ["nada", "✅", "Nada, só quero evoluir"]] },
+    { k: "estilo", kicker: "Estilo", q: "O que te faz voltar a treinar?", op: [["videos", "🎬", "Seguir vídeos guiados"], ["cargas", "📈", "Anotar séries e ver a evolução"], ["desafios", "🏆", "Bater tempo e vencer desafios"], ["amigos", "👥", "Treinar junto com os amigos"]] },
+  ];
+  const qzTxt = (k, v) => QUIZ.find((p) => p.k === k)?.op.find((o) => o[0] === v)?.[2] || v || "—";
+  function trilhaSugerida(r) {
+    const tem = (k) => !!TRILHAS[k];
+    if (r.local === "box") return "cross";
+    if ((r.objetivo === "correr" || r.local === "rua") && tem("corrida")) return "corrida";
+    if (r.local === "academia" || r.local === "halteres") return r.estilo === "videos" ? "hibrido" : "academia";
+    if (r.local === "barra") return r.estilo === "videos" ? "hibrido" : "calistenia";
+    return r.estilo === "cargas" ? "calistenia" : "insanos";
   }
+  function quizPassos(modo, r) {
+    const ps = [...QUIZ];
+    if (modo !== "onboarding") return ps;
+    const sug = trilhaSugerida(r);
+    ps.push({ k: "trilha", kicker: "Sua trilha", q: "Por onde você quer começar?", sub: `Pelas suas respostas, ${TRILHAS[sug].nome} combina com você. Dá para trocar depois no Perfil, sem perder o XP.`, semXp: true,
+      op: Object.entries(TRILHAS).sort(([a], [b]) => (b === sug) - (a === sug)).map(([k, x]) => [k, x.ic, x.nome, x.desc, k === sug]) });
+    if (r.trilha === "hibrido" && IA.c21) ps.push({ k: "forca", kicker: "Dias de força", q: "Nos dias de força, você prefere…", semXp: true,
+      op: [["hiper", "🏋️", "Academia"], ["c21", "🤸", "Calistenia"]] });
+    if (r.trilha && TRILHAS[r.trilha] && etapaAtual(r.trilha).prog === "plano") ps.push({ k: "semana", kicker: "Treino da Fera", q: "Em qual semana do programa você está?", semXp: true,
+      op: PROGRAMA.map((s, i) => [String(i + 1), "📆", `Semana ${i + 1}`, s.nome]) });
+    return ps;
+  }
+  const qzRespondida = (v) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== "");
+
+  let QZ = null;
+  function quizRender() {
+    const box = $("#quiz"); if (!box || !QZ) return;
+    const ps = quizPassos(QZ.modo, QZ.r), p = ps[QZ.i], sel = QZ.r[p.k];
+    const xp = QUIZ.filter((x) => qzRespondida(QZ.r[x.k])).length * QZ_XP;
+    const on = (v) => (p.multi ? (sel || []).includes(v) : sel === v);
+    box.innerHTML = `<div class="qz-top">
+        <button type="button" class="qz-voltar" data-qz-voltar ${QZ.i === 0 && QZ.modo === "onboarding" ? "hidden" : ""}>← voltar</button>
+        <div class="qz-bar" role="progressbar" aria-valuenow="${QZ.i}" aria-valuemax="${ps.length}"><i style="width:${Math.round((QZ.i / ps.length) * 100)}%"></i></div>
+        <span class="qz-xp" id="qz-xp">⚡ <b>${xp}</b> XP</span>
+      </div>
+      <div class="qz-body">
+        <p class="qz-kicker">${esc(p.kicker)}</p>
+        <h1 class="qz-q">${esc(p.q)}</h1>
+        <p class="qz-meta">Pergunta ${QZ.i + 1} de ${ps.length}${p.semXp ? "" : ` · vale <b>+${QZ_XP} XP</b>`}</p>
+        ${p.sub ? `<p class="qz-sub">${esc(p.sub)}</p>` : ""}
+        <div class="qz-ops">${p.op.map(([v, ic, t, sub, rec]) => `<button type="button" class="qz-op${on(v) ? " on" : ""}${rec ? " rec" : ""}" data-qz="${esc(v)}">
+          <span class="qz-ic">${ic}</span><span class="qz-t"><b>${esc(t)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>${rec ? `<span class="qz-rec">Recomendada</span>` : ""}</button>`).join("")}</div>
+        ${p.multi ? `<button type="button" class="btn btn-blue qz-ok" data-qz-ok ${(sel || []).length ? "" : "disabled"}>Continuar</button>` : ""}
+      </div>`;
+    box.scrollTop = 0;
+  }
+  function startQuiz(modo) {
+    const box = $("#quiz"); if (!box) return;
+    QZ = { modo, i: 0, r: modo === "onboarding" ? {} : Object.fromEntries(QUIZ.map((p) => [p.k, S.quiz?.[p.k]]).filter(([, v]) => v !== undefined)), ocupado: false };
+    quizRender();
+    box.onclick = (e) => {
+      if (!QZ || QZ.ocupado) return;
+      const ps = quizPassos(QZ.modo, QZ.r), p = ps[QZ.i];
+      if (e.target.closest("[data-qz-voltar]")) {
+        if (QZ.i > 0) { QZ.i--; quizRender(); } else location.hash = S.ficha ? "#/ficha" : "#/evolucao";
+        return;
+      }
+      if (e.target.closest("[data-qz-ok]")) return quizAvancar(p);
+      const b = e.target.closest("[data-qz]"); if (!b) return;
+      const v = b.dataset.qz;
+      if (p.multi) {
+        let a = [...(QZ.r[p.k] || [])];
+        a = a.includes(v) ? a.filter((x) => x !== v) : v === "nada" ? ["nada"] : [...a.filter((x) => x !== "nada"), v];
+        QZ.r[p.k] = a; quizRender(); return;
+      }
+      QZ.r[p.k] = v;
+      box.querySelectorAll(".qz-op").forEach((x) => x.classList.toggle("on", x === b));
+      quizAvancar(p, b);
+    };
+  }
+  function quizAvancar(p, alvo) {
+    const box = $("#quiz"), ganhou = !p.semXp && !QZ.contado?.[p.k];
+    QZ.contado = { ...(QZ.contado || {}), [p.k]: true };
+    if (ganhou) {
+      const xp = $("#qz-xp"); if (xp) { xp.querySelector("b").textContent = QUIZ.filter((x) => qzRespondida(QZ.r[x.k])).length * QZ_XP; xp.classList.remove("pop"); void xp.offsetWidth; xp.classList.add("pop"); }
+      if (alvo) { const f = document.createElement("span"); f.className = "qz-float"; f.textContent = `+${QZ_XP} XP`; alvo.appendChild(f); }
+    }
+    QZ.ocupado = true;
+    setTimeout(() => {
+      QZ.ocupado = false;
+      if (!$("#quiz")) return;
+      QZ.i++;
+      if (QZ.i >= quizPassos(QZ.modo, QZ.r).length) quizFim(); else quizRender();
+    }, alvo ? 420 : 120);
+    void box;
+  }
+  function quizFim() {
+    const r = QZ.r, modo = QZ.modo;
+    S.quiz = { ...Object.fromEntries(QUIZ.map((p) => [p.k, r[p.k]])), em: hojeKey };
+    if (modo === "onboarding") {
+      S.nivel = r.nivel; S.trilha = r.trilha;
+      if (r.forca) S.forca = r.forca;
+      const at = etapaAtual();
+      escolherPrograma(at.prog);
+      if (at.prog === "plano") S.inicio = keyOf(addDays(mondayOf(hoje), -((Number(r.semana) || 1) - 1) * 7));
+    }
+    preencherCoach(S.quiz);
+    novaFicha();
+    save();
+    QZ = null;
+    const box = $("#quiz");
+    box.onclick = null;
+    box.classList.add("fc-tela");
+    box.innerHTML = fichaHtml(modo === "onboarding" ? "onboarding" : "nova");
+    box.scrollTop = 0;
+  }
+
+  /* Respostas do quiz que valem para a entrevista do Coach: só as que batem com uma opção dele (as outras ele pergunta) */
+  const QZ_COACH = {
+    hiper: { objetivo: (q) => ({ massa: "Ganhar massa muscular", gordura: "Perder gordura", forca: "Ganhar força", saude: "Saúde e condicionamento" }[q.objetivo]),
+      dias: (q) => q.dias, tempo: (q) => ({ 45: "45 min", 60: "1 hora" }[q.tempo]), local: (q) => ({ academia: "Academia completa", halteres: "Em casa com halteres" }[q.local]) },
+    c21: { objetivo: (q) => ({ gordura: "Perder gordura", forca: "Ganhar força (primeira barra, mais flexões)", saude: "Condicionamento e saúde" }[q.objetivo]),
+      equipamento: (q) => ({ casa: "Só peso do corpo", barra: "Tenho barra fixa" }[q.local]), dias: (q) => (Number(q.dias) >= 3 ? q.dias : undefined),
+      tempo: (q) => ({ 20: "20 min", 30: "30 min", 45: "45 min", 60: "45 min" }[q.tempo]) },
+    run: { objetivo: (q) => ({ gordura: "Perder gordura" }[q.objetivo]), forca: (q) => ({ academia: "Academia", halteres: "Em casa com halteres", casa: "Só peso do corpo", barra: "Barra fixa e peso do corpo" }[q.local]),
+      dias: (q) => (Number(q.dias) >= 3 ? q.dias : undefined), tempo: (q) => ({ 30: "30 min", 45: "45 min", 60: "1 hora" }[q.tempo]) },
+  };
+  function preencherCoach(q) {
+    for (const [pk, m] of Object.entries(QZ_COACH)) {
+      const St = S[pk]; if (!IA[pk] || !St || St.plano || (St.etapa || 0) > 0) continue;
+      St.pre = {};
+      for (const [k, f] of Object.entries(m)) { const v = f(q); if (v) { St.perfil[k] = String(v); St.pre[k] = true; } }
+    }
+  }
+  const coachFaltam = (pk) => IA[pk].passos.filter((p) => !S[pk].pre?.[p.k]).length;
+
+  /* ---------- Ficha ---------- */
+  const LETRAS = ["E", "D", "C", "B", "A", "S"], RANK_MIN = [0, 20, 35, 50, 65, 80];
+  const rankDe = (m) => LETRAS[RANK_MIN.filter((x) => m >= x).length - 1];
+  const ATRIB = [["for", "FOR", "Força: séries de empurrar, puxar e pernas"], ["agi", "AGI", "Agilidade: core, treinos metabólicos (WODs e vídeos) e um pouco do cardio"], ["res", "RES", "Resistência: corrida e cardio"], ["dis", "DIS", "Disciplina: treinos na meta da semana e sequência"]];
+  const clampA = (v) => Math.max(5, Math.min(99, Math.round(v)));
+  function fichaBase(q) {
+    const b0 = { Iniciante: 18, "Intermediário": 34, "Avançado": 50 }[q.nivel] ?? 22;
+    const x = { for: b0, agi: b0, res: b0, dis: b0 - 6 };
+    if (q.objetivo === "massa" || q.objetivo === "forca") x.for += 6;
+    if (q.objetivo === "gordura" || q.objetivo === "saude") { x.res += 4; x.agi += 3; }
+    if (q.objetivo === "correr") x.res += 7;
+    if (q.local === "box") x.agi += 6;
+    if (q.local === "rua") x.res += 4;
+    if (q.local === "academia") x.for += 4;
+    if ((q.obst || []).includes("ritmo")) x.dis -= 8;
+    if (Number(q.dias) >= 5) x.dis += 4;
+    return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, clampA(v)]));
+  }
+  function fichaReal() {
+    const a = keyOf(addDays(hoje, -27)), r28 = linhasLocais().filter((r) => r.data >= a && r.data <= hojeKey), fe = feitas(r28);
+    const dias = new Set(fe.map((r) => r.data)).size, v = volumePadroes(r28);
+    const metcon = fe.filter((r) => r.programa === "cf" || VP[r.programa]).length;
+    const nota = (x, alvo) => 100 * Math.sqrt(Math.min(1, x / alvo));
+    return { dias, for: nota(v.empurrar + v.puxar + v.pernas, 360), agi: nota(v.core + metcon * 6 + v.cardio * 0.3, 150), res: nota(v.cardio, 150),
+      dis: 85 * Math.min(1, dias / (metaSemana() * 4)) + Math.min(15, sequencia() * 2) };
+  }
+  function fichaAtual() {
+    const base = S.ficha?.base || fichaBase(S.quiz || {}), real = fichaReal(), w = Math.min(1, real.dias / 8);
+    const attrs = Object.fromEntries(ATRIB.map(([k]) => [k, clampA(base[k] * (1 - w) + real[k] * w)]));
+    const media = Math.round(soma(Object.values(attrs)) / ATRIB.length);
+    return { attrs, media, rank: rankDe(media), w, real };
+  }
+  function novaFicha() {
+    S.ficha = { base: fichaBase(S.quiz), criada: hojeKey, metaIni: hojeKey };
+    novaMeta();
+  }
+  function novaMeta() {
+    const f = fichaAtual();
+    Object.assign(S.ficha, { metaIni: hojeKey, rankIni: f.rank, ini: f.attrs, meta: LETRAS[Math.min(LETRAS.length - 1, LETRAS.indexOf(f.rank) + 1)] });
+  }
+  const OBST = {
+    tempo: (q) => ["Falta de tempo", `Treinos de ${q.tempo === "60" ? "1 hora" : `${q.tempo || 30} min`}, ${q.dias || 3}x por semana. Num dia corrido, o Treino de emergência leva 15 min.`],
+    ritmo: () => ["Começo e paro", "Sequência, meta da semana e XP mostram o seu ritmo. O Coach analisa o seu último treino sempre que você abre a conversa."],
+    saber: () => ["Não sei o que fazer", "O treino do dia já vem pronto, com vídeo de execução e as séries para anotar."],
+    chato: () => ["Enjoo do treino", "Desafios com os amigos, conquistas e uma classe nova a cada 5 níveis. Dá para trocar de trilha sem perder o XP."],
+    dor: () => ["Dor ou lesão", "Conte ao Coach o que dói: ele adapta os exercícios. Se a dor for forte ou não passar, procure um profissional."],
+  };
+  function proximoPasso() {
+    const k = principal(), x = progDe(k);
+    if (k === "plano") { const n = semanaDe(hoje), t = treino(Math.max(0, n), hojeDia); return `Hoje é <b>${DIAS[hojeDia]} da Semana ${Math.max(0, n) + 1}</b>${t ? `: <b>${esc(t.titulo)}</b>` : ""}. Em cada exercício, anote as repetições de cada série.`; }
+    if (k === "cf") return "No box, tire uma foto do quadro: eu leio o WOD e lanço o treino. Depois você anota o tempo ou as voltas.";
+    if (IA[k]) { const m = coachFaltam(k); return `Agora o Coach monta o seu <b>${esc(x.nome)}</b>. ${m < IA[k].passos.length ? `Já usei as suas respostas: faltam só <b>${m} perguntas</b>.` : `São ${m} perguntas rápidas.`}`; }
+    if (VP[k]) { const w = insSemanaDe(k, hoje); return w < 0 ? `A semana 1 do <b>${esc(x.nome)}</b> começa na segunda, ${ddmm(S[k].inicio)}. Até lá, dá para conhecer os vídeos.` : `Você está na <b>semana 1</b> do ${esc(x.nome)}. Abra o treino de hoje, toque em Assistir e marque cada vídeo como feito.`; }
+    return "";
+  }
+  function fichaHtml(modo) {
+    const q = S.quiz || {}, F = S.ficha, f = fichaAtual(), n = meuNivel(), nova = modo !== "pagina";
+    const dias = Math.max(0, Math.min(30, diffDays(parseKey(F.metaIni), hoje))), fim = keyOf(addDays(parseKey(F.metaIni), 30));
+    const iMeta = LETRAS.indexOf(F.meta), batida = LETRAS.indexOf(f.rank) >= iMeta, falta = Math.max(0, RANK_MIN[iMeta] - f.media);
+    const obst = (q.obst || []).filter((o) => OBST[o]).map((o) => OBST[o](q));
+    const bar = ([k, rot, tip]) => { const v = f.attrs[k], d = v - (F.ini?.[k] ?? v);
+      return `<div class="fc-attr" title="${esc(tip)}"><b>${rot}</b><span class="fc-bar"><i style="width:${v}%"></i></span><strong>${v}</strong>${!nova && d ? `<em class="${d > 0 ? "up" : "dn"}">${d > 0 ? "+" : ""}${d}</em>` : "<em></em>"}</div>`; };
+    const metaTxt = batida ? "Meta batida! 🎉" : dias >= 30 ? "Prazo da meta acabou" : `faltam ${falta} pts`;
+    return `${modo === "pagina" ? `<header class="fc-head"><a href="#/evolucao" class="qz-voltar">← voltar</a></header>` : ""}
+      <div class="fc-wrap">
+        <p class="qz-kicker gold">${nova ? "[ Coach ] · análise concluída" : "Ficha de atleta"}</p>
+        ${nova ? `<h1 class="fc-h1">${esc(primeiroNome())}, sua ficha de atleta está pronta</h1>` : ""}
+        ${nova ? `<p class="fc-ganho">⚡ +${XP.ficha} XP pela ficha</p>` : ""}
+        <div class="fc-card">
+          <div class="fc-top">
+            <span class="fc-av metal-${n.metal}"><img src="${classeImg(n.slug)}" alt=""></span>
+            <div class="fc-id"><strong>${esc(primeiroNome())}</strong><span class="fc-cl">${esc(n.classe)} · nível ${n.nivel}</span>
+              <div class="fc-rank"><span>Rank<br>${nova ? "inicial" : "atual"}</span><b class="rk rk-${f.rank}">${f.rank}</b><span>→ meta até<br>${ddmm(fim)}</span><b class="rk rk-${F.meta}">${F.meta}</b></div></div>
+          </div>
+          ${ATRIB.map(bar).join("")}
+          <div class="fc-attr meta"><b>META</b><span class="fc-bar"><i style="width:${Math.round((dias / 30) * 100)}%"></i></span><strong>${dias}/30d</strong><em></em></div>
+          <p class="fc-nota">${batida && !nova ? "Meta batida! 🎉 " : !nova ? `${esc(metaTxt)} para o rank ${F.meta}. ` : ""}${f.real.dias ? `Calculada com ${f.real.dias} ${f.real.dias === 1 ? "treino" : "treinos"} dos últimos 28 dias${f.w < 1 ? " e as suas respostas" : ""}.` : "Estimada pelas suas respostas: a cada treino ela passa a usar os seus dados reais."}</p>
+          ${!nova && (batida || dias >= 30) ? `<button type="button" class="btn btn-blue fc-btn" data-ficha-meta>Nova meta de 30 dias</button>` : ""}
+        </div>
+        <div class="fc-grid">
+          <div><small>Trilha</small><strong>${TRILHAS[trilha()].ic} ${esc(TRILHAS[trilha()].nome)}</strong></div>
+          <div><small>Programa</small><strong>${esc(progDe(principal())?.nome || "—")}</strong></div>
+          <div><small>Frequência</small><strong>${q.dias ? `${q.dias}x por semana` : "—"}</strong></div>
+          <div><small>Por treino</small><strong>${q.tempo ? (q.tempo === "60" ? "1 hora+" : `${q.tempo} min`) : "—"}</strong></div>
+        </div>
+        ${obst.length ? `<p class="qz-kicker">Seus inimigos, derrotados</p><div class="fc-obst">${obst.map(([t, s]) => `<div><span>✓</span><p><b>${esc(t)}:</b> ${esc(s)}</p></div>`).join("")}</div>` : ""}
+        <details class="fc-leg"><summary>Como os atributos são calculados</summary><ul>${ATRIB.map(([, r, t]) => `<li><b>${r}</b> ${esc(t)}</li>`).join("")}<li>Rank pela média: ${LETRAS.map((x, i) => `${x} ${RANK_MIN[i]}+`).join(" · ")}</li></ul></details>
+        ${modo === "onboarding" ? `<p class="qz-kicker">Próximo passo</p><p class="fc-prox">${proximoPasso()}</p><button type="button" class="btn btn-blue fc-btn grande" data-ficha-comecar>Começar 💪</button>`
+          : modo === "nova" ? `<button type="button" class="btn btn-blue fc-btn grande" data-ficha-ok>Ver minha ficha</button>`
+          : `<button type="button" class="fc-refazer" data-ficha-refazer>Refazer o quiz</button>`}
+      </div>`;
+  }
+  telas.ficha = (p1) => {
+    setToolbar(null);
+    if (!S.ficha || p1 === "quiz") return `<section class="screen quiz" id="quiz"></section>`;
+    return `<section class="screen quiz fc-tela" id="ficha">${fichaHtml("pagina")}</section>`;
+  };
+  function fichaMini() {
+    if (!S.ficha) return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de atleta</strong><span class="t">${QUIZ.length} perguntas rápidas, +${XP.ficha} XP: rank, atributos e uma meta de 30 dias.</span></span></a>`;
+    const f = fichaAtual();
+    return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-${f.rank}">${f.rank}</span><span><strong>Ficha de atleta · meta ${S.ficha.meta}</strong><span class="t">${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(" · ")}</span></span></a>`;
+  }
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-ficha-comecar]")) {
+      S.onboarded = true; save(); location.hash = principal() === "plano" ? "#/home" : `#/${principal()}`;
+      if (IA[principal()] && !S[principal()].plano) setTimeout(() => iaIniciarChat(principal()), 500);
+    } else if (e.target.closest("[data-ficha-ok]")) { if (location.hash === "#/ficha") render(); else location.hash = "#/ficha"; }
+    else if (e.target.closest("[data-ficha-refazer]")) location.hash = "#/ficha/quiz";
+    else if (e.target.closest("[data-ficha-meta]")) { novaMeta(); save(); render(); }
+  });
 
   if (S.logado && !S.user) aplicarTrava(); // visitante: só o MAX:30 (e a Fera de apoio)
   conferirXp(true);
