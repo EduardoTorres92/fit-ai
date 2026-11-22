@@ -2928,7 +2928,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesXpAnt: S.missoesXpAnt || 0 };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesXpAnt: S.missoesXpAnt || 0 };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3486,7 +3486,7 @@
     const etapas = etapasDe(), f = formaturas();
     return `<div class="nivel-card metal-${n.metal}">
       <div class="nc-crest"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
-      <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""} · ${T.ic} ${esc(T.nome)}</span><strong>${esc(n.classe)}</strong>
+      <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""} · ${T.ic} ${esc(T.nome)}</span><strong>${esc(n.classe)}${estiloTxt() ? ` <span class="nc-estilo">${esc(estiloTxt())}</span>` : ""}</strong>
         <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
         <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
       ${S.dono ? `<button class="btn btn-outline ver-membro" id="ver-membro">${S.verComoMembro ? "👁️ Vendo como usuário comum · voltar à visão de dono" : "👁️ Ver como usuário comum"}</button>` : ""}
@@ -3507,7 +3507,7 @@
         <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>`;
   }
   // Selo pequeno de nível (ranking do grupo, perfil de membro)
-  const nivelSelo = (cfg) => (cfg && cfg.nivel_xp ? `<span class="nv-selo metal-${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][2])}" title="${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][1])}"><img src="${classeImg(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][0])}" alt="" width="16" height="16">${Number(cfg.nivel_xp) || 1}</span>` : "");
+  const nivelSelo = (cfg) => (cfg && cfg.nivel_xp ? `<span class="nv-selo metal-${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][2])}" title="${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][1])}${ESTILOS[cfg.estilo] ? ` · ${ESTILOS[cfg.estilo].nome}` : ""}"><img src="${classeImg(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][0])}" alt="" width="16" height="16">${Number(cfg.nivel_xp) || 1}${ESTILOS[cfg.estilo] ? `<span class="nv-es">${ESTILOS[cfg.estilo].ic}</span>` : ""}</span>` : "");
 
   const CONQ = [
     ["primeiro", "🎯", "Primeiro treino", (m) => [m.treinos, 1]],
@@ -3787,7 +3787,7 @@
     xp: ["🛡️ XP", (k) => k.xp, (v) => (v ? `${v.toLocaleString("pt-BR")} XP` : "—")],
   };
   // Nível de quem está no grupo: o meu é calculado aqui; o dos outros vem do que cada um sincronizou (perfis.config)
-  const cfgNivel = (id) => (id === uid ? (() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel }; })() : G.perfis[id]?.config || null);
+  const cfgNivel = (id) => (id === uid ? (() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, estilo: estiloAtual().slug }; })() : G.perfis[id]?.config || null);
   function ranking() {
     const [, val, fmt] = RANKS[G.rank];
     const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual, agua: mlNoPeriodo(aguaDe(id), PERIODOS[G.periodo][1]()), xp: Number(cfgNivel(id)?.xp) || 0 } }; })
@@ -3885,7 +3885,7 @@
     const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows);
     return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
       <div class="page-head"><a class="icon-btn" href="#/grupo" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a><h1>Perfil</h1><span class="spacer"></span></div>
-      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""} ${nivelSelo(cfgNivel(id))}</strong><span>${cfgNivel(id)?.nivel_xp ? `Nível ${cfgNivel(id).nivel_xp} · ${esc(CLASSES[Math.min(9, Math.floor((cfgNivel(id).nivel_xp - 1) / 5))][1])} · ` : ""}${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
+      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""} ${nivelSelo(cfgNivel(id))}</strong><span>${cfgNivel(id)?.nivel_xp ? `Nível ${cfgNivel(id).nivel_xp} · ${esc(CLASSES[Math.min(9, Math.floor((cfgNivel(id).nivel_xp - 1) / 5))][1])}${ESTILOS[cfgNivel(id).estilo] ? ` ${ESTILOS[cfgNivel(id).estilo].ic} ${esc(ESTILOS[cfgNivel(id).estilo].nome)}` : ""} · ` : ""}${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
       <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
       <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
       <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
@@ -5539,6 +5539,7 @@
     if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
     { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
       out.push(`Chefes (metas de recorde): ${cs.filter((c) => c.derrotado).length} de ${cs.length} derrotados.${vivos.length ? ` Mais perto: ${vivos.map((c) => `${c.nome} (${c.desc}; marco ${fmtMarca(c.met, c.melhor)}, HP ${c.hp}%)`).join("; ")}.` : ""} Missões de hoje: ${missoesDe(hojeKey).map((m) => `${m.t} ${m.ok ? "(feita)" : `(${m.fmt(m.valor, m.alvoV)})`}`).join("; ")}.`); }
+    { const e = estiloAtual(); out.push(`Estilo de treino (últimos 28 dias): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
     if (S.ficha) { const f = fichaAtual(); out.push(`Ficha de atleta: rank ${f.rank} (meta ${S.ficha.meta} até ${ddmm(keyOf(addDays(parseKey(S.ficha.metaIni), 30)))}), ${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(", ")} (0 a 100). Use os atributos mais baixos para sugerir o que treinar.`); }
     { const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, T = TRILHAS[trilha()];
       const libs = CATALOGO.filter((x) => liberado(x.k)).map((x) => x.nome).join(", ");
@@ -5648,6 +5649,46 @@
   }
 
   /* ---------- Onboarding ---------- */
+  /* ==========================================================
+     Estilo de treino: soma-se à classe de nível ("Escudeiro · Monge"). Vem dos treinos dos últimos 28 dias:
+     cada sessão conta pelos minutos (mínimo 20) no tipo dela. Um tipo com 50% ou mais dá o estilo; sem isso, Ronin (híbrido).
+     ========================================================== */
+  const ESTILOS = {
+    monge: { nome: "Monge", ic: "🥋", tipo: "corpo", desc: "treina com o peso do corpo" },
+    gladiador: { nome: "Gladiador", ic: "🛡️", tipo: "carga", desc: "treina com carga" },
+    batedor: { nome: "Batedor", ic: "🏹", tipo: "cardio", desc: "corre e faz cardio" },
+    berserker: { nome: "Berserker", ic: "🪓", tipo: "metcon", desc: "vive de WODs e treinos intensos" },
+    ronin: { nome: "Ronin", ic: "⚔️", tipo: null, desc: "equilibra força e cardio" },
+  };
+  const TIPOS_TREINO = [["corpo", "Peso do corpo", "#4fd2ff"], ["carga", "Carga", "#ffb45e"], ["cardio", "Cardio", "#4ee39b"], ["metcon", "WOD e vídeos", "#ff6b8b"]];
+  function estiloAtual() {
+    const a = keyOf(addDays(hoje, -27)), rows = feitas(linhasLocais()).filter((r) => r.data >= a && r.data <= hojeKey);
+    const t = { corpo: 0, carga: 0, cardio: 0, metcon: 0 }, add = (k, m) => (t[k] += m);
+    for (const r of rows) {
+      const m = Math.max(20, r.minutos || 0), pr = r.programa;
+      if (pr === "calistenia" || pr === "c21") add("corpo", m);
+      else if (pr === "hiper") add("carga", m);
+      else if (pr === "run") { add("cardio", m * 0.6); add("carga", m * 0.4); }
+      else if (pr === "cf" || VP[pr]) add("metcon", m);
+      else if (pr === "corrida") add("cardio", m);
+    }
+    const total = soma(Object.values(t)), pct = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, total ? Math.round((v / total) * 100) : 0]));
+    if (rows.length < 3) return { slug: null, pct, treinos: rows.length };
+    const [top] = Object.entries(pct).sort((x, y) => y[1] - x[1]);
+    const slug = top[1] >= 50 ? Object.keys(ESTILOS).find((k) => ESTILOS[k].tipo === top[0]) : "ronin";
+    return { slug, ...ESTILOS[slug], pct, treinos: rows.length, top: top[0] };
+  }
+  // Barra empilhada com a divisão do treino e o que falta para mudar de estilo
+  function estiloHtml() {
+    const e = estiloAtual();
+    const barra = `<span class="es-bar">${TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("")}</span>
+      <span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span>`;
+    if (!e.slug) return `<div class="es-box"><div class="es-top"><span class="es-ic">❔</span><div><b>Estilo: a descobrir</b><small>Faça ${3 - e.treinos} ${3 - e.treinos === 1 ? "treino" : "treinos"} a mais e ele aparece, pelo que você realmente treina.</small></div></div>${e.treinos ? barra : ""}</div>`;
+    const nota = e.slug === "ronin" ? "Nenhum tipo passa de 50%: você é híbrido." : `Mais de 50% do seu treino é ${esc(TIPOS_TREINO.find(([k]) => k === e.top)[1].toLowerCase())}. Se outro tipo passar de 50%, o estilo muda; se nenhum passar, vira Ronin.`;
+    return `<div class="es-box"><div class="es-top"><span class="es-ic">${e.ic}</span><div><b>Estilo: ${esc(e.nome)}</b><small>Você ${esc(e.desc)} · últimos 28 dias</small></div></div>${barra}<p class="es-nota">${nota}</p></div>`;
+  }
+  const estiloTxt = () => { const e = estiloAtual(); return e.slug ? `${e.ic} ${e.nome}` : ""; };
+
   /* ==========================================================
      Chefes (recordes viram monstros: a vida cai conforme o seu melhor se aproxima da meta) e Missões do dia.
      Os chefes são calculados do histórico (valem para recordes antigos). As missões do dia ficam registradas
@@ -6010,7 +6051,7 @@
         <div class="fc-card">
           <div class="fc-top">
             <span class="fc-av metal-${n.metal}"><img src="${classeImg(n.slug)}" alt=""></span>
-            <div class="fc-id"><strong>${esc(primeiroNome())}</strong><span class="fc-cl">${esc(n.classe)} · nível ${n.nivel}</span>
+            <div class="fc-id"><strong>${esc(primeiroNome())}</strong><span class="fc-cl">${esc(n.classe)}${estiloAtual().slug ? ` · ${esc(estiloAtual().nome)}` : ""} · nível ${n.nivel}</span>
               <div class="fc-rank"><span>Rank<br>${nova ? "inicial" : "atual"}</span><b class="rk rk-${f.rank}">${f.rank}</b><span>→ meta até<br>${ddmm(fim)}</span><b class="rk rk-${F.meta}">${F.meta}</b></div></div>
           </div>
           ${ATRIB.map(bar).join("")}
@@ -6018,6 +6059,7 @@
           <p class="fc-nota">${batida && !nova ? "Meta batida! 🎉 " : !nova ? `${esc(metaTxt)} para o rank ${F.meta}. ` : ""}${f.real.dias ? `Calculada com ${f.real.dias} ${f.real.dias === 1 ? "treino" : "treinos"} dos últimos 28 dias${f.w < 1 ? " e as suas respostas" : ""}.` : "Estimada pelas suas respostas: a cada treino ela passa a usar os seus dados reais."}</p>
           ${!nova && (batida || dias >= 30) ? `<button type="button" class="btn btn-blue fc-btn" data-ficha-meta>Nova meta de 30 dias</button>` : ""}
         </div>
+        ${estiloHtml()}
         <div class="fc-grid">
           <div><small>Trilha</small><strong>${TRILHAS[trilha()].ic} ${esc(TRILHAS[trilha()].nome)}</strong></div>
           <div><small>Programa</small><strong>${esc(progDe(principal())?.nome || "—")}</strong></div>
