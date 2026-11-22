@@ -611,7 +611,8 @@
     const hist = P.maxOut ? insMaxHist(p, id) : [], ant = hist.filter((h) => h.k < k).pop(), best = hist.length ? Math.max(...hist.map((h) => h.seg)) : 0;
     const link = insLink(id);
     const fit = v.fitTest && P.fitTest, fitAnt = fit ? fitHist(p).filter((h) => h.k < kk).pop() : null;
-    return `<div class="ex ins${ok ? " done" : ""}" data-ins="${id}" data-kc="${k || ""}" data-ed="${editavel ? 1 : 0}">
+    const boss = id === "cardio-challenge" || v.fitTest ? chefes().find((c) => c.k === (v.fitTest ? "shaunt-ft" : "shaunt-cc")) : null;
+    return `${boss ? chefeBanner(boss, boss.derrotado ? "Chefe já derrotado · revanche" : "Dia de chefe!") : ""}<div class="ex ins${ok ? " done" : ""}" data-ins="${id}" data-kc="${k || ""}" data-ed="${editavel ? 1 : 0}">
       <div class="ex-top">
         <span class="ex-name"><span class="ex-check">${check}</span><span>${rotulo ? `<small class="ins-rot">${esc(rotulo)}</small>` : ""}${esc(v.nome)}</span></span>
         <button class="ask" data-ask-ins="${id}" data-p="${p}" aria-label="Perguntar ao Coach AI sobre ${esc(v.nome)}">${icon("circle-question.svg", 20)}</button>
@@ -5681,11 +5682,24 @@
     { k: "dragao", nome: "Dragão da Terra", ic: "🐉", desc: "Levantamento terra com 2x o seu peso", re: /levantamento terra|deadlift/, nao: /stiff|romeno|romanian/, met: "kg", meta: () => Math.round((pesoCorpo() || 75) * 2), corpo: 2 },
     { k: "lobo", nome: "Lobo da Estrada", ic: "🐺", desc: "Correr 5 km de uma vez", re: /^corrida$/, met: "km", meta: () => 5 },
     { k: "rei", nome: "Rei Demônio dos 10 km", ic: "👹", desc: "Correr 10 km de uma vez", re: /^corrida$/, met: "km", meta: () => 10 },
+    // Chefe do Insanity: só aparece para quem faz o programa (trilha Insanos ou Híbridos, ou já tem registro nele)
+    { k: "shaunt-cc", nome: "Shaun T · Cardio Challenge", img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity", met: "s",
+      desc: "Chegar ao fim do Cardio Challenge sem Max Out", meta: () => (INSV["cardio-challenge"]?.min || 30) * 60,
+      calc: () => { const h = maxOuts(linhasLocais()).filter((m) => m.v === "cardio-challenge").sort((a, b) => a.k.localeCompare(b.k)), meta = (INSV["cardio-challenge"]?.min || 30) * 60;
+        return { tem: h.length > 0, melhor: Math.max(0, ...h.map((m) => m.s)), em: h.find((m) => m.s >= meta)?.k || null }; } },
+    { k: "shaunt-ft", nome: "Shaun T · Fit Test", img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity60", met: "pct",
+      desc: "Melhorar 25% no total do Fit Test", meta: () => 25,
+      calc: () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60"); if (!ft.length) return { tem: false, melhor: 0, em: null };
+        const base = ft[0].total || 1; let melhor = 0, em = null;
+        for (const x of ft.slice(1)) { const v = Math.round(((x.total - base) / base) * 100); if (v > melhor) melhor = v; if (!em && v >= 25) em = x.k; }
+        return { tem: true, melhor, em }; } },
   ];
+  const chefeVisivel = (c) => !c.prog || (VP[c.prog] && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S[c.prog]?.logs || {}).length > 0));
   function chefes() {
     if (CACHE_CHEFES) return CACHE_CHEFES;
     const regs = registrosEx().sort((a, b) => a.data.localeCompare(b.data));
-    CACHE_CHEFES = CHEFES.map((c) => {
+    CACHE_CHEFES = CHEFES.filter(chefeVisivel).map((c) => {
+      if (c.calc) { const r = c.calc(), meta = c.meta(); return { ...c, metaV: meta, ...r, hp: r.tem ? Math.max(0, Math.round((1 - Math.min(1, r.melhor / meta)) * 100)) : 100, derrotado: !!r.em }; }
       const meta = c.meta(), mine = regs.filter((r) => c.re.test(norm(r.nome)) && !(c.nao && c.nao.test(norm(r.nome))) && (r[c.met] || 0) > 0);
       let melhor = 0, em = null;
       for (const r of mine) { const v = r[c.met]; if (v > melhor) melhor = v; if (!em && v >= meta) em = r.data; }
@@ -5694,12 +5708,12 @@
     });
     return CACHE_CHEFES;
   }
-  const fmtMarca = (met, v) => (met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
+  const fmtMarca = (met, v) => (met === "pct" ? `${v > 0 ? "+" : ""}${v}%` : met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
   const chefesXp = () => chefes().filter((c) => c.derrotado).length * XP.chefe;
   function chefeCard(c) {
     const cls = c.derrotado ? "ch-ok" : c.tem ? "" : "ch-novo";
     return `<div class="ch-card ${cls}">
-      <span class="ch-ic">${c.ic}</span>
+      <span class="ch-ic">${c.img ? `<img src="${c.img}" alt="">` : c.ic}</span>
       <div class="ch-txt"><div class="ch-l1"><b>${esc(c.nome)}</b>${c.derrotado ? `<span class="ch-tag">Derrotado · ${ddmm(c.em)}</span>` : ""}</div>
         <small>${esc(c.desc)}${c.corpo && !pesoCorpo() ? " (75 kg até você informar o seu peso)" : c.corpo ? ` (${fmtMarca("kg", c.metaV)})` : ""}</small>
         <span class="ch-hp"><i style="width:${c.hp}%"></i></span>
@@ -5709,15 +5723,24 @@
     setToolbar(null);
     const cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
     const ordem = [...cs].sort((a, b) => (a.derrotado - b.derrotado) || (b.tem - a.tem) || (a.hp - b.hp));
+    const destaque = cs.find((c) => c.banner && !c.derrotado) || null;
     return `<section class="screen quiz ch-tela">
       <header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>
       <p class="qz-kicker">Batalhas de chefe</p>
       <h1 class="fc-h1">Seus recordes viram monstros</h1>
       <p class="ch-resumo"><b>${mortos}</b> de ${cs.length} derrotados · cada chefe vale <b>+${XP.chefe} XP</b></p>
-      <div class="ch-lista">${ordem.map(chefeCard).join("")}</div>
+      ${chefeBanner(destaque)}
+      <div class="ch-lista">${ordem.filter((c) => c !== destaque).map(chefeCard).join("")}</div>
       <p class="ch-nota">A vida do chefe cai conforme o seu melhor registro chega perto da meta. Valem as séries da calistenia e da academia, os PRs do CrossFit e as corridas pelo print. Recordes antigos também contam.</p>
     </section>`;
   };
+  // Faixa grande do chefe do Insanity (tela de chefes e dias de Fit Test ou Cardio Challenge)
+  function chefeBanner(c, hojeTxt = "") {
+    if (!c) return "";
+    return `<div class="ch-banner"><img src="${c.banner}" alt="">
+      <div class="ch-bn-txt">${hojeTxt ? `<span class="ch-bn-k">${esc(hojeTxt)}</span>` : `<span class="ch-bn-k">Chefe do Insanity</span>`}<b>${esc(c.nome)}</b><small>${esc(c.desc)}</small>
+        <span class="ch-hp"><i style="width:${c.hp}%"></i></span><span class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${c.met === "s" ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor)}` : "Primeiro combate"}</span></span></div></div>`;
+  }
   function chefesNovos() {
     const mortos = chefes().filter((c) => c.derrotado).map((c) => c.k);
     if (!S.chefesVistos) { S.chefesVistos = mortos; save(); return; } // primeira vez: só registra, sem festa
@@ -5725,7 +5748,7 @@
     if (!novos.length) return;
     S.chefesVistos = mortos; save();
     const c = chefes().find((x) => x.k === novos[0]);
-    dlgGami(`<div class="gami-crest ch-crest">${c.ic}</div><p class="gami-k">Chefe derrotado · +${XP.chefe} XP</p><h2>${esc(c.nome)}</h2>
+    dlgGami(`<div class="gami-crest ch-crest">${c.img ? `<img src="${c.img}" alt="">` : c.ic}</div><p class="gami-k">Chefe derrotado · +${XP.chefe} XP</p><h2>${esc(c.nome)}</h2>
       <p class="note">${esc(c.desc)}: o seu marco é <b>${fmtMarca(c.met, c.melhor)}</b>.${novos.length > 1 ? ` E mais ${novos.length - 1} chefe${novos.length > 2 ? "s" : ""} caiu junto!` : ""}</p>`);
   }
 
