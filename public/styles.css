@@ -1479,3 +1479,16 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .tp-srq b { display: block; font-size: 13px; }
 .tp-srq .ch-hp { margin-top: 5px; }
 .tp-srq em { font-style: normal; font-weight: 800; color: #c79bff; }
+
+/* ---------- Pop-up da temporada ---------- */
+#tp-pop { padding: 0; border: 0; background: transparent; max-width: min(380px, 92vw); width: 100%; margin: auto; }
+#tp-pop::backdrop { background: rgba(4, 6, 18, 0.78); }
+.tp-pop-box { position: relative; border-radius: 22px; overflow: hidden; background: #0a1130; border: 1px solid #8a6d22; box-shadow: 0 0 40px rgba(255, 190, 60, 0.25); color: #f4f6ff; animation: gami-pop .6s var(--ease-out); }
+.tp-pop-box > img { display: block; width: 100%; max-height: 62vh; object-fit: cover; object-position: 50% 30%; image-rendering: pixelated; }
+.tp-pop-x { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 16px; cursor: pointer; }
+.tp-pop-txt { padding: 14px 16px 12px; text-align: center; display: flex; flex-direction: column; gap: 8px; }
+.tp-pop-txt p { font-size: 14px; line-height: 1.4; color: #c8cff0; margin: 0; }
+.tp-pop-txt p b { color: #fff; }
+.tp-pop-txt .btn { width: 100%; margin-top: 4px; }
+.tp-pop-txt .lnk-btn { color: #a9b4e0; }
+.tp-pop-txt .lnk-btn { align-self: center; }

@@ -4660,6 +4660,7 @@
     if (rota === "onboarding") startQuiz("onboarding");
     if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
     if (rota === "home" || rota === "chefes") setTimeout(chefesNovos, 700);
+    if (rota === "home") setTimeout(popTemporada, 1400);
     const tab = document.querySelector(".wtab.on");
     if (tab) tab.scrollIntoView({ inline: "center", block: "nearest" });
     const aba = document.querySelector(".seg.prog.rolar a.on");
@@ -6043,6 +6044,25 @@
         <li>Sr. Q é o chefe da temporada: cada desafio semanal do grupo que você cumprir é um golpe. São 8 semanas, então ele cai com os 8 desafios.</li>
         <li>Quem treinar na temporada ganha a insígnia Pioneiro; quem fizer o Cardio Challenge final do MAX:30 até ${ddmm(t.fim)}, a Finalista.</li></ul></details>
     </div>`;
+  }
+  // Pop-up da temporada: aparece uma vez por dia ao abrir o app (tela inicial), enquanto a temporada não acabou
+  function popTemporada() {
+    const t = temporada();
+    if (t.fase === "fim" || S.popTemp === hojeKey || document.getElementById("tp-pop")?.open || document.querySelector("dialog[open]")) return;
+    S.popTemp = hojeKey; save();
+    const liga = ligaTemporada(linhasLocais(), t), pts = liga && t.fase === "agora" ? pontosTemporada(linhasLocais(), liga, meuOpts(), t).total : null;
+    const q = chefes().find((c) => c.k === "sr-q");
+    const linha = t.fase === "antes" ? `Começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`}: ${ddmm(t.ini)} a ${ddmm(t.fim)}.` : `Semana ${t.semana} de 8 · faltam ${t.faltam} ${t.faltam === 1 ? "dia" : "dias"}.`;
+    let d = document.getElementById("tp-pop");
+    if (!d) { d = document.createElement("dialog"); d.id = "tp-pop"; document.body.appendChild(d);
+      d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-tp-fechar]")) d.close(); else if (e.target.closest("[data-tp-ir]")) { d.close(); location.hash = "#/grupo"; } }); }
+    d.innerHTML = `<div class="tp-pop-box"><button class="tp-pop-x" data-tp-fechar aria-label="Fechar">✕</button>
+      <img src="assets/temporada-1.webp" alt="Temporada 1 · Aquecimento, 23/11 a 17/01">
+      <div class="tp-pop-txt"><p><b>${esc(linha)}</b></p>
+        <p>${liga ? `Você está na <b>Liga ${esc(LIGA_T[liga].nome)}</b>${pts != null ? ` com <b>${pts} pontos</b>` : ""}.` : "Treine para entrar numa liga: cada uma tem um chefe para derrubar."}${q && t.fase === "agora" ? ` Sr. Q: ${q.melhor}/8 desafios.` : ""}</p>
+        <button class="btn btn-blue" data-tp-ir>${uid ? "Ver ranking da temporada" : "Ver a temporada"}</button>
+        <button class="lnk-btn" data-tp-fechar>Agora não</button></div></div>`;
+    d.showModal();
   }
   function temporadaHome() {
     const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t);
