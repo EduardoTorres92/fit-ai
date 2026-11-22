@@ -3339,11 +3339,6 @@
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
-  const spriteImg = (slug, parado = false) => `assets/classes/sprites/${slug}.${parado ? "png" : "gif"}`; // pixel art animado (tools/sprites.py)
-  function galeriaClasses(n) {
-    return `<div class="cls-galeria" aria-label="Classes">${CLASSES.map(([slug, nome, metal], i) => { const ok = i <= n.ci;
-      return `<div class="cls-it${i === n.ci ? " on" : ok ? "" : " off"} metal-${metal}"><span class="cls-spr"><img class="sprite" src="${ok ? spriteImg(slug) : spriteImg(slug, true)}" alt=""></span><b>${ok ? esc(nome) : "???"}</b><small>nível ${i * 5 + 1}</small></div>`; }).join("")}</div>`;
-  }
 
   /* ==========================================================
      Trilhas: cada pessoa escolhe como treina; cada trilha tem etapas com formatura (80% das sessões + um teste de saída).
@@ -3465,7 +3460,7 @@
     if (!d.open) d.showModal();
   }
   function modalNivel(n, novaClasse) {
-    dlgGami(`<div class="gami-crest gami-sprite metal-${n.metal}"><img class="sprite" src="${spriteImg(n.slug)}" alt=""></div>
+    dlgGami(`<div class="gami-crest metal-${n.metal}"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt=""></div>
       <p class="gami-k">${novaClasse ? "Nova classe!" : "Subiu de nível!"}</p><h2>${novaClasse ? esc(n.classe) : `Nível ${n.nivel}`}</h2>
       <p class="note">${novaClasse ? `Você agora é <b>${esc(n.classe)}</b> (nível ${n.nivel}).` : `${esc(n.classe)} · faltam ${n.fim - n.xp} XP para o nível ${n.nivel + 1}.`}</p>`);
   }
@@ -3487,11 +3482,10 @@
     const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, prox = CLASSES[n.ci + 1], T = TRILHAS[trilha()];
     const etapas = etapasDe(), f = formaturas();
     return `<div class="nivel-card metal-${n.metal}">
-      <div class="nc-crest nc-sprite"><img class="sprite" src="${spriteImg(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
+      <div class="nc-crest"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
       <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""} · ${T.ic} ${esc(T.nome)}</span><strong>${esc(n.classe)}</strong>
         <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
         <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
-      ${galeriaClasses(n)}
       ${S.dono ? `<button class="btn btn-outline ver-membro" id="ver-membro">${S.verComoMembro ? "👁️ Vendo como usuário comum · voltar à visão de dono" : "👁️ Ver como usuário comum"}</button>` : ""}
       ${at.n === 1 && !g ? `<div class="grad-box"><div class="sec-head"><h2>${esc(at.nome)}</h2></div>
         <p class="note small">Cada WOD concluído vale ${XP.cf} XP, e cada PR (carga ou WOD repetido mais rápido) +${XP.recorde}. Bata a meta de ${metaSemana()} treinos na semana para ganhar +${XP.semana}.</p></div>` : `<div class="grad-box"><div class="sec-head"><h2>Etapa ${at.i + 1} de ${at.n} · ${esc(at.nome)}</h2>${g && !g.semPlano ? `<span>${g.feitas}/${g.precisa} sessões</span>` : ""}</div>
@@ -5856,7 +5850,7 @@
         ${nova ? `<p class="fc-ganho">⚡ +${XP.ficha} XP pela ficha</p>` : ""}
         <div class="fc-card">
           <div class="fc-top">
-            <span class="fc-av metal-${n.metal}"><img class="sprite" src="${spriteImg(n.slug)}" alt=""></span>
+            <span class="fc-av metal-${n.metal}"><img src="${classeImg(n.slug)}" alt=""></span>
             <div class="fc-id"><strong>${esc(primeiroNome())}</strong><span class="fc-cl">${esc(n.classe)} · nível ${n.nivel}</span>
               <div class="fc-rank"><span>Rank<br>${nova ? "inicial" : "atual"}</span><b class="rk rk-${f.rank}">${f.rank}</b><span>→ meta até<br>${ddmm(fim)}</span><b class="rk rk-${F.meta}">${F.meta}</b></div></div>
           </div>
