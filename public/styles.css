@@ -1377,3 +1377,29 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .es-nota { margin-top: 8px; font-size: 12.5px; color: #8f9cc8; line-height: 1.4; }
 .nc-estilo { font-size: 0.62em; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .nv-es { margin-left: 2px; font-size: 11px; }
+
+/* ---------- Cartas e avatares das classes (artes do Eduardo) ---------- */
+.fc-av img { width: 100%; height: 100%; object-fit: cover; border-radius: 18px; }
+.fc-av { overflow: hidden; }
+.nc-crest.nc-arte { width: 84px; height: 84px; border-radius: 18px; overflow: hidden; border: 2px solid #c98a4a; }
+.nc-crest.nc-arte.metal-prata { border-color: #cfd6e6; }
+.nc-crest.nc-arte.metal-ouro { border-color: #ffd76a; }
+.nc-crest.nc-arte.metal-diamante { border-color: #7fe7ff; box-shadow: 0 0 12px rgba(127, 231, 255, 0.4); }
+.nc-crest.nc-arte img { width: 100%; height: 100%; object-fit: cover; }
+.xp-av { border-radius: 8px; object-fit: cover; }
+.gami-carta { width: 180px; margin: 0 auto 6px; animation: gami-pop .7s var(--ease-out); }
+.gami-carta img { display: block; width: 100%; border-radius: 14px; box-shadow: 0 10px 40px rgba(255, 200, 80, 0.25); }
+.carta-gal { display: flex; gap: 8px; overflow-x: auto; padding: 6px 2px 10px; margin: 12px 0 6px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.carta-gal::-webkit-scrollbar { display: none; }
+.carta-it { position: relative; flex: 0 0 96px; scroll-snap-align: start; }
+.carta-it img { display: block; width: 100%; border-radius: 10px; }
+.carta-it.on img { outline: 2px solid #ffd76a; outline-offset: 2px; box-shadow: 0 0 14px rgba(255, 215, 106, 0.4); }
+.carta-it.off img { filter: grayscale(1) brightness(0.35); }
+.carta-lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; }
+.arte-seg { margin-bottom: 6px; }
+.qz-ic img { width: 100%; height: 100%; object-fit: cover; border-radius: 13px; }
+.qz-ops.grade { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qz-ops.grade .qz-op { flex-direction: column; padding: 10px; gap: 10px; text-align: center; }
+.qz-ops.grade .qz-ic { width: 100%; height: auto; aspect-ratio: 1; flex: none; }
+.qz-ops.grade .qz-t { align-items: center; }
+.arte-seg button { flex: 1; }

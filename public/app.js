@@ -2928,7 +2928,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesXpAnt: S.missoesXpAnt || 0 };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3342,6 +3342,14 @@
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
+  // Artes das classes (cartas desenhadas pelo Eduardo): versão masculina ou feminina pelo sexo informado, ou pela escolha no Perfil
+  const sexoArte = () => (S.arte === "f" || S.arte === "m" ? S.arte : /^fem/.test(norm(S.quiz?.sexo === "f" ? "feminino" : S.quiz?.sexo === "m" ? "masculino" : nutriSexo())) ? "f" : "m");
+  const avatarClasse = (slug) => `assets/classes/avatar/${slug}-${sexoArte()}.webp`;
+  const cartaClasse = (slug, g = sexoArte()) => `assets/classes/cartas/${slug}-${g}.webp`;
+  function galeriaCartas(n) {
+    return `<div class="carta-gal">${CLASSES.map(([slug, nome], i) => `<div class="carta-it${i === n.ci ? " on" : i > n.ci ? " off" : ""}"><img src="${cartaClasse(slug)}" alt="${esc(nome)}${i > n.ci ? " (bloqueada)" : ""}" loading="lazy">${i > n.ci ? `<span class="carta-lock">🔒</span>` : ""}</div>`).join("")}</div>
+      <div class="seg arte-seg"><button class="${sexoArte() === "m" ? "on" : ""}" data-arte="m">Personagem ♂</button><button class="${sexoArte() === "f" ? "on" : ""}" data-arte="f">Personagem ♀</button></div>`;
+  }
 
   /* ==========================================================
      Trilhas: cada pessoa escolhe como treina; cada trilha tem etapas com formatura (80% das sessões + um teste de saída).
@@ -3451,7 +3459,7 @@
   function xpToast(ganho, n) {
     const t = document.createElement("div");
     t.className = "xp-toast"; t.setAttribute("role", "status");
-    t.innerHTML = `<img src="${classeImg(n.slug)}" alt="" width="34" height="34"><div><strong>+${ganho} XP</strong><small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="xp-bar"><i style="width:${n.pct}%"></i></span></div>`;
+    t.innerHTML = `<img class="xp-av" src="${avatarClasse(n.slug)}" alt="" width="34" height="34"><div><strong>+${ganho} XP</strong><small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="xp-bar"><i style="width:${n.pct}%"></i></span></div>`;
     document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add("on"));
     setTimeout(() => { t.classList.remove("on"); setTimeout(() => t.remove(), 400); }, 2600);
@@ -3463,7 +3471,7 @@
     if (!d.open) d.showModal();
   }
   function modalNivel(n, novaClasse) {
-    dlgGami(`<div class="gami-crest metal-${n.metal}"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt=""></div>
+    dlgGami(`<div class="gami-carta"><img src="${cartaClasse(n.slug)}" alt="Carta da classe ${esc(n.classe)}"></div>
       <p class="gami-k">${novaClasse ? "Nova classe!" : "Subiu de nível!"}</p><h2>${novaClasse ? esc(n.classe) : `Nível ${n.nivel}`}</h2>
       <p class="note">${novaClasse ? `Você agora é <b>${esc(n.classe)}</b> (nível ${n.nivel}).` : `${esc(n.classe)} · faltam ${n.fim - n.xp} XP para o nível ${n.nivel + 1}.`}</p>`);
   }
@@ -3485,10 +3493,11 @@
     const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, prox = CLASSES[n.ci + 1], T = TRILHAS[trilha()];
     const etapas = etapasDe(), f = formaturas();
     return `<div class="nivel-card metal-${n.metal}">
-      <div class="nc-crest"><img class="gm-frame" src="${molduraImg(n.metal)}" alt=""><img class="gm-cls" src="${classeImg(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
+      <div class="nc-crest nc-arte metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
       <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""} · ${T.ic} ${esc(T.nome)}</span><strong>${esc(n.classe)}${estiloTxt() ? ` <span class="nc-estilo">${esc(estiloTxt())}</span>` : ""}</strong>
         <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
         <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
+      ${galeriaCartas(n)}
       ${S.dono ? `<button class="btn btn-outline ver-membro" id="ver-membro">${S.verComoMembro ? "👁️ Vendo como usuário comum · voltar à visão de dono" : "👁️ Ver como usuário comum"}</button>` : ""}
       ${at.n === 1 && !g ? `<div class="grad-box"><div class="sec-head"><h2>${esc(at.nome)}</h2></div>
         <p class="note small">Cada WOD concluído vale ${XP.cf} XP, e cada PR (carga ou WOD repetido mais rápido) +${XP.recorde}. Bata a meta de ${metaSemana()} treinos na semana para ganhar +${XP.semana}.</p></div>` : `<div class="grad-box"><div class="sec-head"><h2>Etapa ${at.i + 1} de ${at.n} · ${esc(at.nome)}</h2>${g && !g.semPlano ? `<span>${g.feitas}/${g.precisa} sessões</span>` : ""}</div>
@@ -4715,6 +4724,7 @@
       if (perfil.config.forca && !S.forca) S.forca = perfil.config.forca;
       if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
+      if (perfil.config.arte && !S.arte) S.arte = perfil.config.arte;
       if (perfil.config.missoes) { S.missoes = S.missoes || {}; for (const [k, n] of Object.entries(perfil.config.missoes)) S.missoes[k] = Math.max(S.missoes[k] || 0, Number(n) || 0); }
       if (perfil.config.missoesXpAnt > (S.missoesXpAnt || 0)) S.missoesXpAnt = perfil.config.missoesXpAnt;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
@@ -5847,6 +5857,7 @@
      ========================================================== */
   const QZ_XP = 15;
   const QUIZ = [
+    { k: "sexo", kicker: "Seu personagem", q: "Pra começar, você é:", sub: "Define a arte do seu personagem. Ele evolui de Recruta a Imortal conforme você treina.", semXp: true, grade: true, op: [["m", `<img src="assets/classes/avatar/recruta-m.webp" alt="">`, "Homem"], ["f", `<img src="assets/classes/avatar/recruta-f.webp" alt="">`, "Mulher"]] },
     { k: "objetivo", kicker: "Objetivo", q: "O que você quer conquistar?", op: [["massa", "💪", "Ganhar massa muscular"], ["gordura", "🔥", "Perder gordura"], ["forca", "🏋️", "Ganhar força"], ["saude", "❤️", "Condicionamento e saúde"], ["correr", "🏃", "Correr mais e melhor"]] },
     { k: "nivel", kicker: "Condicionamento", q: "Como está o seu condicionamento hoje?", op: NIVEIS.map(([v, t], i) => [v, ["🌱", "⚡", "🦾"][i], v, t]) },
     { k: "local", kicker: "Campo de treino", q: "Onde você vai treinar?", op: [["casa", "🏠", "Em casa, sem equipamento"], ["barra", "🤸", "Em casa, com barra fixa"], ["halteres", "🏋️", "Em casa, com halteres"], ["academia", "🏢", "Na academia"], ["box", "⏱️", "Num box de CrossFit"], ["rua", "🌳", "Ao ar livre, correndo"]] },
@@ -5882,7 +5893,7 @@
   function quizRender() {
     const box = $("#quiz"); if (!box || !QZ) return;
     const ps = quizPassos(QZ.modo, QZ.r), p = ps[QZ.i], sel = QZ.r[p.k];
-    const xp = QUIZ.filter((x) => qzRespondida(QZ.r[x.k])).length * QZ_XP;
+    const xp = QUIZ.filter((x) => !x.semXp && qzRespondida(QZ.r[x.k])).length * QZ_XP;
     const on = (v) => (p.multi ? (sel || []).includes(v) : sel === v);
     box.innerHTML = `<div class="qz-top">
         <button type="button" class="qz-voltar" data-qz-voltar ${QZ.i === 0 && QZ.modo === "onboarding" ? "hidden" : ""}>← voltar</button>
@@ -5894,7 +5905,7 @@
         <h1 class="qz-q">${esc(p.q)}</h1>
         <p class="qz-meta">Pergunta ${QZ.i + 1} de ${ps.length}${p.semXp ? "" : ` · vale <b>+${QZ_XP} XP</b>`}</p>
         ${p.sub ? `<p class="qz-sub">${esc(p.sub)}</p>` : ""}
-        <div class="qz-ops">${p.op.map(([v, ic, t, sub, rec]) => `<button type="button" class="qz-op${on(v) ? " on" : ""}${rec ? " rec" : ""}" data-qz="${esc(v)}">
+        <div class="qz-ops${p.grade ? " grade" : ""}">${p.op.map(([v, ic, t, sub, rec]) => `<button type="button" class="qz-op${on(v) ? " on" : ""}${rec ? " rec" : ""}" data-qz="${esc(v)}">
           <span class="qz-ic">${ic}</span><span class="qz-t"><b>${esc(t)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>${rec ? `<span class="qz-rec">Recomendada</span>` : ""}</button>`).join("")}</div>
         ${p.multi ? `<button type="button" class="btn btn-blue qz-ok" data-qz-ok ${(sel || []).length ? "" : "disabled"}>Continuar</button>` : ""}
       </div>`;
@@ -5928,7 +5939,7 @@
     const box = $("#quiz"), ganhou = !p.semXp && !QZ.contado?.[p.k];
     QZ.contado = { ...(QZ.contado || {}), [p.k]: true };
     if (ganhou) {
-      const xp = $("#qz-xp"); if (xp) { xp.querySelector("b").textContent = QUIZ.filter((x) => qzRespondida(QZ.r[x.k])).length * QZ_XP; xp.classList.remove("pop"); void xp.offsetWidth; xp.classList.add("pop"); }
+      const xp = $("#qz-xp"); if (xp) { xp.querySelector("b").textContent = QUIZ.filter((x) => !x.semXp && qzRespondida(QZ.r[x.k])).length * QZ_XP; xp.classList.remove("pop"); void xp.offsetWidth; xp.classList.add("pop"); }
       if (alvo) { const f = document.createElement("span"); f.className = "qz-float"; f.textContent = `+${QZ_XP} XP`; alvo.appendChild(f); }
     }
     QZ.ocupado = true;
@@ -5963,12 +5974,12 @@
 
   /* Respostas do quiz que valem para a entrevista do Coach: só as que batem com uma opção dele (as outras ele pergunta) */
   const QZ_COACH = {
-    hiper: { objetivo: (q) => ({ massa: "Ganhar massa muscular", gordura: "Perder gordura", forca: "Ganhar força", saude: "Saúde e condicionamento" }[q.objetivo]),
+    hiper: { sexo: (q) => ({ m: "Masculino", f: "Feminino" }[q.sexo]), objetivo: (q) => ({ massa: "Ganhar massa muscular", gordura: "Perder gordura", forca: "Ganhar força", saude: "Saúde e condicionamento" }[q.objetivo]),
       dias: (q) => q.dias, tempo: (q) => ({ 45: "45 min", 60: "1 hora" }[q.tempo]), local: (q) => ({ academia: "Academia completa", halteres: "Em casa com halteres" }[q.local]) },
-    c21: { objetivo: (q) => ({ gordura: "Perder gordura", forca: "Ganhar força (primeira barra, mais flexões)", saude: "Condicionamento e saúde" }[q.objetivo]),
+    c21: { sexo: (q) => ({ m: "Masculino", f: "Feminino" }[q.sexo]), objetivo: (q) => ({ gordura: "Perder gordura", forca: "Ganhar força (primeira barra, mais flexões)", saude: "Condicionamento e saúde" }[q.objetivo]),
       equipamento: (q) => ({ casa: "Só peso do corpo", barra: "Tenho barra fixa" }[q.local]), dias: (q) => (Number(q.dias) >= 3 ? q.dias : undefined),
       tempo: (q) => ({ 20: "20 min", 30: "30 min", 45: "45 min", 60: "45 min" }[q.tempo]) },
-    run: { objetivo: (q) => ({ gordura: "Perder gordura" }[q.objetivo]), forca: (q) => ({ academia: "Academia", halteres: "Em casa com halteres", casa: "Só peso do corpo", barra: "Barra fixa e peso do corpo" }[q.local]),
+    run: { sexo: (q) => ({ m: "Masculino", f: "Feminino" }[q.sexo]), objetivo: (q) => ({ gordura: "Perder gordura" }[q.objetivo]), forca: (q) => ({ academia: "Academia", halteres: "Em casa com halteres", casa: "Só peso do corpo", barra: "Barra fixa e peso do corpo" }[q.local]),
       dias: (q) => (Number(q.dias) >= 3 ? q.dias : undefined), tempo: (q) => ({ 30: "30 min", 45: "45 min", 60: "1 hora" }[q.tempo]) },
   };
   function preencherCoach(q) {
@@ -6050,7 +6061,7 @@
         ${nova ? `<p class="fc-ganho">⚡ +${XP.ficha} XP pela ficha</p>` : ""}
         <div class="fc-card">
           <div class="fc-top">
-            <span class="fc-av metal-${n.metal}"><img src="${classeImg(n.slug)}" alt=""></span>
+            <span class="fc-av metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt=""></span>
             <div class="fc-id"><strong>${esc(primeiroNome())}</strong><span class="fc-cl">${esc(n.classe)}${estiloAtual().slug ? ` · ${esc(estiloAtual().nome)}` : ""} · nível ${n.nivel}</span>
               <div class="fc-rank"><span>Rank<br>${nova ? "inicial" : "atual"}</span><b class="rk rk-${f.rank}">${f.rank}</b><span>→ meta até<br>${ddmm(fim)}</span><b class="rk rk-${F.meta}">${F.meta}</b></div></div>
           </div>
@@ -6090,6 +6101,7 @@
     } else if (e.target.closest("[data-ficha-ok]")) { if (location.hash === "#/ficha") render(); else location.hash = "#/ficha"; }
     else if (e.target.closest("[data-ficha-refazer]")) location.hash = "#/ficha/quiz";
     else if (e.target.closest("[data-ficha-meta]")) { novaMeta(); save(); render(); }
+    else if (e.target.closest("[data-arte]")) { S.arte = e.target.closest("[data-arte]").dataset.arte; save(); render(); }
   });
 
   if (S.logado && !S.user) aplicarTrava(); // visitante: só o MAX:30 (e a Fera de apoio)
