@@ -1406,3 +1406,21 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .arte-lbl { margin: 4px 2px 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .seg.arte-seg { display: flex; width: 100%; }
 .seg.arte-seg button { flex: 1 1 0; justify-content: center; text-align: center; }
+
+/* ---------- Insígnias de benchmark (Perfil e perfil de membro) ---------- */
+.ins-box { margin-top: 4px; }
+.ins-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.ins-it { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border-radius: 16px; text-align: center; border: 1px solid var(--line); background: var(--card); min-width: 0; }
+.ins-med { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; font-size: 22px; margin-bottom: 4px; }
+.ins-it b { font-size: 13px; font-weight: 700; }
+.ins-it small { font-size: 11px; color: var(--muted); line-height: 1.25; }
+.ins-ouro .ins-med { background: radial-gradient(circle at 35% 30%, #fff2a8, #f0c030 45%, #8a5a06); box-shadow: 0 0 12px rgba(240, 192, 48, 0.45); }
+.ins-prata .ins-med { background: radial-gradient(circle at 35% 30%, #ffffff, #c7d0e0 45%, #5b6478); }
+.ins-bronze .ins-med { background: radial-gradient(circle at 35% 30%, #ffd08a, #c27a3a 45%, #5a2e10); }
+.ins-ouro { border-color: rgba(240, 192, 48, 0.55); }
+.ins-off { opacity: 0.45; }
+.ins-off .ins-med { background: var(--secondary); filter: grayscale(1); }
+.ins-hp { display: block; width: 80%; height: 5px; margin-top: 4px; border-radius: 5px; background: var(--secondary); overflow: hidden; }
+.ins-hp i { display: block; height: 100%; background: linear-gradient(90deg, #ff3d6e, #ffb45e); border-radius: 5px; }
+.ins-ouro .ins-hp i { background: linear-gradient(90deg, #f0c030, #fff2a8); }
+.ins-pct { font-size: 10px !important; }

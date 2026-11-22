@@ -94,6 +94,9 @@ html[data-tema="escuro"] .rd-raio { stroke: var(--line); }
 html[data-tema="escuro"] .rd-pt { stroke: var(--line); }
 html[data-tema="escuro"] .rd-rot { fill: var(--fg); }
 html[data-tema="escuro"] .nc-crest.nc-arte.metal-prata { border-color: color-mix(in srgb, #cfd6e6 30%, var(--bg)); }
+html[data-tema="escuro"] .ins-ouro .ins-med { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, #fff2a8 18%, var(--bg)), #f0c030 45%, #8a5a06); }
+html[data-tema="escuro"] .ins-prata .ins-med { background: radial-gradient(circle at 35% 30%, var(--card), color-mix(in srgb, #c7d0e0 18%, var(--bg)) 45%, #5b6478); }
+html[data-tema="escuro"] .ins-ouro .ins-hp i { background: linear-gradient(90deg, #f0c030, color-mix(in srgb, #fff2a8 18%, var(--bg))); }
 
 /* FIT.AI — tema escuro. Liga com <html data-tema="escuro"> (Perfil → Aparência: Escuro, o padrão, Claro ou Automático).
    Esta parte é a manual (cores-base, ícones e o painel de Evolução); o resto vem do tools/tema-escuro.py. */

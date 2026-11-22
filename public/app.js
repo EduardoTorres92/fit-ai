@@ -811,6 +811,7 @@
             <input type="file" id="foto-arquivo" accept="image/*" hidden>
             <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
           ${nivelCard()}
+          ${trilha() === "cross" || Object.values(S.cf?.logs || {}).some((l) => l.done) ? insigniasHtml(linhasLocais(), sexoArte(), true) : ""}
           ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
             ${stat("weight.svg", P.peso || "—", "Peso (kg)", { edit: "peso" })}
@@ -1802,6 +1803,48 @@
     B_("Murph", "Heroes", "for_time", [M_("Corrida", "1,6 km"), M_("Pull-up", "100"), M_("Flexão", "200"), M_("Agachamento", "300"), M_("Corrida", "1,6 km")], { descricao: "Com colete de 9/6 kg. Pode dividir pull-ups, flexões e agachamentos como quiser (ex.: 20 voltas de 5-10-15)." }),
     B_("DT", "Heroes", "for_time", [M_("Deadlift", "12", "70/47 kg"), M_("Hang power clean", "9", "70/47 kg"), M_("Push jerk", "6", "70/47 kg")], { rodadas: 5 }),
   ];
+
+
+  /* ---------- Insígnias de benchmark: fez o benchmark, ganha a insígnia. Ouro = RX; nos de carga, a barra mostra a % da carga RX usada ---------- */
+  const cargaKg = (c, g) => { const n = String(c || "").match(/\d+(?:[.,]\d+)?/g); if (!n || !/kg/i.test(c)) return 0; return Number((n.length > 1 && g === "f" ? n[1] : n[0]).replace(",", ".")); };
+  function insigniasBench(rows, g = "m") {
+    const cf = rows.filter((r) => r.programa === "cf" && r.concluido && r.detalhes?.wod);
+    return CF_BENCH.map((b) => {
+      const movsRx = b.wod.partes[0].movimentos.filter((m) => cargaKg(m.carga, g));
+      const feitos = cf.filter((r) => cfNome(r.detalhes.wod.titulo) === cfNome(b.titulo)).sort((x, y) => x.data.localeCompare(y.data));
+      const base = { b, carga: movsRx.length > 0, vezes: feitos.length };
+      if (!feitos.length) return { ...base, feito: false };
+      let pct = movsRx.length ? 0 : null, rx = false, melhor = null;
+      for (const r of feitos) {
+        const l = { wod: r.detalhes.wod, res: r.detalhes.res || {} }, eRx = l.res.rx !== false;
+        if (eRx) rx = true;
+        if (movsRx.length) {
+          let p = eRx ? 100 : null;
+          if (!eRx) { // Scaled: compara a carga anotada em cada movimento com a carga RX
+            const ms = l.wod.partes.flatMap((x) => x.movimentos || []);
+            const rs = movsRx.map((mr) => { const lm = ms.find((m) => cfNome(m.nome) === cfNome(mr.nome)); const u = lm && lm.carga !== mr.carga ? cargaKg(lm.carga, g) : 0; return u ? Math.min(100, Math.round((u / cargaKg(mr.carga, g)) * 100)) : null; }).filter((x) => x != null);
+            p = rs.length ? Math.min(...rs) : null;
+          }
+          if (p != null && p > pct) pct = p;
+        }
+        const v = l.wod.partes?.length ? cfValor(l) : null;
+        if (v && (!melhor || v.v > melhor.v)) melhor = { ...v, rx: eRx };
+      }
+      const tier = rx ? "ouro" : movsRx.length ? (pct >= 70 ? "prata" : "bronze") : "prata";
+      return { ...base, feito: true, rx, pct, melhor, tier, em: feitos[0].data };
+    });
+  }
+  function insigniasHtml(rows, g, eu) {
+    const ins = insigniasBench(rows, g), n = ins.filter((x) => x.feito).length;
+    if (!n && !eu) return "";
+    const tile = (x) => `<div class="ins-it ${x.feito ? `ins-${x.tier}` : "ins-off"}" title="${esc(x.b.titulo)}${x.feito ? ` · ${x.rx ? "RX" : "Scaled"}` : " · ainda não feito"}">
+      <span class="ins-med">${x.b.cat === "Heroes" ? "🎖️" : "🏆"}</span><b>${esc(x.b.titulo)}</b>
+      <small>${x.feito ? `${x.melhor ? esc(x.melhor.txt) : "feito"}${x.rx ? " · RX" : " · Scaled"}` : "—"}</small>
+      ${x.carga ? `<span class="ins-hp" aria-label="Carga: ${x.feito && x.pct != null ? x.pct : 0}% da RX"><i style="width:${x.feito && x.pct != null ? x.pct : 0}%"></i></span><small class="ins-pct">${x.feito ? (x.pct != null ? `${x.pct}% da carga RX` : "carga não anotada") : "com carga"}</small>` : ""}</div>`;
+    return `<div class="ins-box"><div class="sec-head"><h2>Insígnias de benchmark</h2><span>${n}/${ins.length}</span></div>
+      <div class="ins-grid">${[...ins].sort((a, c) => c.feito - a.feito).map(tile).join("")}</div>
+      ${eu ? `<p class="note small">Fez o benchmark, ganhou a insígnia: <b>ouro</b> em RX; nos de carga, <b>prata</b> com 70% ou mais da carga RX e <b>bronze</b> abaixo disso (anote a carga que usou no Scaled). ${sexoArte() === "f" ? "Carga RX feminina." : "Carga RX masculina."}</p>` : ""}</div>`;
+  }
 
   /* ---------- PRs (levantamentos) ---------- */
   const CF_LIFTS = ["Back squat", "Front squat", "Overhead squat", "Deadlift", "Clean", "Power clean", "Squat clean", "Clean and jerk", "Snatch", "Power snatch", "Push press", "Push jerk", "Split jerk", "Strict press", "Bench press", "Thruster"];
@@ -3898,6 +3941,7 @@
       <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
       <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
       <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
+      ${insigniasHtml(rows, G.perfis[id]?.config?.arte === "f" || (G.perfis[id]?.config?.arte !== "m" && G.perfis[id]?.config?.quiz?.sexo === "f") ? "f" : "m", id === uid)}
       <div>${recordesHtml(rows, `${esc((p.nome || "Essa pessoa").split(" ")[0])} ainda não registrou Max Out nem Fit Test.`)}</div>
       </div></section>`;
   }
