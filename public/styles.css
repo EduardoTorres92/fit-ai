@@ -1424,3 +1424,15 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .ins-hp i { display: block; height: 100%; background: linear-gradient(90deg, #ff3d6e, #ffb45e); border-radius: 5px; }
 .ins-ouro .ins-hp i { background: linear-gradient(90deg, #f0c030, #fff2a8); }
 .ins-pct { font-size: 10px !important; }
+
+/* ---------- Insígnias de calistenia (Treino da Fera) ---------- */
+.fera-capa { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid #ff6b2c; box-shadow: 0 0 20px rgba(255, 107, 44, 0.25); background: #1a0a06; color: #fff; }
+.fera-capa img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: 50% 30%; image-rendering: pixelated; }
+.fera-capa > div { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 14px 12px; background: linear-gradient(180deg, transparent, rgba(10, 4, 2, 0.92) 55%); }
+.fera-capa b { display: block; font-size: 20px; margin-top: 4px; }
+.fera-capa small { color: #ffd2b0; font-size: 13px; }
+.fera-box .ins-med { font-size: 24px; }
+.ins-try { margin-top: 6px; padding: 3px 10px; border-radius: 999px; background: var(--blue); color: #fff; font-size: 11px; font-weight: 700; text-decoration: none; }
+.ins-off .ins-try { opacity: 1; }
+.fera-box .ins-off { opacity: 1; }
+.fera-box .ins-off > :not(.ins-try) { opacity: 0.45; }
