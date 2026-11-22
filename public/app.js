@@ -217,7 +217,8 @@
       return s;
     } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])), cf: { logs: {}, perfil: {} }, corrida: { logs: {} } }; }
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
+  let CACHE_CHEFES = null; // chefes calculados do histórico (zera a cada save)
+  function save() { CACHE_CHEFES = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
   const semanasDesde = (d) => Math.floor(diffDays(parseKey(S.inicio), d) / 7);
   const semanaDe = (d) => { const n = semanasDesde(d); return n < 0 ? -1 : n % PROGRAMA.length; };
@@ -694,6 +695,7 @@
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
           ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
+          ${missoesHome()}
           ${ativHome()}
           ${desafioHome()}
           ${grupoHome()}
@@ -2893,7 +2895,7 @@
   let syncTimer = null, sincronizando = false, deNovo = false;
   function agendarSync() {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { verificarConquistas(); conferirXp(); if (uid) sincronizar(); }, 1200);
+    syncTimer = setTimeout(() => { verificarConquistas(); if (registrarMissoes()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) sincronizar(); }, 1200);
   }
   async function sincronizar() {
     if (!uid || !sb) return;
@@ -2925,7 +2927,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesXpAnt: S.missoesXpAnt || 0 };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3163,7 +3165,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3335,7 +3337,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp();
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -4571,6 +4573,7 @@
 
   /* ---------- Router ---------- */
   function render() {
+    CACHE_CHEFES = null;
     let [, rota = "", p1, p2] = location.hash.split("/");
     if (rota === "grupo" && p1 === "entrar" && /^[A-Za-z0-9]{4,12}$/.test(p2 || "") && !uid) { S.convite = p2.toUpperCase(); save(); }
     if (rota === "grupo" && p1 === "novo" && p2) { // desafio montado no Telegram: abre o formulário preenchido
@@ -4601,6 +4604,7 @@
     app.innerHTML = telas[rota](p1, p2);
     if (rota === "onboarding") startQuiz("onboarding");
     if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
+    if (rota === "home" || rota === "chefes") setTimeout(chefesNovos, 700);
     const tab = document.querySelector(".wtab.on");
     if (tab) tab.scrollIntoView({ inline: "center", block: "nearest" });
     const aba = document.querySelector(".seg.prog.rolar a.on");
@@ -4710,6 +4714,8 @@
       if (perfil.config.forca && !S.forca) S.forca = perfil.config.forca;
       if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
+      if (perfil.config.missoes) { S.missoes = S.missoes || {}; for (const [k, n] of Object.entries(perfil.config.missoes)) S.missoes[k] = Math.max(S.missoes[k] || 0, Number(n) || 0); }
+      if (perfil.config.missoesXpAnt > (S.missoesXpAnt || 0)) S.missoesXpAnt = perfil.config.missoesXpAnt;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
@@ -5530,6 +5536,8 @@
     out.push(`Perfil: ${P.peso || "?"} kg, ${P.altura || "?"} cm, ${P.idade || "?"} anos. Sequência atual: ${sequencia()} dias. Treinos concluídos: ${treinosFeitos()}.`);
     out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
     if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
+    { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
+      out.push(`Chefes (metas de recorde): ${cs.filter((c) => c.derrotado).length} de ${cs.length} derrotados.${vivos.length ? ` Mais perto: ${vivos.map((c) => `${c.nome} (${c.desc}; marco ${fmtMarca(c.met, c.melhor)}, HP ${c.hp}%)`).join("; ")}.` : ""} Missões de hoje: ${missoesDe(hojeKey).map((m) => `${m.t} ${m.ok ? "(feita)" : `(${m.fmt(m.valor, m.alvoV)})`}`).join("; ")}.`); }
     if (S.ficha) { const f = fichaAtual(); out.push(`Ficha de atleta: rank ${f.rank} (meta ${S.ficha.meta} até ${ddmm(keyOf(addDays(parseKey(S.ficha.metaIni), 30)))}), ${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(", ")} (0 a 100). Use os atributos mais baixos para sugerir o que treinar.`); }
     { const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, T = TRILHAS[trilha()];
       const libs = CATALOGO.filter((x) => liberado(x.k)).map((x) => x.nome).join(", ");
@@ -5639,6 +5647,134 @@
   }
 
   /* ---------- Onboarding ---------- */
+  /* ==========================================================
+     Chefes (recordes viram monstros: a vida cai conforme o seu melhor se aproxima da meta) e Missões do dia.
+     Os chefes são calculados do histórico (valem para recordes antigos). As missões do dia ficam registradas
+     em S.missoes (data -> quantas cumpridas) assim que são cumpridas, para o XP não mudar depois.
+     ========================================================== */
+  const pesoCorpo = () => { const p = Number(String(S.perfil.peso || "").replace(",", ".")); return p > 0 ? p : 0; };
+  // Todos os registros de exercício: { data, nome, reps, kg, s, km }
+  function registrosEx() {
+    const out = [];
+    for (const [k, l] of Object.entries(S.logs)) for (const [id, s] of Object.entries(l.sets || {})) {
+      const e = EXI[id]; if (!e || !s.length) continue;
+      for (const v of s) out.push({ data: k, nome: e.nome, ...(e.un === "s" ? { s: v } : e.un === "reps" || !e.un ? { reps: v } : {}) });
+    }
+    for (const pk of IAK) for (const [k, l] of Object.entries(S[pk].logs)) for (const [id, s] of Object.entries(l.sets || {})) {
+      const e = IA[pk].ci[id]; if (!e) continue;
+      const un = e.med === "s" ? "s" : unDe(pk, e);
+      for (const x of s || []) { if (!x) continue; out.push({ data: k, nome: e.nome, kg: x.kg || 0, ...(un === "s" ? { s: x.r || 0 } : un === "reps" ? { reps: x.r || 0 } : {}) }); }
+    }
+    for (const pr of S.cf?.prs || []) out.push({ data: pr.k || hojeKey, nome: pr.mov || "", kg: pr.kg || 0, reps: pr.reps || 0 });
+    for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (/corrida|esteira/.test(a.tipo || "") && a.km) out.push({ data: k, nome: "corrida", km: a.km });
+    return out;
+  }
+  const CHEFES = [
+    { k: "goblin", nome: "Goblin das Flexões", ic: "👺", desc: "30 flexões numa série", re: /flex/, nao: /joelho|inclinad|negativ|isom|hold|pike|handstand|pseudo|parada|half/, met: "reps", meta: () => 30 },
+    { k: "troll", nome: "Troll da Barra", ic: "🧌", desc: "12 barras fixas numa série", re: /barra (fixa|supinada|ombro)|^barra fixa|pull.?up|chin.?up/, nao: /australiana|negativ|isom|escapul|bicep|tricep|joelho|knee/, met: "reps", meta: () => 12 },
+    { k: "gargula", nome: "Gárgula das Paralelas", ic: "🗿", desc: "20 dips numa série", re: /dips|paralela|mergulho/, met: "reps", meta: () => 20 },
+    { k: "sentinela", nome: "Sentinela da Prancha", ic: "🛡️", desc: "2 minutos de prancha", re: /^prancha$/, met: "s", meta: () => 120 },
+    { k: "lich", nome: "Lich da Pistol", ic: "💀", desc: "5 pistol squats sem apoio", re: /pistol/, nao: /apoio|suporte|assist/, met: "reps", meta: () => 5 },
+    { k: "espectro", nome: "Espectro do Muscle-up", ic: "👻", desc: "1 muscle-up", re: /muscle.?up/, met: "reps", meta: () => 1 },
+    { k: "golem", nome: "Golem do Supino", ic: "🪨", desc: "Supino com o seu peso", re: /supino reto com barra|bench press/, met: "kg", meta: () => pesoCorpo() || 75, corpo: 1 },
+    { k: "hidra", nome: "Hidra do Agachamento", ic: "🐍", desc: "Agachamento com 1,5x o seu peso", re: /agachamento livre|back squat|front squat/, met: "kg", meta: () => Math.round((pesoCorpo() || 75) * 1.5), corpo: 1.5 },
+    { k: "dragao", nome: "Dragão da Terra", ic: "🐉", desc: "Levantamento terra com 2x o seu peso", re: /levantamento terra|deadlift/, nao: /stiff|romeno|romanian/, met: "kg", meta: () => Math.round((pesoCorpo() || 75) * 2), corpo: 2 },
+    { k: "lobo", nome: "Lobo da Estrada", ic: "🐺", desc: "Correr 5 km de uma vez", re: /^corrida$/, met: "km", meta: () => 5 },
+    { k: "rei", nome: "Rei Demônio dos 10 km", ic: "👹", desc: "Correr 10 km de uma vez", re: /^corrida$/, met: "km", meta: () => 10 },
+  ];
+  function chefes() {
+    if (CACHE_CHEFES) return CACHE_CHEFES;
+    const regs = registrosEx().sort((a, b) => a.data.localeCompare(b.data));
+    CACHE_CHEFES = CHEFES.map((c) => {
+      const meta = c.meta(), mine = regs.filter((r) => c.re.test(norm(r.nome)) && !(c.nao && c.nao.test(norm(r.nome))) && (r[c.met] || 0) > 0);
+      let melhor = 0, em = null;
+      for (const r of mine) { const v = r[c.met]; if (v > melhor) melhor = v; if (!em && v >= meta) em = r.data; }
+      const hp = mine.length ? Math.max(0, Math.round((1 - Math.min(1, melhor / meta)) * 100)) : 100;
+      return { ...c, metaV: meta, melhor, tem: mine.length > 0, hp, derrotado: !!em, em };
+    });
+    return CACHE_CHEFES;
+  }
+  const fmtMarca = (met, v) => (met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
+  const chefesXp = () => chefes().filter((c) => c.derrotado).length * XP.chefe;
+  function chefeCard(c) {
+    const cls = c.derrotado ? "ch-ok" : c.tem ? "" : "ch-novo";
+    return `<div class="ch-card ${cls}">
+      <span class="ch-ic">${c.ic}</span>
+      <div class="ch-txt"><div class="ch-l1"><b>${esc(c.nome)}</b>${c.derrotado ? `<span class="ch-tag">Derrotado · ${ddmm(c.em)}</span>` : ""}</div>
+        <small>${esc(c.desc)}${c.corpo && !pesoCorpo() ? " (75 kg até você informar o seu peso)" : c.corpo ? ` (${fmtMarca("kg", c.metaV)})` : ""}</small>
+        <span class="ch-hp"><i style="width:${c.hp}%"></i></span>
+        <div class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${fmtMarca(c.met, c.melhor)}` : "Ainda sem registro"}</span></div></div></div>`;
+  }
+  telas.chefes = () => {
+    setToolbar(null);
+    const cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
+    const ordem = [...cs].sort((a, b) => (a.derrotado - b.derrotado) || (b.tem - a.tem) || (a.hp - b.hp));
+    return `<section class="screen quiz ch-tela">
+      <header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>
+      <p class="qz-kicker">Batalhas de chefe</p>
+      <h1 class="fc-h1">Seus recordes viram monstros</h1>
+      <p class="ch-resumo"><b>${mortos}</b> de ${cs.length} derrotados · cada chefe vale <b>+${XP.chefe} XP</b></p>
+      <div class="ch-lista">${ordem.map(chefeCard).join("")}</div>
+      <p class="ch-nota">A vida do chefe cai conforme o seu melhor registro chega perto da meta. Valem as séries da calistenia e da academia, os PRs do CrossFit e as corridas pelo print. Recordes antigos também contam.</p>
+    </section>`;
+  };
+  function chefesNovos() {
+    const mortos = chefes().filter((c) => c.derrotado).map((c) => c.k);
+    if (!S.chefesVistos) { S.chefesVistos = mortos; save(); return; } // primeira vez: só registra, sem festa
+    const novos = mortos.filter((k) => !S.chefesVistos.includes(k));
+    if (!novos.length) return;
+    S.chefesVistos = mortos; save();
+    const c = chefes().find((x) => x.k === novos[0]);
+    dlgGami(`<div class="gami-crest ch-crest">${c.ic}</div><p class="gami-k">Chefe derrotado · +${XP.chefe} XP</p><h2>${esc(c.nome)}</h2>
+      <p class="note">${esc(c.desc)}: o seu marco é <b>${fmtMarca(c.met, c.melhor)}</b>.${novos.length > 1 ? ` E mais ${novos.length - 1} chefe${novos.length > 2 ? "s" : ""} caiu junto!` : ""}</p>`);
+  }
+
+  /* ---------- Missões do dia ---------- */
+  const minutosDia = (k) => soma(linhasLocais().filter((r) => r.data === k).map((r) => r.minutos || 0));
+  const seriesDia = (k) => soma(Object.values(S.logs[k]?.sets || {}).map((s) => s.length)) + soma(IAK.map((pk) => soma(Object.values(S[pk].logs[k]?.sets || {}).map((s) => (s || []).filter(Boolean).length))));
+  const videosDia = (k) => soma(VKEYS.map((p) => (S[p].logs[k]?.feitos || []).length));
+  const MISSOES = {
+    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
+    minutos: { ic: "⏱️", t: "Treine 30 minutos", v: minutosDia, alvo: () => 30, fmt: (v, a) => `${Math.min(v, a)}/${a} min` },
+    series: { ic: "🔁", t: "Registre 15 séries", v: seriesDia, alvo: () => 15, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
+    videos: { ic: "🎬", t: "Faça 2 vídeos", v: videosDia, alvo: () => 2, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
+    agua: { ic: "💧", t: "Bata a meta de água", v: (k) => soma((S.agua?.[k] || []).map((x) => x.ml || 0)), alvo: () => nutriMetas().agua, fmt: (v, a) => `${fmtL(Math.min(v, a))} de ${fmtL(a)}` },
+    corrida: { ic: "🏃", t: "Registre uma corrida ou caminhada", v: (k) => ((S.corrida?.logs[k]?.itens || []).length ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
+  };
+  function missoesDe(k) {
+    const p = principal(), t = trilha();
+    const pool = ["minutos", "agua"];
+    if (p === "plano" || IA[p] || IA[forcaHibrido()] && t === "hibrido") pool.push("series");
+    if (VP[p] || t === "hibrido" || t === "insanos") pool.push("videos");
+    if (t === "corrida" || t === "hibrido" || Object.keys(S.corrida?.logs || {}).length) pool.push("corrida");
+    let h = 0; for (const ch of k + (S.user?.id || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const a = pool[h % pool.length], resto = pool.filter((x) => x !== a), b = resto[(h >>> 8) % resto.length];
+    return ["treino", a, b].map((id) => { const m = MISSOES[id], alvo = m.alvo(), v = m.v(k); return { id, ...m, alvoV: alvo, valor: v, ok: v >= alvo, pct: Math.min(100, Math.round((v / alvo) * 100)) }; });
+  }
+  // Guarda quantas missões foram cumpridas hoje (só aumenta) e o XP das que saíram da janela de 30 dias
+  function registrarMissoes() {
+    const n = missoesDe(hojeKey).filter((m) => m.ok).length;
+    S.missoes = S.missoes || {};
+    if (n > (S.missoes[hojeKey] || 0)) S.missoes[hojeKey] = n; else return false;
+    const lim = keyOf(addDays(hoje, -30));
+    for (const k of Object.keys(S.missoes)) if (k < lim) { S.missoesXpAnt = (S.missoesXpAnt || 0) + xpMissoesN(S.missoes[k]); delete S.missoes[k]; }
+    return true;
+  }
+  const xpMissoesN = (n) => n * XP.missao + (n >= 3 ? XP.missoesTodas : 0);
+  const missoesXp = () => soma(Object.values(S.missoes || {}).map(xpMissoesN)) + (S.missoesXpAnt || 0);
+  function renovaEm() { const m = Math.max(0, Math.round((addDays(hoje, 1) - Date.now()) / 60000)); return `${Math.floor(m / 60)}h${pad(m % 60)}`; }
+  function missoesHome() {
+    const ms = missoesDe(hojeKey), feitas = ms.filter((m) => m.ok).length, cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
+    const prox = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp)[0];
+    return `<div class="ms-card">
+      <div class="ms-head"><span class="ms-k">Missões do dia</span><span class="ms-t" data-renova>renovam em ${renovaEm()}</span></div>
+      ${ms.map((m) => `<div class="ms-row${m.ok ? " ok" : ""}"><span class="ms-ic">${m.ok ? "✓" : m.ic}</span><div class="ms-txt"><b>${esc(m.t)}</b><span class="ms-bar"><i style="width:${m.pct}%"></i></span></div><span class="ms-v">${m.ok ? `+${XP.missao} XP` : esc(m.fmt(m.valor, m.alvoV))}</span></div>`).join("")}
+      <p class="ms-bonus">${feitas >= 3 ? `🏆 Todas cumpridas: +${XP.missoesTodas} XP de bônus!` : `Cumpra as 3 e ganhe <b>+${XP.missoesTodas} XP</b> de bônus (${feitas}/3)`}</p>
+      <a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.ic} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>
+    </div>`;
+  }
+  setInterval(() => { const el = document.querySelector("[data-renova]"); if (el) el.textContent = `renovam em ${renovaEm()}`; }, 30000);
+
   /* ==========================================================
      Quiz de entrada (uma pergunta por tela, XP por resposta) e Ficha de atleta.
      A ficha começa estimada pelas respostas e passa a usar os treinos reais dos últimos 28 dias:

@@ -1312,3 +1312,44 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .fc-refazer { display: block; margin: 22px auto 0; background: none; border: 0; color: #a9b4e0; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
 .evo-card.fc-mini { text-decoration: none; }
 .evo-card.fc-mini .rk { flex: 0 0 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; background: #0b1230; font-size: 26px; }
+
+/* ---------- Missões do dia (tela inicial) e Chefes ---------- */
+.ms-card { margin-top: 14px; padding: 14px 14px 10px; border-radius: 20px; border: 1px solid #8a6d22; background: linear-gradient(180deg, #16245e, #0a1130); color: #f4f6ff; }
+.ms-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ms-k { color: #ffd76a; font-size: 12px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; }
+.ms-t { color: #8f9cc8; font-size: 12px; }
+.ms-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.ms-ic { flex: 0 0 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(0, 0, 0, 0.35); font-size: 17px; }
+.ms-row.ok .ms-ic { background: rgba(78, 227, 155, 0.18); color: #4ee39b; font-weight: 800; }
+.ms-txt { flex: 1; min-width: 0; }
+.ms-txt b { display: block; font-size: 14px; font-weight: 600; }
+.ms-row.ok .ms-txt b { color: #a9b4e0; text-decoration: line-through; text-decoration-color: rgba(169, 180, 224, 0.5); }
+.ms-bar { display: block; height: 6px; margin-top: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.ms-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #2b54ff, #4fd2ff); }
+.ms-row.ok .ms-bar i { background: linear-gradient(90deg, #2fbf71, #9cf5c4); }
+.ms-v { flex: 0 0 auto; font-size: 12.5px; color: #c8cff0; font-weight: 600; }
+.ms-row.ok .ms-v { color: #ffd76a; }
+.ms-bonus { margin: 8px 0 0; font-size: 12.5px; color: #a9b4e0; }
+.ms-bonus b { color: #ffd76a; }
+.ms-chefes { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 107, 139, 0.1); border: 1px solid rgba(255, 107, 139, 0.3); color: #f4f6ff; font-size: 13px; text-decoration: none; }
+.ms-chefes b { color: #ff8fa6; }
+.ms-chefes span:last-child { color: #c8cff0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ch-resumo { text-align: center; color: #c8cff0; margin-top: 8px; font-size: 14px; }
+.ch-resumo b { color: #ffd76a; }
+.ch-lista { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.ch-card { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 18px; border: 1px solid rgba(255, 107, 139, 0.35); background: linear-gradient(90deg, rgba(60, 14, 40, 0.55), rgba(14, 24, 66, 0.7)); }
+.ch-ic { flex: 0 0 56px; height: 56px; display: grid; place-items: center; font-size: 32px; border-radius: 14px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); }
+.ch-txt { flex: 1; min-width: 0; }
+.ch-l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ch-l1 b { font-size: 16px; }
+.ch-txt small { display: block; color: #c8cff0; font-size: 12.5px; margin-top: 2px; }
+.ch-hp { display: block; height: 8px; margin-top: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.ch-hp i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, #ff3d6e, #ff8a5b); }
+.ch-l3 { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11.5px; color: #8f9cc8; }
+.ch-tag { padding: 2px 8px; border-radius: 999px; background: rgba(78, 227, 155, 0.18); color: #4ee39b; font-size: 11px; font-weight: 700; }
+.ch-card.ch-ok { border-color: rgba(78, 227, 155, 0.35); background: linear-gradient(90deg, rgba(14, 50, 40, 0.5), rgba(14, 24, 66, 0.7)); }
+.ch-card.ch-ok .ch-ic { filter: grayscale(1); opacity: 0.6; }
+.ch-card.ch-novo { opacity: 0.72; border-color: rgba(110, 140, 255, 0.2); }
+.ch-nota { margin: 18px 0 0; color: #8f9cc8; font-size: 12.5px; line-height: 1.45; text-align: center; }
+.gami-box .gami-crest.ch-crest { font-size: 84px; width: 150px; height: 150px; border-radius: 28px; background: radial-gradient(circle, #3c0e28, #0b1230 70%); }

@@ -108,7 +108,7 @@ def walk(text, wrap=None):
             if not PROPS.match(p) or 'var(--' in v and not HEX.search(v) and not RGBA.search(v): continue
             nv = conv_value(p, v, ctx)
             if nv: new.append(f'{p}: {nv}')
-        if not new or re.search(r'login|btn-email|btn-google|onb-|qz-|fc-|\.quiz|\.rk|\.video|backdrop|cf-mapa|musc img|cal-d i', sel): continue
+        if not new or re.search(r'login|btn-email|btn-google|onb-|qz-|fc-|ms-|ch-|\.quiz|\.rk|\.video|backdrop|cf-mapa|musc img|cal-d i', sel): continue
         parts, depth, cur = [], 0, ''
         for ch in sel:
             if ch in '(': depth += 1
