@@ -5810,7 +5810,7 @@
   /* ==========================================================
      Ligas: cada modalidade tem insígnias (bronze, prata, ouro) e um chefe que cai quando todas são conquistadas.
      Cross = Lobo (benchmarks), Calistenia = Fera (dias do Treino da Fera + recordes), Corrida = Pantera,
-     Híbrido = Jacaré, Hipertrofia = Gorila, Insanity = Shaun T. Tudo sai das linhas de treino, então vale para o perfil dos membros.
+     Híbrido = Jacaré, Hipertrofia = Gorila, Insanity = Canguru. Tudo sai das linhas de treino, então vale para o perfil dos membros.
      ========================================================== */
   const tierPor = (v, lim, menor = false) => (menor ? (v > 0 && v < lim[2] ? 3 : v > 0 && v < lim[1] ? 2 : v > 0 && v < lim[0] ? 1 : 0) : v >= lim[2] ? 3 : v >= lim[1] ? 2 : v >= lim[0] ? 1 : 0);
   const fmtKm = (v) => `${String(Math.round(v * 10) / 10).replace(".", ",")} km`;
@@ -5968,7 +5968,7 @@
   }
   const MOD_DE = (pr) => (pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
   const LIGA_T = {
-    insanity: { nome: "Insanity", rot: "Shaun T", img: "assets/chefes/shaun-t-rosto.webp" },
+    insanity: { nome: "Insanity", rot: "Canguru", img: "assets/chefes/canguru-rosto.webp" },
     cross: { nome: "Cross", rot: "Loba", img: "assets/chefes/loba-rosto.webp" },
     calistenia: { nome: "Calistenia", rot: "Fera", img: "assets/chefes/fera-rosto.webp" },
     corrida: { nome: "Corrida", rot: "Pantera", img: "assets/chefes/pantera-rosto.webp" },
@@ -6133,11 +6133,11 @@
   ];
   const CHEFES = [
     // Chefe do Insanity: só aparece para quem faz o programa (trilha Insanos ou Híbridos, ou já tem registro nele)
-    { k: "shaunt-cc", nome: "Shaun T · Cardio Challenge", tag: "Chefe do Insanity", vis: () => VP.insanity && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity?.logs || {}).length > 0), img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity", met: "s",
+    { k: "shaunt-cc", nome: "Canguru · Cardio Challenge", tag: "Chefe do Insanity", vis: () => VP.insanity && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity?.logs || {}).length > 0), img: "assets/chefes/canguru-rosto.webp", banner: "assets/chefes/canguru.webp", prog: "insanity", met: "s",
       desc: "Chegar ao fim do Cardio Challenge sem Max Out", meta: () => (INSV["cardio-challenge"]?.min || 30) * 60,
       calc: () => { const h = maxOuts(linhasLocais()).filter((m) => m.v === "cardio-challenge").sort((a, b) => a.k.localeCompare(b.k)), meta = (INSV["cardio-challenge"]?.min || 30) * 60;
         return { tem: h.length > 0, melhor: Math.max(0, ...h.map((m) => m.s)), em: h.find((m) => m.s >= meta)?.k || null }; } },
-    { k: "shaunt-ft", nome: "Shaun T · Fit Test", tag: "Chefe do Insanity", vis: () => VP.insanity60 && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity60?.logs || {}).length > 0), img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity60", met: "pct",
+    { k: "shaunt-ft", nome: "Canguru · Fit Test", tag: "Chefe do Insanity", vis: () => VP.insanity60 && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity60?.logs || {}).length > 0), img: "assets/chefes/canguru-rosto.webp", banner: "assets/chefes/canguru.webp", prog: "insanity60", met: "pct",
       desc: "Melhorar 25% no total do Fit Test", meta: () => 25,
       calc: () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60"); if (!ft.length) return { tem: false, melhor: 0, em: null };
         const base = ft[0].total || 1; let melhor = 0, em = null;
@@ -6196,7 +6196,7 @@
       <p class="ch-resumo"><b>${mortos}</b> de ${cs.length} derrotados · cada chefe vale <b>+${XP.chefe} XP</b></p>
       ${chefeBanner(destaque)}
       <div class="ch-lista">${ordem.filter((c) => c !== destaque).map(chefeCard).join("")}</div>
-      <p class="ch-nota">Cada liga tem um chefe: ele perde vida a cada insígnia que você conquista e cai quando você tem todas, em qualquer faixa. As insígnias ficam no seu Perfil. O Shaun T cai pelo Max Out no Cardio Challenge e pela melhora no Fit Test.</p>
+      <p class="ch-nota">Cada liga tem um chefe: ele perde vida a cada insígnia que você conquista e cai quando você tem todas, em qualquer faixa. As insígnias ficam no seu Perfil. O Canguru cai pelo Max Out no Cardio Challenge e pela melhora no Fit Test.</p>
     </section>`;
   };
   // Faixa grande do chefe do Insanity (tela de chefes e dias de Fit Test ou Cardio Challenge)
