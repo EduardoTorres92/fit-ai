@@ -2516,7 +2516,6 @@
       ${P.extra ? `<div class="section">
         <div class="sec-head"><h2>${esc(P.extraTitulo || "Extra")}</h2></div>
         ${insVideoCard(p, P.extra, null, false)}
-        ${timerBox(p, hojeKey)}
       </div>` : ""}
       <div class="section">
         <div class="field">
@@ -2558,7 +2557,6 @@
         <a class="icon-btn" href="#/${p}/${w}" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a>
         <h1>${k === hojeKey ? `${esc(P.curto)} de hoje` : `Semana ${w + 1} · ${DIAS[d]}`}</h1><span class="spacer"></span></div>
       ${insCard(p, w, d, { link: false })}
-      ${timerBox(p, editavel ? k : hojeKey)}
       <div class="note-box"><p>${P.nota}</p>${quando && !editavel ? `<p>Este treino está marcado para <b>${quando}</b>. Se fizer agora, conta como treino de hoje.</p>` : ""}${!k ? `<p>Escolha sua semana na tela do ${esc(P.nome)} para seguir o calendário. Dá para fazer os vídeos mesmo assim: contam como treino de hoje.</p>` : ""}</div>
       <div class="ex-list">
         ${t.ids.map((id, i) => insVideoCard(p, id, k, editavel, t.ids.length > 1 ? (i ? "Depois" : "Principal") : "")).join("")}
@@ -6220,12 +6218,19 @@
   /* ---------- Missões do dia ---------- */
   const minutosDia = (k) => soma(linhasLocais().filter((r) => r.data === k).map((r) => r.minutos || 0));
   const seriesDia = (k) => soma(Object.values(S.logs[k]?.sets || {}).map((s) => s.length)) + soma(IAK.map((pk) => soma(Object.values(S[pk].logs[k]?.sets || {}).map((s) => (s || []).filter(Boolean).length))));
+  // Vídeos marcados no calendário de hoje (programa principal ou o de vídeo do híbrido); dia de descanso conta 1 (vale um avulso)
+  function videosHoje() {
+    const p = VP[principal()] ? principal() : VP.insanity ? "insanity" : null;
+    if (!p || !S[p]?.inicio) return 1;
+    const n = diffDays(parseKey(S[p].inicio), hoje), t = n >= 0 ? insDia(p, Math.floor(n / 7), n % 7) : null;
+    return Math.max(1, (t?.ids || []).length);
+  }
   const videosDia = (k) => soma(VKEYS.map((p) => (S[p].logs[k]?.feitos || []).length));
   const MISSOES = {
     treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
     minutos: { ic: "⏱️", t: "Treine 30 minutos", v: minutosDia, alvo: () => 30, fmt: (v, a) => `${Math.min(v, a)}/${a} min` },
     series: { ic: "🔁", t: "Registre 15 séries", v: seriesDia, alvo: () => 15, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
-    videos: { ic: "🎬", t: "Faça 2 vídeos", v: videosDia, alvo: () => 2, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
+    videos: { ic: "🎬", t: "Faça os vídeos de hoje", v: videosDia, alvo: videosHoje, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
     agua: { ic: "💧", t: "Bata a meta de água", v: (k) => soma((S.agua?.[k] || []).map((x) => x.ml || 0)), alvo: () => nutriMetas().agua, fmt: (v, a) => `${fmtL(Math.min(v, a))} de ${fmtL(a)}` },
     corrida: { ic: "🏃", t: "Registre uma corrida ou caminhada", v: (k) => ((S.corrida?.logs[k]?.itens || []).length ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
   };
@@ -6258,7 +6263,7 @@
       <div class="ms-head"><span class="ms-k">Missões do dia</span><span class="ms-t" data-renova>renovam em ${renovaEm()}</span></div>
       ${ms.map((m) => `<div class="ms-row${m.ok ? " ok" : ""}"><span class="ms-ic">${m.ok ? "✓" : m.ic}</span><div class="ms-txt"><b>${esc(m.t)}</b><span class="ms-bar"><i style="width:${m.pct}%"></i></span></div><span class="ms-v">${m.ok ? `+${XP.missao} XP` : esc(m.fmt(m.valor, m.alvoV))}</span></div>`).join("")}
       <p class="ms-bonus">${feitas >= 3 ? `🏆 Todas cumpridas: +${XP.missoesTodas} XP de bônus!` : `Cumpra as 3 e ganhe <b>+${XP.missoesTodas} XP</b> de bônus (${feitas}/3)`}</p>
-      <a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.ic} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>
+      <a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.img ? `<img class="ms-ch-img" src="${prox.img}" alt="">` : prox.ic || ""} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>
     </div>`;
   }
   setInterval(() => { const el = document.querySelector("[data-renova]"); if (el) el.textContent = `renovam em ${renovaEm()}`; }, 30000);

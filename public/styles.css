@@ -1469,3 +1469,7 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .tp-home small { color: #a9b4e0; font-size: 12px; }
 .tp-home strong { font-size: 20px; color: #ffd76a; text-align: right; line-height: 1; }
 .tp-home strong small { display: block; font-size: 10px; color: #a9b4e0; }
+.ms-ch-img { width: 20px; height: 20px; border-radius: 6px; vertical-align: -5px; image-rendering: pixelated; }
+.ms-chefes { align-items: center; }
+.ms-chefes span:first-child { white-space: nowrap; }
+.ms-chefes span:last-child { display: flex; align-items: center; gap: 6px; min-width: 0; }
