@@ -6265,6 +6265,13 @@
   const minutosDia = (k) => soma(linhasLocais().filter((r) => r.data === k).map((r) => r.minutos || 0));
   const seriesDia = (k) => soma(Object.values(S.logs[k]?.sets || {}).map((s) => s.length)) + soma(IAK.map((pk) => soma(Object.values(S[pk].logs[k]?.sets || {}).map((s) => (s || []).filter(Boolean).length))));
   // Vídeos marcados no calendário de hoje (programa principal ou o de vídeo do híbrido); dia de descanso conta 1 (vale um avulso)
+  const absDia = (k) => soma(VKEYS.map((p) => [...(S[p].logs[k]?.feitos || []), ...(S[p].logs[k]?.avulso || [])].filter((id) => INSV[id]?.tipo === "Abdômen").length));
+  // Desafio da semana do grupo: pendente (ainda não cumprido) e cumprido naquele dia (para a missão não valer todo dia)
+  const meuFeito = (d) => (G.feitos || []).find((f) => f.desafio_id === d.id && f.usuario_id === uid);
+  function desafioPendente(k) { const d = uid && desafioDaSemana(); if (!d) return false; const f = meuFeito(d); return !f || (f.feito_em || "").slice(0, 10) === k || keyOf(new Date(f.feito_em)) === k; }
+  function desafioCumpridoEm(k) { const d = uid && desafioDaSemana(), f = d && meuFeito(d); return f && f.feito_em && keyOf(new Date(f.feito_em)) === k ? 1 : 0; }
+  // Dia de descanso no calendário do programa em vídeo principal
+  function diaDescanso(k) { const p = principal(); if (!VP[p] || !S[p]?.inicio) return false; const n = diffDays(parseKey(S[p].inicio), parseKey(k)), t = n >= 0 ? insDia(p, Math.floor(n / 7), n % 7) : null; return !!t && !t.ids.length; }
   function videosHoje() {
     const p = VP[principal()] ? principal() : VP.insanity ? "insanity" : null;
     if (!p || !S[p]?.inicio) return 1;
@@ -6276,19 +6283,26 @@
     treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
     minutos: { ic: "⏱️", t: "Treine 30 minutos", v: minutosDia, alvo: () => 30, fmt: (v, a) => `${Math.min(v, a)}/${a} min` },
     series: { ic: "🔁", t: "Registre 15 séries", v: seriesDia, alvo: () => 15, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
-    videos: { ic: "🎬", t: "Faça os vídeos de hoje", v: videosDia, alvo: videosHoje, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
+    abs: { ic: "🔥", t: "Faça um vídeo de abdômen", v: absDia, alvo: () => 1, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
+    bench: { ic: "🏆", t: "Faça um benchmark (vale insígnia)", v: (k) => (S.cf?.logs[k]?.done && CF_BENCH.some((b) => cfNome(b.titulo) === cfNome(S.cf.logs[k].wod?.titulo)) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
+    desafio: { ic: "❓", t: "Cumpra o desafio da semana", v: desafioCumpridoEm, alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
     agua: { ic: "💧", t: "Bata a meta de água", v: (k) => soma((S.agua?.[k] || []).map((x) => x.ml || 0)), alvo: () => nutriMetas().agua, fmt: (v, a) => `${fmtL(Math.min(v, a))} de ${fmtL(a)}` },
     corrida: { ic: "🏃", t: "Registre uma corrida ou caminhada", v: (k) => ((S.corrida?.logs[k]?.itens || []).length ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
   };
   function missoesDe(k) {
-    const p = principal(), t = trilha();
+    const p = principal(), t = trilha(), pend = desafioPendente(k), descanso = diaDescanso(k);
     const pool = ["minutos", "agua"];
     if (p === "plano" || IA[p] || IA[forcaHibrido()] && t === "hibrido") pool.push("series");
-    if (VP[p] || t === "hibrido" || t === "insanos") pool.push("videos");
+    if ((VP[p] || ["hibrido", "insanos"].includes(t)) && Object.values(INSV).some((v) => v.tipo === "Abdômen")) pool.push("abs");
+    if (p === "cf" || t === "cross") pool.push("bench");
     if (t === "corrida" || t === "hibrido" || Object.keys(S.corrida?.logs || {}).length) pool.push("corrida");
     let h = 0; for (const ch of k + (S.user?.id || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    const a = pool[h % pool.length], resto = pool.filter((x) => x !== a), b = resto[(h >>> 8) % resto.length];
-    return ["treino", a, b].map((id) => { const m = MISSOES[id], alvo = m.alvo(), v = m.v(k); return { id, ...m, alvoV: alvo, valor: v, ok: v >= alvo, pct: Math.min(100, Math.round((v / alvo) * 100)) }; });
+    // 1ª: treino (ou, no dia de descanso, a água); o desafio da semana pendente sempre entra; o resto sorteado do dia
+    const lista = [descanso ? "agua" : "treino"];
+    if (pend) lista.push("desafio");
+    const resto = pool.filter((x) => !lista.includes(x) && !(descanso && ["minutos", "series"].includes(x)));
+    while (lista.length < 3 && resto.length) lista.push(resto.splice((h >>>= 3) % resto.length, 1)[0]);
+    return lista.map((id) => { const m = MISSOES[id], alvo = m.alvo(), v = m.v(k); return { id, ...m, alvoV: alvo, valor: v, ok: v >= alvo, pct: Math.min(100, Math.round((v / alvo) * 100)) }; });
   }
   // Guarda quantas missões foram cumpridas hoje (só aumenta) e o XP das que saíram da janela de 30 dias
   function registrarMissoes() {
