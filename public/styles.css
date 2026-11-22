@@ -1402,4 +1402,7 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .qz-ops.grade .qz-op { flex-direction: column; padding: 10px; gap: 10px; text-align: center; }
 .qz-ops.grade .qz-ic { width: 100%; height: auto; aspect-ratio: 1; flex: none; }
 .qz-ops.grade .qz-t { align-items: center; }
-.arte-seg button { flex: 1; }
+.arte-seg button { flex: 1; white-space: nowrap; }
+.arte-lbl { margin: 4px 2px 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.seg.arte-seg { display: flex; width: 100%; }
+.seg.arte-seg button { flex: 1 1 0; justify-content: center; text-align: center; }

@@ -3348,7 +3348,7 @@
   const cartaClasse = (slug, g = sexoArte()) => `assets/classes/cartas/${slug}-${g}.webp`;
   function galeriaCartas(n) {
     return `<div class="carta-gal">${CLASSES.map(([slug, nome], i) => `<div class="carta-it${i === n.ci ? " on" : i > n.ci ? " off" : ""}"><img src="${cartaClasse(slug)}" alt="${esc(nome)}${i > n.ci ? " (bloqueada)" : ""}" loading="lazy">${i > n.ci ? `<span class="carta-lock">🔒</span>` : ""}</div>`).join("")}</div>
-      <div class="seg arte-seg"><button class="${sexoArte() === "m" ? "on" : ""}" data-arte="m">Personagem ♂</button><button class="${sexoArte() === "f" ? "on" : ""}" data-arte="f">Personagem ♀</button></div>`;
+      <p class="arte-lbl">Gênero do personagem</p><div class="seg arte-seg"><button class="${sexoArte() === "m" ? "on" : ""}" data-arte="m">♂ Masculino</button><button class="${sexoArte() === "f" ? "on" : ""}" data-arte="f">♀ Feminino</button></div>`;
   }
 
   /* ==========================================================
