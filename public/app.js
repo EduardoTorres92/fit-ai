@@ -5914,15 +5914,15 @@
   }
 
   const LIGAS = [
-    { k: "cross", nome: "Cross", chefe: "lobo", rot: "Lobo", banner: "lobo", tag: "Chefe do Cross", cor: "#5fb4ff", ins: (rows, o) => crossIns(rows, o.g),
+    { k: "cross", nome: "Cross", chefe: "loba", rot: "Loba", art: "a", banner: "loba", tag: "Chefe do Cross", cor: "#5fb4ff", ins: (rows, o) => crossIns(rows, o.g),
       vis: () => trilha() === "cross" || Object.values(S.cf?.logs || {}).some((l) => l.done) },
-    { k: "calistenia", nome: "Calistenia", chefe: "fera", rot: "Fera", banner: "fera", tag: "Chefe da calistenia", cor: "#ff6b2c", ins: (rows) => caliIns(rows),
+    { k: "calistenia", nome: "Calistenia", chefe: "fera", rot: "Fera", art: "a", banner: "fera", tag: "Chefe da calistenia", cor: "#ff6b2c", ins: (rows) => caliIns(rows),
       vis: () => ["calistenia", "hibrido"].includes(trilha()) || Object.keys(S.logs || {}).length > 0 || Object.keys(S.c21?.logs || {}).length > 0 },
-    { k: "corrida", nome: "Corrida", chefe: "pantera", rot: "Pantera", banner: "pantera", tag: "Chefe da corrida", cor: "#a66bff", ins: (rows) => corridaIns(rows),
+    { k: "corrida", nome: "Corrida", chefe: "pantera", rot: "Pantera", art: "a", banner: "pantera", tag: "Chefe da corrida", cor: "#a66bff", ins: (rows) => corridaIns(rows),
       vis: () => ["corrida", "hibrido"].includes(trilha()) || Object.keys(S.corrida?.logs || {}).length > 0 },
-    { k: "hibrido", nome: "Híbrido", chefe: "jacare", rot: "Jacaré", banner: "jacare", tag: "Chefe do híbrido", cor: "#4ee39b", ins: (rows) => hibridoIns(rows),
+    { k: "hibrido", nome: "Híbrido", chefe: "jacare", rot: "Jacaré", art: "o", banner: "jacare", tag: "Chefe do híbrido", cor: "#4ee39b", ins: (rows) => hibridoIns(rows),
       vis: () => ["hibrido", "corrida"].includes(trilha()) || (Object.keys(S.corrida?.logs || {}).length > 0 && Object.keys(S.hiper?.logs || {}).length + Object.keys(S.logs || {}).length > 0) },
-    { k: "hipertrofia", nome: "Hipertrofia", chefe: "gorila", rot: "Gorila", banner: "gorila", tag: "Chefe da hipertrofia", cor: "#ff8a5b", ins: (rows, o) => hipertrofiaIns(rows, o.peso, o.form, o.prs),
+    { k: "hipertrofia", nome: "Hipertrofia", chefe: "gorila", rot: "Gorila", art: "o", banner: "gorila", tag: "Chefe da hipertrofia", cor: "#ff8a5b", ins: (rows, o) => hipertrofiaIns(rows, o.peso, o.form, o.prs),
       vis: () => trilha() === "academia" || (trilha() === "hibrido" && forcaHibrido() === "hiper") || Object.keys(S.hiper?.logs || {}).length > 0 },
   ];
   const meuOpts = () => ({ g: sexoArte(), peso: pesoCorpo(), form: formaturas(), prs: S.cf?.prs || [] });
@@ -5940,7 +5940,7 @@
     if (!n && !eu) return "";
     const grupos = [...new Set(ins.map((x) => x.grupo))];
     return `<div class="ins-box liga-box" style="--liga:${L.cor}">
-      <div class="fera-capa liga-capa"><img src="assets/chefes/${L.banner}.webp" alt=""><div><span class="ch-bn-k">Liga ${esc(L.nome)}</span><b>${esc(L.rot)}: ${n} de ${ins.length} insígnias</b><small>${n === ins.length ? "Chefe derrotado! 🏆" : `Conquiste todas para derrotar ${L.rot === "Fera" ? "a" : L.rot === "Pantera" ? "a" : "o"} ${esc(L.rot)}`}</small></div></div>
+      <div class="fera-capa liga-capa"><img src="assets/chefes/${L.banner}.webp" alt=""><div><span class="ch-bn-k">Liga ${esc(L.nome)}</span><b>${esc(L.rot)}: ${n} de ${ins.length} insígnias</b><small>${n === ins.length ? "Chefe derrotado! 🏆" : `Conquiste todas para derrotar ${L.art} ${esc(L.rot)}`}</small></div></div>
       ${grupos.map((g) => { const gi = ins.filter((x) => x.grupo === g); return `<div class="sec-head" style="margin-top:12px"><h2>${esc(g)}</h2><span>${gi.filter((x) => x.tier).length}/${gi.length}</span></div>
         <div class="ins-grid">${gi.map((x) => insTile(x, eu)).join("")}</div>`; }).join("")}
     </div>`;
@@ -6040,7 +6040,7 @@
         for (const x of ft.slice(1)) { const v = Math.round(((x.total - base) / base) * 100); if (v > melhor) melhor = v; if (!em && v >= 25) em = x.k; }
         return { tem: true, melhor, em }; } },
     // Chefes das ligas: caem quando todas as insígnias da liga são conquistadas (em qualquer faixa)
-    ...LIGAS.map((L) => ({ k: L.chefe, nome: { lobo: "O Lobo", fera: "A Fera", pantera: "A Pantera", jacare: "O Jacaré", gorila: "O Gorila" }[L.chefe], tag: L.tag, liga: L.k,
+    ...LIGAS.map((L) => ({ k: L.chefe, nome: { loba: "A Loba", fera: "A Fera", pantera: "A Pantera", jacare: "O Jacaré", gorila: "O Gorila" }[L.chefe], tag: L.tag, liga: L.k,
       img: `assets/chefes/${L.banner}-rosto.webp`, banner: `assets/chefes/${L.banner}.webp`, met: "ins", desc: `Conquistar todas as insígnias da liga ${L.nome}`, vis: L.vis, meta: () => 1,
       calc: () => { const ins = L.ins(linhasLocais(), meuOpts()), f = ins.filter((x) => x.tier);
         return { tem: f.length > 0, melhor: f.length, meta: ins.length, em: f.length === ins.length ? (f.map((x) => x.em).filter(Boolean).sort().pop() || hojeKey) : null }; } })),
