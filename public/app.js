@@ -811,8 +811,7 @@
             <input type="file" id="foto-arquivo" accept="image/*" hidden>
             <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
           ${nivelCard()}
-          ${trilha() === "cross" || Object.values(S.cf?.logs || {}).some((l) => l.done) ? insigniasHtml(linhasLocais(), sexoArte(), true) : ""}
-          ${["calistenia", "hibrido"].includes(trilha()) || Object.keys(S.logs || {}).length || Object.keys(S.c21?.logs || {}).length ? feraHtml(linhasLocais(), true) : ""}
+          ${ligasPerfilHtml(linhasLocais(), true, meuOpts())}
           ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
             ${stat("weight.svg", P.peso || "—", "Peso (kg)", { edit: "peso" })}
@@ -3942,8 +3941,7 @@
       <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
       <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
       <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
-      ${feraHtml(rows, id === uid)}
-      ${insigniasHtml(rows, G.perfis[id]?.config?.arte === "f" || (G.perfis[id]?.config?.arte !== "m" && G.perfis[id]?.config?.quiz?.sexo === "f") ? "f" : "m", id === uid)}
+      ${id === uid ? ligasPerfilHtml(linhasLocais(), true, meuOpts()) : ligasPerfilHtml(rows, false, { g: G.perfis[id]?.config?.arte === "f" || (G.perfis[id]?.config?.arte !== "m" && G.perfis[id]?.config?.quiz?.sexo === "f") ? "f" : "m", peso: 0, form: G.perfis[id]?.config?.formaturas || {}, prs: [] })}
       <div>${recordesHtml(rows, `${esc((p.nome || "Essa pessoa").split(" ")[0])} ainda não registrou Max Out nem Fit Test.`)}</div>
       </div></section>`;
   }
@@ -5807,6 +5805,153 @@
   }
 
   /* ==========================================================
+     Ligas: cada modalidade tem insígnias (bronze, prata, ouro) e um chefe que cai quando todas são conquistadas.
+     Cross = Lobo (benchmarks), Calistenia = Fera (dias do Treino da Fera + recordes), Corrida = Pantera,
+     Híbrido = Jacaré, Hipertrofia = Gorila, Insanity = Shaun T. Tudo sai das linhas de treino, então vale para o perfil dos membros.
+     ========================================================== */
+  const tierPor = (v, lim, menor = false) => (menor ? (v > 0 && v < lim[2] ? 3 : v > 0 && v < lim[1] ? 2 : v > 0 && v < lim[0] ? 1 : 0) : v >= lim[2] ? 3 : v >= lim[1] ? 2 : v >= lim[0] ? 1 : 0);
+  const fmtKm = (v) => `${String(Math.round(v * 10) / 10).replace(".", ",")} km`;
+  const semanaDe_ = (k) => keyOf(mondayOf(parseKey(k)));
+  // Maior sequência de semanas seguidas dentro de um conjunto de segundas-feiras
+  function semanasSeguidas(segundas) {
+    const s = [...new Set(segundas)].sort(); let melhor = 0, atual = 0, prev = null;
+    for (const k of s) { atual = prev && diffDays(parseKey(prev), parseKey(k)) === 7 ? atual + 1 : 1; melhor = Math.max(melhor, atual); prev = k; }
+    return melhor;
+  }
+  const corridasLiga = (rows) => rows.filter((r) => r.programa === "corrida").flatMap((r) => (r.detalhes?.itens || []).filter((a) => /corrida|esteira/.test(a.tipo || "") && a.km > 0).map((a) => ({ data: r.data, km: Number(a.km) || 0, tempo: Number(a.tempo) || 0 })));
+
+  // Calistenia: os recordes que antes eram chefes (meta numa série); bronze 60%, prata 80%, ouro 100% da meta
+  const RECORDES_CALI = ["goblin", "troll", "gargula", "sentinela", "lich", "espectro"];
+  function recordesCali(rows) {
+    const dias = seriesCaliPorDia(rows), todas = Object.entries(dias).flatMap(([data, s]) => s.map((x) => ({ ...x, data })));
+    return RECORDES.filter((c) => RECORDES_CALI.includes(c.k)).map((c) => {
+      const meta = c.meta(), mine = todas.filter((x) => c.re.test(x.nome) && !(c.nao && c.nao.test(x.nome)) && (c.met === "s" ? x.seg === true : x.seg === false));
+      let melhor = 0, em = null; for (const x of mine.sort((a, b) => a.data.localeCompare(b.data))) if (x.v > melhor) { melhor = x.v; em = x.data; }
+      const tier = tierPor(melhor / meta, [0.6, 0.8, 1]);
+      return { k: c.k, nome: c.nome, grupo: "Recordes", ic: c.ic, tier, em: tier ? em : null, pct: Math.min(100, Math.round((melhor / meta) * 100)), det: melhor ? `${fmtMarca(c.met, melhor)} de ${fmtMarca(c.met, meta)}` : c.desc };
+    });
+  }
+  function caliIns(rows) {
+    return [...feraInsignias(rows).map((x) => ({ k: x.k, nome: x.nome, grupo: `Nível ${x.nv} · ${FERA_NV[x.nv]}`, ic: "🦁", tier: x.tier, em: x.em, try: x.dia,
+      det: x.feito ? "" : x.r.map(([c, t]) => `${t}${FCAT[c].seg ? " s" : ""} ${FERA_ROT[c]}`).join(" · ") })), ...recordesCali(rows)];
+  }
+  const FERA_ROT = { flexao: "flexões", barra: "barras", agachamento: "agach.", abdominal: "abdominais", abdPend: "abd. pendurado", pulos: "pulos", pike: "pike", diamante: "diamante", pistol: "pistols", afundo: "afundos", remada: "remadas", hspu: "HSPU", unilateral: "flexões 1 mão", pseudo: "pseudo planche", canivete: "canivetes", lsit: "L-sit", dragon: "dragon flag", hollow: "hollow", prancha: "prancha", ponte: "pontes", panturrilha: "panturrilhas", tiro: "tiros" };
+
+  // Cross: os 17 benchmarks
+  const crossIns = (rows, g) => insigniasBench(rows, g).map((x) => ({ k: cfNome(x.b.titulo), nome: x.b.titulo, grupo: x.b.cat, ic: x.b.cat === "Heroes" ? "🎖️" : "🏆", tier: x.feito ? { ouro: 3, prata: 2, bronze: 1 }[x.tier] : 0, em: x.em,
+    pct: x.carga && x.feito && x.pct != null ? x.pct : undefined, det: x.feito ? `${x.melhor ? x.melhor.txt : "feito"} · ${x.rx ? "RX" : "Scaled"}${x.carga && x.pct != null ? ` · ${x.pct}% da carga RX` : ""}` : x.carga ? "com carga" : "" }));
+
+  // Corrida (Pantera): distâncias, ritmo nos 5 e 10 km, volume do mês, constância e longão
+  function corridaIns(rows) {
+    const cs = corridasLiga(rows).sort((a, b) => a.data.localeCompare(b.data)), out = [];
+    for (const [k, nome, d] of [["d5", "5 km", 5], ["d10", "10 km", 10], ["d15", "15 km", 15], ["d21", "Meia maratona", 21.1], ["d42", "Maratona", 42.2]]) {
+      const x = cs.find((c) => c.km >= d * 0.98);
+      out.push({ k, nome, grupo: "Distância", ic: "🏁", tier: x ? 3 : 0, em: x?.data || null, det: x ? "" : `correr ${d < 20 ? nome : nome.toLowerCase()} de uma vez` });
+    }
+    for (const [k, nome, d, lim] of [["r5", "5 km rápido", 5, [2100, 1800, 1500]], ["r10", "10 km rápido", 10, [4200, 3600, 3000]]]) {
+      const ts = cs.filter((c) => c.km >= d * 0.98 && c.tempo).map((c) => ({ t: Math.round((c.tempo * d) / c.km), data: c.data })), best = ts.sort((a, b) => a.t - b.t)[0];
+      const tier = best ? tierPor(best.t, lim, true) : 0;
+      out.push({ k, nome, grupo: "Ritmo", ic: "⚡", tier, em: tier ? best.data : null, det: best ? `melhor: ${mmss(best.t)} · ouro abaixo de ${mmss(lim[2])}` : `bronze abaixo de ${mmss(lim[0])}, ouro abaixo de ${mmss(lim[2])}` });
+    }
+    const mes = {}; for (const c of cs) mes[c.data.slice(0, 7)] = (mes[c.data.slice(0, 7)] || 0) + c.km;
+    const melhorMes = Math.max(0, ...Object.values(mes));
+    out.push({ k: "vol", nome: "Volume do mês", grupo: "Constância", ic: "📅", tier: tierPor(melhorMes, [25, 50, 100]), det: melhorMes ? `melhor mês: ${fmtKm(melhorMes)} · ouro com 100 km` : "bronze 25 km, prata 50, ouro 100 num mês" });
+    const sem = {}; for (const c of cs) (sem[semanaDe_(c.data)] ||= new Set()).add(c.data);
+    const seguidas = semanasSeguidas(Object.entries(sem).filter(([, d]) => d.size >= 3).map(([k]) => k));
+    out.push({ k: "const", nome: "3 corridas por semana", grupo: "Constância", ic: "🔁", tier: tierPor(seguidas, [2, 3, 4]), det: `${seguidas} ${seguidas === 1 ? "semana seguida" : "semanas seguidas"} · ouro com 4` });
+    const longao = Math.max(0, ...cs.map((c) => c.tempo));
+    out.push({ k: "longao", nome: "Longão", grupo: "Constância", ic: "⏳", tier: tierPor(longao, [1800, 2700, 3600]), det: longao ? `maior corrida: ${mmss(longao)} · ouro com 1 hora` : "bronze 30 min, prata 45, ouro 1 hora sem parar" });
+    return out;
+  }
+
+  // Híbrido (Jacaré): corrida e força juntas
+  const FORCA_PROG = ["hiper", "c21", "calistenia", "cf"];
+  function hibridoIns(rows) {
+    const feitos = rows.filter((r) => r.concluido), forca = new Set(feitos.filter((r) => FORCA_PROG.includes(r.programa)).map((r) => r.data));
+    const corre = new Set([...corridasLiga(rows).map((c) => c.data), ...feitos.filter((r) => r.programa === "run").map((r) => r.data)]);
+    const duplo = [...corre].filter((k) => forca.has(k)).sort()[0];
+    const sem = {}; for (const k of corre) (sem[semanaDe_(k)] ||= { c: new Set(), f: new Set() }).c.add(k); for (const k of forca) (sem[semanaDe_(k)] ||= { c: new Set(), f: new Set() }).f.add(k);
+    const seguidas = semanasSeguidas(Object.entries(sem).filter(([, x]) => x.c.size >= 3 && x.f.size >= 2).map(([k]) => k));
+    const sessao = feitos.filter((r) => r.programa === "run" && IA.run).find((r) => { const ids = Object.entries(r.detalhes?.sets || {}).filter(([, s]) => (s || []).some(Boolean)).map(([id]) => IA.run.ci[id]).filter(Boolean);
+      return ids.some((e) => unDe("run", e) === "min") && ids.some((e) => unDe("run", e) !== "min"); });
+    const murph = feitos.filter((r) => r.programa === "cf" && cfNome(r.detalhes?.wod?.titulo) === "murph").sort((a, b) => a.data.localeCompare(b.data));
+    const murphRx = murph.find((r) => r.detalhes?.res?.rx !== false);
+    const km = soma(corridasLiga(rows).map((c) => c.km)), nf = feitos.filter((r) => FORCA_PROG.includes(r.programa)).length;
+    return [
+      { k: "duplo", nome: "Dia duplo", grupo: "Híbrido", ic: "🐊", tier: duplo ? 3 : 0, em: duplo || null, det: duplo ? "" : "corrida e força no mesmo dia" },
+      { k: "semana", nome: "Semana híbrida", grupo: "Híbrido", ic: "📆", tier: tierPor(seguidas, [1, 2, 4]), det: `3 corridas + 2 forças na semana · ${seguidas} ${seguidas === 1 ? "seguida" : "seguidas"}, ouro com 4` },
+      { k: "sessao", nome: "Sessão híbrida", grupo: "Híbrido", ic: "⚙️", tier: sessao ? 3 : 0, em: sessao?.data || null, det: sessao ? "" : "um treino da Corrida e Híbrido com corrida e força" },
+      { k: "murph", nome: "Murph", grupo: "Híbrido", ic: "🎖️", tier: murphRx ? 3 : murph.length ? 2 : 0, em: (murphRx || murph[0])?.data || null, det: murph.length ? (murphRx ? "RX" : "Scaled") : "o benchmark Murph, do Cross" },
+      { k: "marca", nome: "Marca híbrida", grupo: "Híbrido", ic: "🏅", tier: Math.min(tierPor(km, [25, 50, 100]), tierPor(nf, [25, 50, 100])), det: `${fmtKm(km)} corridos e ${nf} treinos de força · ouro com 100 + 100` },
+    ];
+  }
+
+  // Hipertrofia (Gorila): força relativa, clube dos 450, tonelagem, progressão e formatura da Adaptação
+  const LIFTS = [["supino", "Supino com o seu peso", /supino reto com barra|bench press/, null, 1], ["agachamento", "Agachamento com 1,5x", /agachamento livre|back squat|front squat/, null, 1.5], ["terra", "Terra com 2x", /levantamento terra|deadlift/, /stiff|romeno|romanian/, 2]];
+  function hipertrofiaIns(rows, peso, form, prs = []) {
+    const hip = rows.filter((r) => r.programa === "hiper" && IA.hiper);
+    const series = hip.flatMap((r) => Object.entries(r.detalhes?.sets || {}).flatMap(([id, s]) => (s || []).filter((x) => x && x.kg > 0).map((x) => ({ data: r.data, id, nome: norm(IA.hiper.ci[id]?.nome || id), kg: x.kg, r: x.r || 0 }))));
+    const pc = peso || 75, out = [], bests = [];
+    for (const [k, nome, re, nao, mult] of LIFTS) {
+      const kgs = [...series.filter((x) => re.test(x.nome) && !(nao && nao.test(x.nome))), ...prs.filter((p) => re.test(norm(p.mov || "")) && !(nao && nao.test(norm(p.mov || ""))))].map((x) => Number(x.kg) || 0);
+      const best = Math.max(0, ...kgs), meta = Math.round(pc * mult); bests.push(best);
+      out.push({ k, nome, grupo: "Força relativa", ic: "🦍", tier: tierPor(best / meta, [0.6, 0.8, 1]), pct: Math.min(100, Math.round((best / meta) * 100)), det: best ? `${fmtKg(best)} kg de ${meta} kg${peso ? "" : " (peso padrão 75 kg)"}` : `meta: ${meta} kg` });
+    }
+    const total = soma(bests);
+    out.push({ k: "clube", nome: "Clube dos 450", grupo: "Força relativa", ic: "🏋️", tier: tierPor(total, [300, 375, 450]), pct: Math.min(100, Math.round((total / 450) * 100)), det: `supino + agachamento + terra: ${fmtKg(total)} kg` });
+    const porTreino = {}, porMes = {};
+    for (const x of series) { porTreino[x.data] = (porTreino[x.data] || 0) + x.kg * x.r; porMes[x.data.slice(0, 7)] = (porMes[x.data.slice(0, 7)] || 0) + x.kg * x.r; }
+    const tt = Math.max(0, ...Object.values(porTreino)), tm = Math.max(0, ...Object.values(porMes)), ton = (v) => `${String(Math.round(v / 100) / 10).replace(".", ",")} t`;
+    out.push({ k: "tonTreino", nome: "Tonelagem num treino", grupo: "Volume", ic: "⚖️", tier: tierPor(tt, [5000, 7500, 10000]), det: tt ? `melhor treino: ${ton(tt)} · ouro com 10 t` : "bronze 5 t, prata 7,5 t, ouro 10 t" });
+    out.push({ k: "tonMes", nome: "Tonelagem no mês", grupo: "Volume", ic: "🗓️", tier: tierPor(tm, [50000, 75000, 100000]), det: tm ? `melhor mês: ${ton(tm)} · ouro com 100 t` : "bronze 50 t, prata 75 t, ouro 100 t" });
+    // Progressão: semanas seguidas em que algum exercício passou da maior carga que já tinha
+    const maxEx = {}, subiu = new Set();
+    for (const x of [...series].sort((a, b) => a.data.localeCompare(b.data))) { if (maxEx[x.id] && x.kg > maxEx[x.id]) subiu.add(semanaDe_(x.data)); maxEx[x.id] = Math.max(maxEx[x.id] || 0, x.kg); }
+    const sp = semanasSeguidas([...subiu]);
+    out.push({ k: "prog", nome: "Sobrecarga progressiva", grupo: "Volume", ic: "📈", tier: tierPor(sp, [2, 3, 4]), det: `${sp} ${sp === 1 ? "semana" : "semanas"} seguidas subindo carga · ouro com 4` });
+    out.push({ k: "adapt", nome: "Formatura da Adaptação", grupo: "Volume", ic: "🎓", tier: form?.adaptacao ? 3 : 0, em: form?.adaptacao || null, det: form?.adaptacao ? "" : "as 4 semanas de adaptação da Hipertrofia" });
+    return out;
+  }
+
+  const LIGAS = [
+    { k: "cross", nome: "Cross", chefe: "lobo", rot: "Lobo", banner: "lobo", tag: "Chefe do Cross", cor: "#5fb4ff", ins: (rows, o) => crossIns(rows, o.g),
+      vis: () => trilha() === "cross" || Object.values(S.cf?.logs || {}).some((l) => l.done) },
+    { k: "calistenia", nome: "Calistenia", chefe: "fera", rot: "Fera", banner: "fera", tag: "Chefe da calistenia", cor: "#ff6b2c", ins: (rows) => caliIns(rows),
+      vis: () => ["calistenia", "hibrido"].includes(trilha()) || Object.keys(S.logs || {}).length > 0 || Object.keys(S.c21?.logs || {}).length > 0 },
+    { k: "corrida", nome: "Corrida", chefe: "pantera", rot: "Pantera", banner: "pantera", tag: "Chefe da corrida", cor: "#a66bff", ins: (rows) => corridaIns(rows),
+      vis: () => ["corrida", "hibrido"].includes(trilha()) || Object.keys(S.corrida?.logs || {}).length > 0 },
+    { k: "hibrido", nome: "Híbrido", chefe: "jacare", rot: "Jacaré", banner: "jacare", tag: "Chefe do híbrido", cor: "#4ee39b", ins: (rows) => hibridoIns(rows),
+      vis: () => ["hibrido", "corrida"].includes(trilha()) || (Object.keys(S.corrida?.logs || {}).length > 0 && Object.keys(S.hiper?.logs || {}).length + Object.keys(S.logs || {}).length > 0) },
+    { k: "hipertrofia", nome: "Hipertrofia", chefe: "gorila", rot: "Gorila", banner: "gorila", tag: "Chefe da hipertrofia", cor: "#ff8a5b", ins: (rows, o) => hipertrofiaIns(rows, o.peso, o.form, o.prs),
+      vis: () => trilha() === "academia" || (trilha() === "hibrido" && forcaHibrido() === "hiper") || Object.keys(S.hiper?.logs || {}).length > 0 },
+  ];
+  const meuOpts = () => ({ g: sexoArte(), peso: pesoCorpo(), form: formaturas(), prs: S.cf?.prs || [] });
+  const TIER_TXT = ["", "Bronze", "Prata", "Ouro"];
+  function insTile(x, eu) {
+    const wd = eu && !x.tier && x.try ? feraDiaWD(x.try) : null;
+    return `<div class="ins-it ${x.tier ? `ins-${TIERS[x.tier]}` : "ins-off"}" title="${esc(x.nome)}">
+      <span class="ins-med">${x.ic}</span><b>${esc(x.nome)}</b>
+      <small>${x.tier ? `${TIER_TXT[x.tier]}${x.em ? ` · ${ddmm(x.em)}` : ""}` : ""}${x.tier && x.det ? "<br>" : ""}${esc(x.det || (x.tier ? "" : "—"))}</small>
+      ${x.pct != null ? `<span class="ins-hp"><i style="width:${x.pct}%"></i></span>` : ""}
+      ${wd ? `<a class="ins-try" href="#/treino/${wd[0]}/${wd[1]}">Tentar</a>` : ""}</div>`;
+  }
+  function ligaHtml(L, rows, eu, o) {
+    const ins = L.ins(rows, o), n = ins.filter((x) => x.tier).length;
+    if (!n && !eu) return "";
+    const grupos = [...new Set(ins.map((x) => x.grupo))];
+    return `<div class="ins-box liga-box" style="--liga:${L.cor}">
+      <div class="fera-capa liga-capa"><img src="assets/chefes/${L.banner}.webp" alt=""><div><span class="ch-bn-k">Liga ${esc(L.nome)}</span><b>${esc(L.rot)}: ${n} de ${ins.length} insígnias</b><small>${n === ins.length ? "Chefe derrotado! 🏆" : `Conquiste todas para derrotar ${L.rot === "Fera" ? "a" : L.rot === "Pantera" ? "a" : "o"} ${esc(L.rot)}`}</small></div></div>
+      ${grupos.map((g) => { const gi = ins.filter((x) => x.grupo === g); return `<div class="sec-head" style="margin-top:12px"><h2>${esc(g)}</h2><span>${gi.filter((x) => x.tier).length}/${gi.length}</span></div>
+        <div class="ins-grid">${gi.map((x) => insTile(x, eu)).join("")}</div>`; }).join("")}
+    </div>`;
+  }
+  // Seções das ligas no Perfil (as que fazem sentido para a pessoa) e no perfil de membro (as que têm alguma insígnia)
+  function ligasPerfilHtml(rows, eu, o) {
+    return LIGAS.filter((L) => (eu ? L.vis() : true)).map((L) => ligaHtml(L, rows, eu, o)).join("") +
+      (eu ? `<p class="note small">Cada liga tem insígnias de bronze, prata e ouro, e um chefe que cai quando todas são conquistadas, em qualquer faixa. Tudo sai dos seus treinos registrados.</p>` : "");
+  }
+
+  /* ==========================================================
      Estilo de treino: soma-se à classe de nível ("Escudeiro · Monge"). Vem dos treinos dos últimos 28 dias:
      cada sessão conta pelos minutos (mínimo 20) no tipo dela. Um tipo com 50% ou mais dá o estilo; sem isso, Ronin (híbrido).
      ========================================================== */
@@ -5868,7 +6013,8 @@
     for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (/corrida|esteira/.test(a.tipo || "") && a.km) out.push({ data: k, nome: "corrida", km: a.km });
     return out;
   }
-  const CHEFES = [
+  // Recordes que antes eram chefes: hoje são insígnias das ligas (o XP de quem já bateu continua)
+  const RECORDES = [
     { k: "goblin", nome: "Goblin das Flexões", ic: "👺", desc: "30 flexões numa série", re: /flex/, nao: /joelho|inclinad|negativ|isom|hold|pike|handstand|pseudo|parada|half/, met: "reps", meta: () => 30 },
     { k: "troll", nome: "Troll da Barra", ic: "🧌", desc: "12 barras fixas numa série", re: /barra (fixa|supinada|ombro)|^barra fixa|pull.?up|chin.?up/, nao: /australiana|negativ|isom|escapul|bicep|tricep|joelho|knee/, met: "reps", meta: () => 12 },
     { k: "gargula", nome: "Gárgula das Paralelas", ic: "🗿", desc: "20 dips numa série", re: /dips|paralela|mergulho/, met: "reps", meta: () => 20 },
@@ -5880,60 +6026,71 @@
     { k: "dragao", nome: "Dragão da Terra", ic: "🐉", desc: "Levantamento terra com 2x o seu peso", re: /levantamento terra|deadlift/, nao: /stiff|romeno|romanian/, met: "kg", meta: () => Math.round((pesoCorpo() || 75) * 2), corpo: 2 },
     { k: "lobo", nome: "Lobo da Estrada", ic: "🐺", desc: "Correr 5 km de uma vez", re: /^corrida$/, met: "km", meta: () => 5 },
     { k: "rei", nome: "Rei Demônio dos 10 km", ic: "👹", desc: "Correr 10 km de uma vez", re: /^corrida$/, met: "km", meta: () => 10 },
-    // A Fera: chefe da calistenia; cada insígnia do Treino da Fera é um golpe, cai com as 16
-    { k: "fera", nome: "A Fera", tag: "Chefe da calistenia", img: "assets/chefes/fera-rosto.webp", banner: "assets/chefes/fera.webp", met: "ins", desc: "Conquistar as 16 insígnias de calistenia",
-      vis: () => ["calistenia", "hibrido"].includes(trilha()) || Object.keys(S.logs || {}).length > 0 || Object.keys(S.c21?.logs || {}).length > 0,
-      meta: () => FERA.length, calc: () => { const ins = feraInsignias(linhasLocais()), f = ins.filter((x) => x.feito); return { tem: f.length > 0, melhor: f.length, em: f.length === FERA.length ? f.map((x) => x.em).sort().pop() : null }; } },
+  ];
+  const CHEFES = [
     // Chefe do Insanity: só aparece para quem faz o programa (trilha Insanos ou Híbridos, ou já tem registro nele)
-    { k: "shaunt-cc", nome: "Shaun T · Cardio Challenge", tag: "Chefe do Insanity", img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity", met: "s",
+    { k: "shaunt-cc", nome: "Shaun T · Cardio Challenge", tag: "Chefe do Insanity", vis: () => VP.insanity && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity?.logs || {}).length > 0), img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity", met: "s",
       desc: "Chegar ao fim do Cardio Challenge sem Max Out", meta: () => (INSV["cardio-challenge"]?.min || 30) * 60,
       calc: () => { const h = maxOuts(linhasLocais()).filter((m) => m.v === "cardio-challenge").sort((a, b) => a.k.localeCompare(b.k)), meta = (INSV["cardio-challenge"]?.min || 30) * 60;
         return { tem: h.length > 0, melhor: Math.max(0, ...h.map((m) => m.s)), em: h.find((m) => m.s >= meta)?.k || null }; } },
-    { k: "shaunt-ft", nome: "Shaun T · Fit Test", tag: "Chefe do Insanity", img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity60", met: "pct",
+    { k: "shaunt-ft", nome: "Shaun T · Fit Test", tag: "Chefe do Insanity", vis: () => VP.insanity60 && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity60?.logs || {}).length > 0), img: "assets/chefes/shaun-t-rosto.webp", banner: "assets/chefes/shaun-t.webp", prog: "insanity60", met: "pct",
       desc: "Melhorar 25% no total do Fit Test", meta: () => 25,
       calc: () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60"); if (!ft.length) return { tem: false, melhor: 0, em: null };
         const base = ft[0].total || 1; let melhor = 0, em = null;
         for (const x of ft.slice(1)) { const v = Math.round(((x.total - base) / base) * 100); if (v > melhor) melhor = v; if (!em && v >= 25) em = x.k; }
         return { tem: true, melhor, em }; } },
+    // Chefes das ligas: caem quando todas as insígnias da liga são conquistadas (em qualquer faixa)
+    ...LIGAS.map((L) => ({ k: L.chefe, nome: { lobo: "O Lobo", fera: "A Fera", pantera: "A Pantera", jacare: "O Jacaré", gorila: "O Gorila" }[L.chefe], tag: L.tag, liga: L.k,
+      img: `assets/chefes/${L.banner}-rosto.webp`, banner: `assets/chefes/${L.banner}.webp`, met: "ins", desc: `Conquistar todas as insígnias da liga ${L.nome}`, vis: L.vis, meta: () => 1,
+      calc: () => { const ins = L.ins(linhasLocais(), meuOpts()), f = ins.filter((x) => x.tier);
+        return { tem: f.length > 0, melhor: f.length, meta: ins.length, em: f.length === ins.length ? (f.map((x) => x.em).filter(Boolean).sort().pop() || hojeKey) : null }; } })),
   ];
-  const chefeVisivel = (c) => (c.vis ? c.vis() : !c.prog) || (VP[c.prog] && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S[c.prog]?.logs || {}).length > 0));
   function chefes() {
     if (CACHE_CHEFES) return CACHE_CHEFES;
-    const regs = registrosEx().sort((a, b) => a.data.localeCompare(b.data));
-    CACHE_CHEFES = CHEFES.filter(chefeVisivel).map((c) => {
-      if (c.calc) { const r = c.calc(), meta = c.meta(); return { ...c, metaV: meta, ...r, hp: r.tem ? Math.max(0, Math.round((1 - Math.min(1, r.melhor / meta)) * 100)) : 100, derrotado: !!r.em }; }
-      const meta = c.meta(), mine = regs.filter((r) => c.re.test(norm(r.nome)) && !(c.nao && c.nao.test(norm(r.nome))) && (r[c.met] || 0) > 0);
-      let melhor = 0, em = null;
-      for (const r of mine) { const v = r[c.met]; if (v > melhor) melhor = v; if (!em && v >= meta) em = r.data; }
-      const hp = mine.length ? Math.max(0, Math.round((1 - Math.min(1, melhor / meta)) * 100)) : 100;
-      return { ...c, metaV: meta, melhor, tem: mine.length > 0, hp, derrotado: !!em, em };
+    CACHE_CHEFES = CHEFES.filter((c) => !c.k.startsWith("shaunt") || (c.k === "shaunt-cc" ? VP.insanity : VP.insanity60)).map((c) => {
+      const r = c.calc(), meta = r.meta ?? c.meta();
+      return { ...c, metaV: meta, ...r, rel: !!c.vis(), hp: r.tem ? Math.max(0, Math.round((1 - Math.min(1, r.melhor / meta)) * 100)) : 100, derrotado: !!r.em };
     });
     return CACHE_CHEFES;
   }
-  const fmtMarca = (met, v) => (met === "ins" ? `${v}/${FERA.length} insígnias` : met === "pct" ? `${v > 0 ? "+" : ""}${v}%` : met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
-  const chefesXp = () => chefes().filter((c) => c.derrotado).length * XP.chefe;
+  let CACHE_RECORDES = null;
+  function recordes() { // os antigos chefes de recorde, calculados como antes (valem XP)
+    if (CACHE_RECORDES && CACHE_RECORDES.v === CACHE_CHEFES) return CACHE_RECORDES.l;
+    const regs = registrosEx().sort((a, b) => a.data.localeCompare(b.data));
+    const l = RECORDES.map((c) => {
+      const meta = c.meta(), mine = regs.filter((r) => c.re.test(norm(r.nome)) && !(c.nao && c.nao.test(norm(r.nome))) && (r[c.met] || 0) > 0);
+      let melhor = 0, em = null;
+      for (const r of mine) { const v = r[c.met]; if (v > melhor) melhor = v; if (!em && v >= meta) em = r.data; }
+      return { ...c, metaV: meta, melhor, tem: mine.length > 0, derrotado: !!em, em };
+    });
+    CACHE_RECORDES = { v: chefes(), l };
+    return l;
+  }
+  const marcaChefe = (c) => (c.met === "ins" ? `${c.melhor}/${c.metaV} insígnias` : c.met === "s" && c.k.startsWith("shaunt") ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor));
+  const fmtMarca = (met, v) => (met === "ins" ? `${v} insígnias` : met === "pct" ? `${v > 0 ? "+" : ""}${v}%` : met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
+  const chefesXp = () => (chefes().filter((c) => c.derrotado).length + recordes().filter((c) => c.derrotado).length) * XP.chefe;
   function chefeCard(c) {
     const cls = c.derrotado ? "ch-ok" : c.tem ? "" : "ch-novo";
     return `<div class="ch-card ${cls}">
       <span class="ch-ic">${c.img ? `<img src="${c.img}" alt="">` : c.ic}</span>
       <div class="ch-txt"><div class="ch-l1"><b>${esc(c.nome)}</b>${c.derrotado ? `<span class="ch-tag">Derrotado · ${ddmm(c.em)}</span>` : ""}</div>
-        <small>${esc(c.desc)}${c.corpo && !pesoCorpo() ? " (75 kg até você informar o seu peso)" : c.corpo ? ` (${fmtMarca("kg", c.metaV)})` : ""}</small>
+        <small>${c.tag ? `<span class="ch-liga">${esc(c.tag)}</span> · ` : ""}${esc(c.desc)}</small>
         <span class="ch-hp"><i style="width:${c.hp}%"></i></span>
-        <div class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${fmtMarca(c.met, c.melhor)}` : "Ainda sem registro"}</span></div></div></div>`;
+        <div class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${marcaChefe(c)}` : "Ainda sem registro"}</span></div></div></div>`;
   }
   telas.chefes = () => {
     setToolbar(null);
     const cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
-    const ordem = [...cs].sort((a, b) => (a.derrotado - b.derrotado) || (b.tem - a.tem) || (a.hp - b.hp));
-    const destaque = cs.find((c) => c.banner && !c.derrotado) || null;
+    const ordem = [...cs].sort((a, b) => (b.rel - a.rel) || (a.derrotado - b.derrotado) || (b.tem - a.tem) || (a.hp - b.hp));
+    const destaque = ordem.find((c) => c.rel && !c.derrotado) || null;
     return `<section class="screen quiz ch-tela">
       <header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>
       <p class="qz-kicker">Batalhas de chefe</p>
-      <h1 class="fc-h1">Seus recordes viram monstros</h1>
+      <h1 class="fc-h1">Um chefe por liga</h1>
       <p class="ch-resumo"><b>${mortos}</b> de ${cs.length} derrotados · cada chefe vale <b>+${XP.chefe} XP</b></p>
       ${chefeBanner(destaque)}
       <div class="ch-lista">${ordem.filter((c) => c !== destaque).map(chefeCard).join("")}</div>
-      <p class="ch-nota">A vida do chefe cai conforme o seu melhor registro chega perto da meta. Valem as séries da calistenia e da academia, os PRs do CrossFit e as corridas pelo print. Recordes antigos também contam.</p>
+      <p class="ch-nota">Cada liga tem um chefe: ele perde vida a cada insígnia que você conquista e cai quando você tem todas, em qualquer faixa. As insígnias ficam no seu Perfil. O Shaun T cai pelo Max Out no Cardio Challenge e pela melhora no Fit Test.</p>
     </section>`;
   };
   // Faixa grande do chefe do Insanity (tela de chefes e dias de Fit Test ou Cardio Challenge)
@@ -5941,7 +6098,7 @@
     if (!c) return "";
     return `<div class="ch-banner"><img src="${c.banner}" alt="">
       <div class="ch-bn-txt">${hojeTxt ? `<span class="ch-bn-k">${esc(hojeTxt)}</span>` : `<span class="ch-bn-k">${esc(c.tag || "Chefe")}</span>`}<b>${esc(c.nome)}</b><small>${esc(c.desc)}</small>
-        <span class="ch-hp"><i style="width:${c.hp}%"></i></span><span class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${c.met === "s" ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor)}` : "Primeiro combate"}</span></span></div></div>`;
+        <span class="ch-hp"><i style="width:${c.hp}%"></i></span><span class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${marcaChefe(c)}` : "Primeiro combate"}</span></span></div></div>`;
   }
   function chefesNovos() {
     const mortos = chefes().filter((c) => c.derrotado).map((c) => c.k);
@@ -5951,7 +6108,7 @@
     S.chefesVistos = mortos; save();
     const c = chefes().find((x) => x.k === novos[0]);
     dlgGami(`<div class="gami-crest ch-crest">${c.img ? `<img src="${c.img}" alt="">` : c.ic}</div><p class="gami-k">Chefe derrotado · +${XP.chefe} XP</p><h2>${esc(c.nome)}</h2>
-      <p class="note">${esc(c.desc)}: o seu marco é <b>${fmtMarca(c.met, c.melhor)}</b>.${novos.length > 1 ? ` E mais ${novos.length - 1} chefe${novos.length > 2 ? "s" : ""} caiu junto!` : ""}</p>`);
+      <p class="note">${esc(c.desc)}: o seu marco é <b>${marcaChefe(c)}</b>.${novos.length > 1 ? ` E mais ${novos.length - 1} chefe${novos.length > 2 ? "s" : ""} caiu junto!` : ""}</p>`);
   }
 
   /* ---------- Missões do dia ---------- */

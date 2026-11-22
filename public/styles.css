@@ -1436,3 +1436,11 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .ins-off .ins-try { opacity: 1; }
 .fera-box .ins-off { opacity: 1; }
 .fera-box .ins-off > :not(.ins-try) { opacity: 0.45; }
+
+/* ---------- Ligas (capa com o chefe de cada liga) ---------- */
+.liga-box { margin-top: 8px; }
+.liga-box .fera-capa { border-color: var(--liga, #ff6b2c); box-shadow: 0 0 20px color-mix(in srgb, var(--liga, #ff6b2c) 30%, transparent); }
+.liga-box .ins-med { font-size: 22px; }
+.liga-box .ins-off { opacity: 1; }
+.liga-box .ins-off > :not(.ins-try) { opacity: 0.45; }
+.ch-liga { color: #ffd76a; font-weight: 700; }
