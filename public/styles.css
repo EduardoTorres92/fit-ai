@@ -1444,3 +1444,28 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .liga-box .ins-off { opacity: 1; }
 .liga-box .ins-off > :not(.ins-try) { opacity: 0.45; }
 .ch-liga { color: #ffd76a; font-weight: 700; }
+
+/* ---------- Temporada (Grupo, tela inicial) ---------- */
+.tp-box { padding-top: 6px; }
+.tp-head { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 18px; background: linear-gradient(90deg, #16245e, #0a1130); color: #f4f6ff; border: 1px solid #8a6d22; }
+.tp-head img { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; image-rendering: pixelated; }
+.tp-head b { display: block; font-size: 18px; }
+.tp-head small { color: #a9b4e0; font-size: 12.5px; }
+.tp-k { color: #ffd76a; font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; }
+.tp-ligas { margin: 10px 0 6px; }
+.tp-rank { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 0; }
+.tp-rank li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+.tp-rank li.eu { border-color: #ffd76a; }
+.tp-pos { width: 28px; font-weight: 800; color: var(--muted); }
+.tp-rank li:nth-child(1) .tp-pos { color: #f0c030; } .tp-rank li:nth-child(2) .tp-pos { color: #c7d0e0; } .tp-rank li:nth-child(3) .tp-pos { color: #d08a3e; }
+.tp-nome { flex: 1; min-width: 0; }
+.tp-nome b { display: block; font-size: 14px; }
+.tp-nome small { color: var(--muted); font-size: 11.5px; }
+.tp-rank strong { font-size: 18px; }
+.tp-home { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 10px 12px; border-radius: 18px; background: linear-gradient(90deg, #16245e, #0a1130); color: #f4f6ff; border: 1px solid #8a6d22; text-decoration: none; }
+.tp-home img { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; image-rendering: pixelated; }
+.tp-home span { flex: 1; min-width: 0; }
+.tp-home b { display: block; font-size: 14px; }
+.tp-home small { color: #a9b4e0; font-size: 12px; }
+.tp-home strong { font-size: 20px; color: #ffd76a; text-align: right; line-height: 1; }
+.tp-home strong small { display: block; font-size: 10px; color: #a9b4e0; }

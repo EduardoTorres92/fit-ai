@@ -696,6 +696,7 @@
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
           ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
+          ${temporadaHome()}
           ${missoesHome()}
           ${ativHome()}
           ${desafioHome()}
@@ -811,6 +812,7 @@
             <input type="file" id="foto-arquivo" accept="image/*" hidden>
             <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
           ${nivelCard()}
+          ${temporadaPerfilHtml()}
           ${ligasPerfilHtml(linhasLocais(), true, meuOpts())}
           ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
@@ -3894,6 +3896,7 @@
     const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
     return `<section class="screen has-toolbar">${head}
       <div class="chips g-chips">${G.grupos.map((x) => `<button class="chip${x.id === G.sel ? " primary" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="chip" id="g-criar">+ Criar</button><button class="chip" id="g-codigo">Código</button></div>
+      ${temporadaGrupoHtml()}
       <div class="section">
         <div class="g-head"><div><h2>${esc(g.nome)}</h2><small>${G.membros.length} ${G.membros.length === 1 ? "pessoa" : "pessoas"} · código <b>${esc(g.codigo)}</b></small></div>
           <button class="btn btn-blue" id="g-convidar">Convidar</button></div>
@@ -5950,6 +5953,104 @@
     return LIGAS.filter((L) => (eu ? L.vis() : true)).map((L) => ligaHtml(L, rows, eu, o)).join("") +
       (eu ? `<p class="note small">Cada liga tem insígnias de bronze, prata e ouro, e um chefe que cai quando todas são conquistadas, em qualquer faixa. Tudo sai dos seus treinos registrados.</p>` : "");
   }
+
+  /* ==========================================================
+     Temporadas: 8 semanas, uma liga por pessoa (quem treina duas ou mais modalidades de verdade entra no Híbrido).
+     Pontos dentro da temporada: +10 por treino concluído da liga (Insanity: por vídeo), +10/20/30 por insígnia nova
+     ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado. Tudo calculado das linhas de treino.
+     ========================================================== */
+  const TEMPORADAS = [{ n: 1, nome: "Temporada 1", sub: "Aquecimento", ini: "2026-11-23", fim: "2027-01-17" }];
+  function temporada() {
+    const t = TEMPORADAS.find((x) => hojeKey >= x.ini && hojeKey <= x.fim) || TEMPORADAS.find((x) => hojeKey < x.ini) || TEMPORADAS[TEMPORADAS.length - 1];
+    const fase = hojeKey < t.ini ? "antes" : hojeKey > t.fim ? "fim" : "agora";
+    const semana = fase === "agora" ? Math.floor(diffDays(parseKey(t.ini), hoje) / 7) + 1 : fase === "fim" ? 8 : 0;
+    return { ...t, fase, semana, faltam: fase === "antes" ? diffDays(hoje, parseKey(t.ini)) : diffDays(hoje, parseKey(t.fim)) };
+  }
+  const MOD_DE = (pr) => (pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
+  const LIGA_T = {
+    insanity: { nome: "Insanity", rot: "Shaun T", img: "assets/chefes/shaun-t-rosto.webp" },
+    cross: { nome: "Cross", rot: "Loba", img: "assets/chefes/loba-rosto.webp" },
+    calistenia: { nome: "Calistenia", rot: "Fera", img: "assets/chefes/fera-rosto.webp" },
+    corrida: { nome: "Corrida", rot: "Pantera", img: "assets/chefes/pantera-rosto.webp" },
+    hipertrofia: { nome: "Hipertrofia", rot: "Gorila", img: "assets/chefes/gorila-rosto.webp" },
+    hibrido: { nome: "Híbrido", rot: "Jacaré", img: "assets/chefes/jacare-rosto.webp" },
+  };
+  const noIntervalo = (rows, a, b) => rows.filter((r) => r.data >= a && r.data <= b);
+  // Liga da pessoa na temporada: modalidade com 2+ treinos e 25%+ do total conta; duas ou mais = Híbrido
+  function ligaTemporada(rows, t = temporada()) {
+    const fe = feitas(noIntervalo(rows, t.ini, t.fim)), n = {};
+    for (const r of fe) { const m = MOD_DE(r.programa); if (m) n[m] = (n[m] || 0) + 1; }
+    const total = soma(Object.values(n)); if (!total) return null;
+    const contam = Object.entries(n).filter(([, v]) => v >= 2 && v / total >= 0.25);
+    return contam.length >= 2 ? "hibrido" : Object.entries(n).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const PTS_TIER = [0, 10, 20, 30];
+  function pontosTemporada(rows, liga, o, t = temporada()) {
+    const ate = t.fase === "fim" ? t.fim : hojeKey, dentro = feitas(noIntervalo(rows, t.ini, ate)), antes = rows.filter((r) => r.data < t.ini), todas = rows.filter((r) => r.data <= ate);
+    const mods = liga === "hibrido" ? null : [liga], conta = (r) => !mods || mods.includes(MOD_DE(r.programa));
+    let treinos = 0;
+    for (const r of dentro.filter(conta)) treinos += MOD_DE(r.programa) === "insanity" ? Math.max(1, (r.detalhes?.feitos || []).length) : MOD_DE(r.programa) ? 1 : 0;
+    let ins = 0, chefes = 0, max = 0;
+    for (const L of LIGAS.filter((L) => liga === "hibrido" || L.k === liga)) {
+      const a = L.ins(antes, o), d = L.ins(todas, o), ta = Object.fromEntries(a.map((x) => [x.k, x.tier]));
+      for (const x of d) if (x.tier > (ta[x.k] || 0)) ins += PTS_TIER[x.tier] - PTS_TIER[ta[x.k] || 0];
+      if (d.every((x) => x.tier) && !a.every((x) => x.tier)) chefes++;
+    }
+    if (liga === "insanity" || liga === "hibrido") { // Max Out que passou do melhor anterior naquele vídeo
+      const best = {};
+      for (const m of maxOuts(todas).sort((a, b) => a.k.localeCompare(b.k))) { if (m.k >= t.ini && best[m.v] && m.s > best[m.v]) max++; best[m.v] = Math.max(best[m.v] || 0, m.s); }
+    }
+    return { treinos, ins, chefes, max, total: treinos * 10 + ins + chefes * 50 + max * 10 };
+  }
+  function tabelaTemporada(t = temporada()) {
+    const opts = (id) => (id === uid ? meuOpts() : { g: G.perfis[id]?.config?.arte === "f" ? "f" : "m", peso: 0, form: G.perfis[id]?.config?.formaturas || {}, prs: [] });
+    return G.membros.map((id) => { const rows = linhasDe(id), liga = ligaTemporada(rows, t); return liga ? { id, liga, ...pontosTemporada(rows, liga, opts(id), t) } : null; }).filter(Boolean);
+  }
+  // Insígnias da temporada (Perfil): Pioneiro (treinou na temporada) e Finalista (Cardio Challenge final do MAX:30 dentro do prazo)
+  function finalistaMax30(t = temporada()) {
+    const P = VP.insanity; if (!P) return null;
+    let ult = null; P.semanas.forEach((s, w) => s.dias.forEach((x, d) => x.ids.length && (ult = [w, d])));
+    return Object.keys(S.insanity?.logs || {}).filter((k) => k >= t.ini && k <= t.fim && insFeito("insanity", k) && S.insanity.logs[k].w === ult[0] && S.insanity.logs[k].d === ult[1]).sort()[0] || null;
+  }
+  function temporadaPerfilHtml() {
+    const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t), treinou = feitas(noIntervalo(rows, t.ini, t.fim)).length > 0, fin = finalistaMax30(t);
+    if (t.fase === "antes") return "";
+    return `<div class="ins-box"><div class="sec-head"><h2>${esc(t.nome)} · ${esc(t.sub)}</h2><span>${liga ? `Liga ${esc(LIGA_T[liga].nome)}` : ""}</span></div>
+      <div class="ins-grid">
+        <div class="ins-it ${treinou && t.fase === "fim" ? "ins-ouro" : treinou ? "ins-prata" : "ins-off"}"><span class="ins-med">🚩</span><b>Pioneiro</b><small>${treinou ? (t.fase === "fim" ? `conquistada · ${esc(t.nome)}` : "garantida no fim da temporada") : "treine na temporada"}</small></div>
+        ${VP.insanity ? `<div class="ins-it ${fin ? "ins-ouro" : "ins-off"}"><span class="ins-med">🏁</span><b>Finalista</b><small>${fin ? `MAX:30 completo · ${ddmm(fin)}` : `Cardio Challenge final do MAX:30 até ${ddmm(t.fim)}`}</small></div>` : ""}
+      </div></div>`;
+  }
+  // Grupo: ranking da liga escolhida
+  function temporadaGrupoHtml() {
+    const t = temporada(), tab = tabelaTemporada(t), minha = tab.find((x) => x.id === uid)?.liga;
+    const ligas = Object.keys(LIGA_T).filter((k) => tab.some((x) => x.liga === k));
+    if (!G.ligaSel || !LIGA_T[G.ligaSel]) G.ligaSel = minha || ligas[0] || "hibrido";
+    const sel = G.ligaSel, lista = tab.filter((x) => x.liga === sel).sort((a, b) => b.total - a.total), L = LIGA_T[sel];
+    const quando = t.fase === "antes" ? `começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`} (${ddmm(t.ini)})` : t.fase === "fim" ? `encerrada em ${ddmm(t.fim)}` : `semana ${t.semana} de 8 · faltam ${t.faltam} ${t.faltam === 1 ? "dia" : "dias"}`;
+    return `<div class="section tp-box">
+      <div class="tp-head"><img src="${L.img}" alt=""><div><span class="tp-k">${esc(t.nome)} · ${esc(t.sub)}</span><b>Liga ${esc(L.nome)}</b><small>${quando}</small></div></div>
+      <div class="chips tp-ligas">${(ligas.length ? ligas : Object.keys(LIGA_T)).map((k) => `<button class="chip${k === sel ? " primary" : ""}" data-tp-liga="${k}">${esc(LIGA_T[k].nome)}${k === minha ? " · você" : ""}</button>`).join("")}</div>
+      ${t.fase === "antes" ? `<p class="note small">A temporada começa na segunda, ${ddmm(t.ini)}, e vai até ${ddmm(t.fim)}. Cada pessoa entra numa liga pelo que treinar: quem fizer duas ou mais modalidades entra no Híbrido.</p>`
+        : lista.length ? `<ol class="tp-rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}"><span class="tp-pos">${i + 1}º</span>${avatar(G.perfis[x.id], 32)}<span class="tp-nome"><b>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</b><small>${x.treinos} ${sel === "insanity" ? (x.treinos === 1 ? "vídeo" : "vídeos") : x.treinos === 1 ? "treino" : "treinos"}${x.ins ? ` · +${x.ins} insígnias` : ""}${x.max ? ` · ${x.max} Max Out` : ""}${x.chefes ? ` · ${x.chefes} chefe` : ""}</small></span><strong>${x.total}</strong></li>`).join("")}</ol>`
+        : `<p class="note small">Ninguém nesta liga ainda.</p>`}
+      <details class="xp-regras"><summary>Como funciona</summary><ul class="note small">
+        <li>${esc(t.nome)} vai de ${ddmm(t.ini)} a ${ddmm(t.fim)}${t.sub === "Aquecimento" ? ": é o aquecimento, sem prêmio por posição" : ""}.</li>
+        <li>Sua liga é a modalidade que você treina. Duas ou mais modalidades (cada uma com 2+ treinos e 25%+ do total) = Híbrido.</li>
+        <li>Pontos: +10 por treino (no Insanity, por vídeo), +10/20/30 por insígnia nova ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado.</li>
+        <li>Quem treinar na temporada ganha a insígnia Pioneiro; quem fizer o Cardio Challenge final do MAX:30 até ${ddmm(t.fim)}, a Finalista.</li></ul></details>
+    </div>`;
+  }
+  function temporadaHome() {
+    const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t);
+    if (t.fase === "fim" && hojeKey > keyOf(addDays(parseKey(t.fim), 14))) return "";
+    let pos = "";
+    if (liga && uid && G.grupos?.length && G.membros?.length) { const l = tabelaTemporada(t).filter((x) => x.liga === liga).sort((a, b) => b.total - a.total), i = l.findIndex((x) => x.id === uid); if (i >= 0) pos = ` · ${i + 1}º de ${l.length}`; }
+    const txt = t.fase === "antes" ? `Começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`} · ${ddmm(t.ini)} a ${ddmm(t.fim)}` : t.fase === "fim" ? "Temporada encerrada" : `Semana ${t.semana} de 8${liga ? ` · Liga ${LIGA_T[liga].nome}${pos}` : " · treine para entrar numa liga"}`;
+    const p = liga && t.fase !== "antes" ? pontosTemporada(rows, liga, meuOpts(), t).total : null;
+    return `<a class="tp-home" href="#/grupo"><img src="${LIGA_T[liga || "hibrido"].img}" alt=""><span><b>${esc(t.nome)} · ${esc(t.sub)}</b><small>${esc(txt)}</small></span>${p != null ? `<strong>${p}<small>pts</small></strong>` : ""}</a>`;
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-tp-liga]"); if (b) { G.ligaSel = b.dataset.tpLiga; render(); } });
 
   /* ==========================================================
      Estilo de treino: soma-se à classe de nível ("Escudeiro · Monge"). Vem dos treinos dos últimos 28 dias:
