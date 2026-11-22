@@ -3211,7 +3211,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3383,7 +3383,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp();
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + (veterano() ? XP.veterano : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -5959,7 +5959,7 @@
      Pontos dentro da temporada: +10 por treino concluído da liga (Insanity: por vídeo), +10/20/30 por insígnia nova
      ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado. Tudo calculado das linhas de treino.
      ========================================================== */
-  const TEMPORADAS = [{ n: 1, nome: "Temporada 1", sub: "Aquecimento", ini: "2026-11-23", fim: "2027-01-17" }];
+  const TEMPORADAS = [{ n: 1, nome: "Temporada 1", sub: "Aquecimento", ini: "2026-11-23", fim: "2027-01-17", herda: true, beta: true }];
   function temporada() {
     const t = TEMPORADAS.find((x) => hojeKey >= x.ini && hojeKey <= x.fim) || TEMPORADAS.find((x) => hojeKey < x.ini) || TEMPORADAS[TEMPORADAS.length - 1];
     const fase = hojeKey < t.ini ? "antes" : hojeKey > t.fim ? "fim" : "agora";
@@ -5978,7 +5978,7 @@
   const noIntervalo = (rows, a, b) => rows.filter((r) => r.data >= a && r.data <= b);
   // Liga da pessoa na temporada: modalidade com 2+ treinos e 25%+ do total conta; duas ou mais = Híbrido
   function ligaTemporada(rows, t = temporada()) {
-    const fe = feitas(noIntervalo(rows, t.ini, t.fim)), n = {};
+    const fe = feitas(noIntervalo(rows, t.herda ? "0000" : t.ini, t.fim)), n = {}; // Temporada 1: o que já foi feito antes também conta
     for (const r of fe) { const m = MOD_DE(r.programa); if (m) n[m] = (n[m] || 0) + 1; }
     const total = soma(Object.values(n)); if (!total) return null;
     const contam = Object.entries(n).filter(([, v]) => v >= 2 && v / total >= 0.25);
@@ -5986,7 +5986,8 @@
   }
   const PTS_TIER = [0, 10, 20, 30];
   function pontosTemporada(rows, liga, o, t = temporada()) {
-    const ate = t.fase === "fim" ? t.fim : hojeKey, dentro = feitas(noIntervalo(rows, t.ini, ate)), antes = rows.filter((r) => r.data < t.ini), todas = rows.filter((r) => r.data <= ate);
+    const ate = t.fase === "fim" ? t.fim : hojeKey, desde = t.herda ? "0000" : t.ini; // herda: quem já treinava parte de onde parou
+    const dentro = feitas(noIntervalo(rows, desde, ate)), antes = rows.filter((r) => r.data < desde), todas = rows.filter((r) => r.data <= ate);
     const mods = liga === "hibrido" ? null : [liga], conta = (r) => !mods || mods.includes(MOD_DE(r.programa));
     let treinos = 0;
     for (const r of dentro.filter(conta)) treinos += MOD_DE(r.programa) === "insanity" ? Math.max(1, (r.detalhes?.feitos || []).length) : MOD_DE(r.programa) ? 1 : 0;
@@ -5998,7 +5999,7 @@
     }
     if (liga === "insanity" || liga === "hibrido") { // Max Out que passou do melhor anterior naquele vídeo
       const best = {};
-      for (const m of maxOuts(todas).sort((a, b) => a.k.localeCompare(b.k))) { if (m.k >= t.ini && best[m.v] && m.s > best[m.v]) max++; best[m.v] = Math.max(best[m.v] || 0, m.s); }
+      for (const m of maxOuts(todas).sort((a, b) => a.k.localeCompare(b.k))) { if (m.k >= desde && best[m.v] && m.s > best[m.v]) max++; best[m.v] = Math.max(best[m.v] || 0, m.s); }
     }
     return { treinos, ins, chefes, max, total: treinos * 10 + ins + chefes * 50 + max * 10 };
   }
@@ -6038,6 +6039,8 @@
         <li>${esc(t.nome)} vai de ${ddmm(t.ini)} a ${ddmm(t.fim)}${t.sub === "Aquecimento" ? ": é o aquecimento, sem prêmio por posição" : ""}.</li>
         <li>Sua liga é a modalidade que você treina. Duas ou mais modalidades (cada uma com 2+ treinos e 25%+ do total) = Híbrido.</li>
         <li>Pontos: +10 por treino (no Insanity, por vídeo), +10/20/30 por insígnia nova ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado.</li>
+        ${t.herda ? `<li>Quem já treinava parte de onde parou: treinos e insígnias de antes de ${ddmm(t.ini)} também contam, e quem começou antes ganhou +${XP.veterano} XP de veterano.</li>` : ""}
+        ${t.beta ? `<li>${esc(t.nome)} é o beta: todo mundo que entrar tem todos os recursos liberados.</li>` : ""}
         <li>Quem treinar na temporada ganha a insígnia Pioneiro; quem fizer o Cardio Challenge final do MAX:30 até ${ddmm(t.fim)}, a Finalista.</li></ul></details>
     </div>`;
   }
@@ -6169,6 +6172,8 @@
   }
   const marcaChefe = (c) => (c.met === "ins" ? `${c.melhor}/${c.metaV} insígnias` : c.met === "s" && c.k.startsWith("shaunt") ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor));
   const fmtMarca = (met, v) => (met === "ins" ? `${v} insígnias` : met === "pct" ? `${v > 0 ? "+" : ""}${v}%` : met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
+  // Bônus de veterano: treinou antes do começo da Temporada 1
+  const veterano = () => feitas(linhasLocais()).some((r) => r.data < TEMPORADAS[0].ini);
   const chefesXp = () => (chefes().filter((c) => c.derrotado).length + recordes().filter((c) => c.derrotado).length) * XP.chefe;
   function chefeCard(c) {
     const cls = c.derrotado ? "ch-ok" : c.tem ? "" : "ch-novo";
