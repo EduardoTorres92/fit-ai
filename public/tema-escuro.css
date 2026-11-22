@@ -1,0 +1,154 @@
+/* ---- gerado por tools/tema-escuro.py a partir do styles.css e do tools/tema-escuro-base.css: não edite à mão ---- */
+@media (min-width: 560px) { html[data-tema="escuro"] body { background: #232429; } }
+html[data-tema="escuro"] .toolbar { background: rgba(22, 23, 27, .86); }
+html[data-tema="escuro"] .tb-menu { background: #232429; }
+html[data-tema="escuro"] .logo-txt.dark { color: var(--fg); }
+html[data-tema="escuro"] .pill.dim { background: rgba(255, 255, 255, 0.112); color: var(--fg); }
+html[data-tema="escuro"] .btn-outline { color: var(--fg); }
+html[data-tema="escuro"] .banner { background: #232429; }
+html[data-tema="escuro"] .wcard { background: #232429; }
+html[data-tema="escuro"] .ex-check { border: 1.6px solid var(--line); }
+html[data-tema="escuro"] .streak-icon { border: 1px solid rgba(255, 255, 255, 0.03); }
+html[data-tema="escuro"] .profile span { color: rgba(255, 255, 255, 0.7); }
+html[data-tema="escuro"] .chip { color: var(--fg); }
+@media (hover: hover) { html[data-tema="escuro"] .chip:hover { background: color-mix(in srgb, #d5dffe 18%, var(--bg)); } }
+html[data-tema="escuro"] .composer input { color: var(--fg); }
+html[data-tema="escuro"] .chat-sheet { background: var(--card); }
+html[data-tema="escuro"] .toast { background: #232429; }
+@media (hover: hover) { html[data-tema="escuro"] .set:hover { background: color-mix(in srgb, #ffe5e5 18%, var(--bg)); } }
+html[data-tema="escuro"] .add-set input { color: var(--fg); }
+html[data-tema="escuro"] .add-set input:focus { background: var(--card); }
+html[data-tema="escuro"] .chart .cv { fill: var(--fg); }
+html[data-tema="escuro"] .seg button.on { background: var(--card); color: var(--fg); }
+html[data-tema="escuro"] .note-box { color: var(--fg); }
+html[data-tema="escuro"] .week-note b { color: var(--fg); }
+html[data-tema="escuro"] .retomada { color: var(--fg); }
+html[data-tema="escuro"] .retomada b { color: var(--fg); }
+html[data-tema="escuro"] .emerg { border: 1px dashed color-mix(in srgb, #c9d3fd 30%, var(--bg)); }
+@media (hover: hover) { html[data-tema="escuro"] .run:hover { background: var(--card); } }
+html[data-tema="escuro"] .rota { background: color-mix(in srgb, #fff4ef 18%, var(--bg)); }
+html[data-tema="escuro"] .run-nums b { color: var(--fg); }
+html[data-tema="escuro"] .btn-strava { border-color: color-mix(in srgb, #ffd9c9 30%, var(--bg)); }
+html[data-tema="escuro"] .seg a.on { background: var(--card); color: var(--fg); }
+html[data-tema="escuro"] .avs .av { border: 2px solid var(--line); }
+html[data-tema="escuro"] .profile .foto-cam { background: var(--card); }
+html[data-tema="escuro"] .fit-grid input { border: 1px solid var(--border, var(--line)); color: var(--fg); background: var(--card); }
+html[data-tema="escuro"] .prog-opt { background: var(--card); }
+html[data-tema="escuro"] .d-mini { color: var(--fg); }
+html[data-tema="escuro"] .form-desafio input, html[data-tema="escuro"] .form-desafio textarea, html[data-tema="escuro"] .form-desafio select { color: var(--fg); }
+html[data-tema="escuro"] .form-desafio input:focus, html[data-tema="escuro"] .form-desafio textarea:focus, html[data-tema="escuro"] .form-desafio select:focus { background: var(--card); }
+html[data-tema="escuro"] .ia-musc { color: var(--fg); }
+html[data-tema="escuro"] .ia-grupos { color: var(--fg); }
+html[data-tema="escuro"] .ia-tm > span { color: var(--fg); }
+html[data-tema="escuro"] .ia-tm.alvo { background: color-mix(in srgb, #e3f7e8 18%, var(--bg)); }
+html[data-tema="escuro"] .ia-tm.desc { background: color-mix(in srgb, #fff4e0 18%, var(--bg)); }
+html[data-tema="escuro"] .macro strong { color: var(--fg); }
+html[data-tema="escuro"] #form-agua label { color: var(--fg); }
+html[data-tema="escuro"] .nutri-form input, html[data-tema="escuro"] .nutri-form select { color: var(--fg); }
+html[data-tema="escuro"] .nutri-form input:focus, html[data-tema="escuro"] .nutri-form select:focus { background: var(--card); }
+html[data-tema="escuro"] .post { background: var(--card); }
+html[data-tema="escuro"] .reacao { background: var(--card); }
+html[data-tema="escuro"] .cf-acao { background: var(--card); }
+html[data-tema="escuro"] .cf-acao.principal { background: #232429; border-color: #3a3b42; }
+html[data-tema="escuro"] .cf-relogio { background: #232429; }
+html[data-tema="escuro"] .cf-volta { background: var(--card); color: var(--fg); }
+html[data-tema="escuro"] .cf-res input:not([type=checkbox]):not([type=radio]), html[data-tema="escuro"] .cf-res textarea, html[data-tema="escuro"] .cf-res select, html[data-tema="escuro"] .cf-edit input:not([type=radio]), html[data-tema="escuro"] .cf-edit select, html[data-tema="escuro"] .cf-edit textarea { background: var(--card); }
+html[data-tema="escuro"] .cf-rx label.on { background: var(--card); }
+html[data-tema="escuro"] .cf-menu { background: #232429; }
+html[data-tema="escuro"] .cf-menu a.on { background: var(--card); color: var(--fg); }
+html[data-tema="escuro"] .cf-formatos label.on { background: #232429; }
+html[data-tema="escuro"] .evo-par img { background: var(--secondary); }
+html[data-tema="escuro"] .evo-ph { background: var(--card); }
+html[data-tema="escuro"] .evo-card { background: var(--card); }
+@media (min-width: 768px) { html[data-tema="escuro"] body.com-menu .sidebar { background: var(--card); } }
+@media (min-width: 768px) { html[data-tema="escuro"] .sb-link.on { background: #232429; } }
+html[data-tema="escuro"] .nv-selo { color: var(--fg); }
+html[data-tema="escuro"] .nv-selo.metal-bronze { background: color-mix(in srgb, #f6e3d2 18%, var(--bg)); }
+html[data-tema="escuro"] .nv-selo.metal-prata { background: var(--secondary); }
+html[data-tema="escuro"] .nv-selo.metal-ouro { background: color-mix(in srgb, #fff1c4 18%, var(--bg)); }
+html[data-tema="escuro"] .nv-selo.metal-diamante { background: color-mix(in srgb, #d9f6ff 18%, var(--bg)); }
+html[data-tema="escuro"] .etapas li { background: var(--card); }
+html[data-tema="escuro"] .etapas li.ok { background: color-mix(in srgb, #dff5e6 18%, var(--bg)); }
+html[data-tema="escuro"] .dsf-capa { background: #232429; }
+html[data-tema="escuro"] .dsf-home.com-capa .dh-txt { background: linear-gradient(180deg, rgba(255, 255, 255, 0.0), rgba(0,0,0,.85)); }
+html[data-tema="escuro"] .ativ-tipos span { background: var(--secondary); }
+html[data-tema="escuro"] .ativ-grid input { border: 1px solid var(--line); }
+html[data-tema="escuro"] .ativ-txt small { color: var(--muted); }
+html[data-tema="escuro"] .cf-musc-n.m1 { background: color-mix(in srgb, #dfe6ff 18%, var(--bg)); }
+html[data-tema="escuro"] .mc { border: 1px solid var(--line); background: var(--card); }
+html[data-tema="escuro"] .mc-pontos { background-image: radial-gradient(circle, rgba(255, 255, 255, 0.196) 1px, transparent 1.2px); }
+html[data-tema="escuro"] .mc-meta { stroke: var(--fg); }
+html[data-tema="escuro"] .mc-meta-rot { background: rgba(22, 23, 27, .8); }
+html[data-tema="escuro"] .mc-tip { background: var(--card); }
+html[data-tema="escuro"] .mc-toggle, html[data-tema="escuro"] .mc-per { background: var(--card); }
+html[data-tema="escuro"] .mc-toggle button[aria-pressed="true"], html[data-tema="escuro"] .mc-per button[aria-pressed="true"] { color: var(--fg); }
+html[data-tema="escuro"] .mc-foot { border-top: 1px solid rgba(255, 255, 255, 0.136); background: var(--card); }
+html[data-tema="escuro"] .mc-foot b { color: var(--fg); }
+html[data-tema="escuro"] .cal { border: 1px solid var(--line); background: var(--card); }
+html[data-tema="escuro"] .cal-d.meio { background: color-mix(in srgb, #dfe6ff 18%, var(--bg)); }
+html[data-tema="escuro"] .cal-resumo { border-top: 1px solid rgba(255, 255, 255, 0.136); }
+html[data-tema="escuro"] .cal-resumo b { color: var(--fg); }
+html[data-tema="escuro"] .rd-card { border: 1px solid var(--line); background: var(--card); }
+html[data-tema="escuro"] .rd-anel { stroke: var(--line); }
+html[data-tema="escuro"] .rd-raio { stroke: var(--line); }
+html[data-tema="escuro"] .rd-pt { stroke: var(--line); }
+html[data-tema="escuro"] .rd-rot { fill: var(--fg); }
+
+/* FIT.AI — tema escuro. Liga com <html data-tema="escuro"> (Perfil → Aparência: Claro, Escuro ou Automático).
+   Esta parte é a manual (cores-base, ícones e o painel de Evolução); o resto vem do tools/tema-escuro.py. */
+html[data-tema="escuro"] {
+  color-scheme: dark;
+  --bg: #0b0b0d;
+  --card: #151619;
+  --fg: #f4f4f6;
+  --muted: #9b9ca5;
+  --line: #26272d;
+  --secondary: #1c1d22;
+  --chip: #1b2448;
+  --blue-soft: #26336e;
+  --blue-08: rgba(77, 112, 255, 0.16);
+  --flame-bg: rgba(240, 97, 0, 0.16);
+}
+html[data-tema="escuro"] body { background: var(--bg); color: var(--fg); }
+/* ícones de traço preto ou cinza (img) ficam claros */
+html[data-tema="escuro"] img[src$="house.svg"], html[data-tema="escuro"] img[src$="chart-active.svg"], html[data-tema="escuro"] img[src$="calendar-active.svg"],
+html[data-tema="escuro"] img[src$="user-active.svg"], html[data-tema="escuro"] img[src$="nutri-active.svg"], html[data-tema="escuro"] img[src$="calendar-14-dark.svg"] { filter: invert(1); }
+html[data-tema="escuro"] img[src$="chevron-left.svg"], html[data-tema="escuro"] img[src$="x.svg"], html[data-tema="escuro"] img[src$="zap.svg"],
+html[data-tema="escuro"] img[src$="circle-question.svg"] { filter: invert(.85); }
+/* campos de formulário sem cor própria */
+html[data-tema="escuro"] input, html[data-tema="escuro"] select, html[data-tema="escuro"] textarea { color: var(--fg); }
+html[data-tema="escuro"] input::placeholder, html[data-tema="escuro"] textarea::placeholder { color: #6b6c75; }
+html[data-tema="escuro"] select option { background: var(--card); color: var(--fg); }
+/* mapas de músculos: o desenho tem fundo branco; fica num cartão claro e suave */
+html[data-tema="escuro"] .musc img, html[data-tema="escuro"] .cf-mapa { background: #fff; filter: brightness(.92); }
+/* painel de Evolução: o visual escuro do Progress Metric Card */
+html[data-tema="escuro"] .mc { background: #171717; border-color: rgba(255,255,255,.1); box-shadow: none; }
+html[data-tema="escuro"] .mc-foot { background: #171717; border-top-color: rgba(255,255,255,.07); }
+html[data-tema="escuro"] .mc-foot b, html[data-tema="escuro"] .cal-resumo b { color: var(--fg); }
+html[data-tema="escuro"] .mc-pontos { background-image: radial-gradient(circle, rgba(255,255,255,.13) 1px, transparent 1.2px); }
+html[data-tema="escuro"] .mc-brilho { background: linear-gradient(to left, color-mix(in srgb, var(--mc) 20%, transparent), transparent 75%); }
+html[data-tema="escuro"] .mc-tip, html[data-tema="escuro"] .mc-toggle, html[data-tema="escuro"] .mc-per { background: #171717; border-color: rgba(255,255,255,.1); }
+html[data-tema="escuro"] .mc-toggle button[aria-pressed="true"], html[data-tema="escuro"] .mc-per button[aria-pressed="true"] { background: #262626; color: var(--fg); }
+html[data-tema="escuro"] .mc-toggle button, html[data-tema="escuro"] .mc-per button { color: #8a8a8a; }
+html[data-tema="escuro"] .mc-ponto { box-shadow: 0 0 0 3px #171717; }
+html[data-tema="escuro"] .mc-meta { stroke: #fff; stroke-opacity: .35; }
+html[data-tema="escuro"] .mc-meta-rot { background: rgba(23,23,23,.85); color: #a3a3a3; }
+html[data-tema="escuro"] .cal, html[data-tema="escuro"] .rd-card { background: #171717; border-color: rgba(255,255,255,.1); }
+html[data-tema="escuro"] .cal-d { background: #222; color: #d4d4d4; }
+html[data-tema="escuro"] .cal-d.vazio, html[data-tema="escuro"] .cal-d.fut { background: none; color: #4a4a4a; }
+html[data-tema="escuro"] .cal-d.meio { background: #1f2a55; }
+html[data-tema="escuro"] .cal-d.on { color: #fff; }
+html[data-tema="escuro"] .cal-d.hoje { box-shadow: inset 0 0 0 2px #f4f4f6; }
+html[data-tema="escuro"] .rd-anel, html[data-tema="escuro"] .rd-raio { stroke: rgba(255,255,255,.1); }
+html[data-tema="escuro"] .rd-rot { fill: var(--fg); }
+html[data-tema="escuro"] .rd-val { fill: #a3a3a3; }
+html[data-tema="escuro"] .rd-val.up { fill: #34d399; }
+html[data-tema="escuro"] .rd-val.down { fill: #f87171; }
+html[data-tema="escuro"] .rd-agora { fill: rgba(77,112,255,.3); stroke: #5b7cff; }
+html[data-tema="escuro"] .rd-pt { fill: #5b7cff; stroke: #171717; }
+html[data-tema="escuro"] .rd-antes { fill: rgba(255,255,255,.04); stroke: #737373; }
+html[data-tema="escuro"] .evo-kpi { background: #171717; }
+/* escolha do tema no Perfil */
+.tema-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--secondary); }
+.tema-seg button { padding: 9px 6px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.tema-seg button[aria-pressed="true"] { background: var(--card, #fff); color: var(--fg); box-shadow: 0 1px 4px rgba(0,0,0,.08); }

@@ -828,6 +828,10 @@
           </div>
           ${trilhaHtml()}
           <div class="field">
+            <span class="field-lbl">Aparência</span>
+            <div class="tema-seg" role="group" aria-label="Tema">${[["claro", "☀️ Claro"], ["escuro", "🌙 Escuro"], ["auto", "Automático"]].map(([v, l]) => `<button type="button" data-tema="${v}" aria-pressed="${temaEscolhido() === v}">${l}</button>`).join("")}</div>
+          </div>
+          <div class="field">
             <span class="field-lbl">Seu programa principal</span>
             <div class="prog-cat">${CATALOGO.map((x, i) => `<button class="prog-opt${principal() === x.k ? " on" : ""}${travado(x.k) ? " lock" : ""}" data-principal="${x.k}"${travado(x.k) ? ' aria-disabled="true"' : ""}>
               <span class="po-n">${travado(x.k) ? "🔒" : i + 1}</span><span class="po-txt"><strong>${esc(x.nome)}</strong><small>${travado(x.k) ? esc(motivoTrava(x.k)[0].toUpperCase() + motivoTrava(x.k).slice(1)) : `${esc(x.nivel)}${S.nivel === x.nivel ? " · seu nível" : ""}`}</small></span>${principal() === x.k ? "<b>✓</b>" : ""}</button>`).join("")}</div>
@@ -2557,7 +2561,7 @@
     const bars = h.map((x, i) => {
       const bh = Math.max(3, (val(x) / max) * (base - top));
       const cx = step * i + step / 2;
-      return `<rect x="${cx - bw / 2}" y="${base - bh}" width="${bw}" height="${bh}" rx="6" fill="${i === h.length - 1 ? "#2b54ff" : "#d5dffe"}"/>
+      return `<rect x="${cx - bw / 2}" y="${base - bh}" width="${bw}" height="${bh}" rx="6" style="fill:${i === h.length - 1 ? "#2b54ff" : "var(--blue-soft)"}"/>
         <text x="${cx}" y="${base - bh - 6}" text-anchor="middle" class="cv">${val(x)}${UN[ex.un]}</text>
         <text x="${cx}" y="${H - 4}" text-anchor="middle" class="cd">${ddmm(x.k)}</text>`;
     }).join("");
@@ -3103,7 +3107,7 @@
     const step = W / serie.length, bw = Math.min(28, step * 0.55);
     const bars = serie.map((x, i) => {
       const bh = x.v ? Math.max(3, (x.v / max) * (base - top)) : 2, cx = step * i + step / 2;
-      return `<rect x="${cx - bw / 2}" y="${base - bh}" width="${bw}" height="${bh}" rx="6" fill="${i === serie.length - 1 ? "#2b54ff" : "#d5dffe"}"/>
+      return `<rect x="${cx - bw / 2}" y="${base - bh}" width="${bw}" height="${bh}" rx="6" style="fill:${i === serie.length - 1 ? "#2b54ff" : "var(--blue-soft)"}"/>
         ${x.v ? `<text x="${cx}" y="${base - bh - 6}" text-anchor="middle" class="cv">${fmt(x.v)}</text>` : ""}
         <text x="${cx}" y="${H - 4}" text-anchor="middle" class="cd">${esc(rotulo(x))}</text>`;
     }).join("");
@@ -4231,6 +4235,24 @@
     toast(primeiro ? "🏅 Conquista da semana garantida para o grupo!" : "Desafio cumprido! 🔥");
   }
 
+  /* ---------- Tema claro, escuro ou automático (segue o sistema). O <head> do app.html já aplica antes de pintar. ---------- */
+  const temaEscolhido = () => { try { return localStorage.getItem("fitai-tema") || "claro"; } catch { return "claro"; } };
+  const MQ_ESCURO = matchMedia("(prefers-color-scheme: dark)");
+  function aplicarTema() {
+    const t = temaEscolhido(), esc_ = t === "escuro" || (t === "auto" && MQ_ESCURO.matches);
+    document.documentElement.dataset.tema = esc_ ? "escuro" : "claro";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", esc_ ? "#0b0b0d" : "#000000");
+  }
+  MQ_ESCURO.addEventListener?.("change", () => temaEscolhido() === "auto" && aplicarTema());
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest?.("button[data-tema]");
+    if (!b) return;
+    try { localStorage.setItem("fitai-tema", b.dataset.tema); } catch {}
+    aplicarTema();
+    document.querySelectorAll("button[data-tema]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  });
+  aplicarTema();
+
   /* ---------- Painel de evolução ----------
      Cartão de indicador (no desenho do Progress Metric Card da ProfitizeBuild, portado para JS puro): o número grande
      à esquerda e, atrás dele, a curva com a área em degradê ou as barras, sobre um fundo de pontos; a variação no
@@ -4313,7 +4335,7 @@
       ${head}
       <div class="mc-total">${esc(o.fmtTotal ? o.fmtTotal(tot) : fmt(tot))}<small>${esc(o.totalRot || "")}</small></div>
       <div class="mc-trend"><span class="mc-pct"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${seta}"/></svg>${pctTxt}</span><small>${esc(o.compRot || "no período")}</small></div>
-      <div class="mc-foot"><span>${o.parcial ? `<b style="color:#0f172a">${esc(fmt(last))}</b>` : `<b>${passo >= 0 ? "+" : "−"}${esc(fmt(Math.abs(passo)))}</b>`} ${esc(o.rodape || "no último")}</span>
+      <div class="mc-foot"><span>${o.parcial ? `<b style="color:var(--fg)">${esc(fmt(last))}</b>` : `<b>${passo >= 0 ? "+" : "−"}${esc(fmt(Math.abs(passo)))}</b>`} ${esc(o.rodape || "no último")}</span>
         <span class="mc-stats"><b>${esc(fmt(Math.max(...vals)))}</b> máx · <b>${esc(fmt(Math.min(...vals)))}</b> mín · <b>${esc(fmt(Math.round(soma(vals) / vals.length * 10) / 10))}</b> média</span></div>
     </div>`;
   }
@@ -4378,7 +4400,7 @@
       <div class="cal-sem">${["S", "T", "Q", "Q", "S", "S", "D"].map((x) => `<span>${x}</span>`).join("")}</div>
       <div class="cal-grade">${cel.join("")}</div>
       ${tipos.length ? `<div class="cal-leg">${tipos.map((t) => `<span><i class="t-${t}"></i>${CAL_ROT[t]}</span>`).join("")}</div>` : ""}
-      <div class="cal-resumo"><span><b>${feitosMes}</b> de ${passados} dias</span><span><b>${naMeta}</b> de ${segs.length} semanas na meta (${meta}/sem)</span><span><b>${sq.atual}</b> dias seguidos</span></div>
+      <div class="cal-resumo"><span><b>${feitosMes}</b> de ${passados} dias</span><span><b>${naMeta}</b> de ${segs.length} semanas na meta (${meta}/sem)</span><span><b>${sq.atual}</b> ${sq.atual === 1 ? "dia seguido" : "dias seguidos"}</span></div>
     </div>`;
   }
 
