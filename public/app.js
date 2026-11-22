@@ -781,23 +781,26 @@
         </div>
         <button type="button" class="evo-card" data-evo-foto><span class="stat-ico">${icon("camera.svg", 18)}</span>
           <span><strong>Evolução por foto</strong><span class="t">Check-in de frente e de lado a cada 15 dias. Só você vê.</span></span></button>
-        <div class="section">
-          <div class="sec-head"><h2>Consistência</h2></div>
-          ${heatmap()}
-          <div class="stats-row">
-            ${stat("circle-check.svg", treinosFeitos(), "Treinos Feitos")}
-            ${stat("circle-percent.svg", taxaConclusao() + "%", "Taxa de conclusão")}
-          </div>
-          ${stat("hourglass.svg", fmtDur(tempoTotal()), "Tempo Total")}
+        <div class="section evo-dash">
+          ${resumoEvo()}
+          <div class="sec-head"><h2>Consistência</h2><span>meta ${metaSemana()} por semana</span></div>
+          ${cartaoTreinos()}
+          ${calendarioEvo()}
+          ${cartaoMinutos()}
         </div>
-        <div class="section"><div class="sec-head"><h2>Este mês</h2></div>${painelPessoal()}</div>
+        <div class="section evo-dash">
+          <div class="sec-head"><h2>Equilíbrio do treino</h2><span>4 semanas</span></div>
+          ${radarEquilibrio()}
+        </div>
+        <div class="section evo-dash">
+          <div class="sec-head"><h2>Evolução nos movimentos</h2></div>
+          ${radarMovimentos()}
+          <div class="sec-head" style="margin-top:6px"><h2>Progresso por exercício</h2></div>
+          ${cartaoExercicio()}
+        </div>
         <div class="section"><div class="sec-head"><h2>Conquistas</h2></div>${medalhas()}</div>
-        ${VPROGS.some((P) => P.maxOut) ? `<div class="section"><div class="sec-head"><h2>Max Out · ${esc(NOMES_MAXOUT)}</h2></div><div id="max-box">${graficoMaxOut()}</div></div>` : ""}
+        ${VPROGS.some((P) => P.maxOut) ? `<div class="section evo-dash"><div class="sec-head"><h2>Max Out · ${esc(NOMES_MAXOUT)}</h2></div><div id="max-box">${cartaoMaxOut()}</div></div>` : ""}
         ${VPROGS.filter((P) => P.fitTest && fitHist(P.k).length).map((P) => `<div class="section"><div class="sec-head"><h2>Fit Test · ${esc(P.nome)}</h2></div>${tabelaFitTest(P.k)}</div>`).join("")}
-        <div class="section">
-          <div class="sec-head"><h2>Progresso por exercício</h2></div>
-          ${progresso()}
-        </div>
         ${secaoAtividades()}
         ${secaoCorridas()}</section>`;
     },
@@ -4228,6 +4231,301 @@
     toast(primeiro ? "🏅 Conquista da semana garantida para o grupo!" : "Desafio cumprido! 🔥");
   }
 
+  /* ---------- Painel de evolução ----------
+     Cartão de indicador (no desenho do Progress Metric Card da ProfitizeBuild, portado para JS puro): o número grande
+     à esquerda e, atrás dele, a curva com a área em degradê ou as barras, sobre um fundo de pontos; a variação no
+     período, a troca curva/barras e os períodos; no rodapé, a variação do último ponto e o máximo, o mínimo e a média.
+     O balão segue o dedo (pointer). Mais o calendário de consistência e dois radares (equilíbrio e movimentos). */
+  const EVO = { per: {}, vista: {}, mes: 0, ex: null };
+  const EVO_COR = { up: ["#10b981", "#059669"], down: ["#ef4444", "#dc2626"], flat: ["#64748b", "#475569"], azul: ["#2b54ff", "#2b54ff"] };
+  // A curva monotone (curveMonotoneX do d3), a mesma do componente: passa por todos os pontos sem inventar picos
+  function curvaMonotone(pts) {
+    const n = pts.length, r = (v) => Math.round(v * 100) / 100;
+    if (!n) return "";
+    if (n < 3) return pts.map((p, i) => `${i ? "L" : "M"}${r(p.x)},${r(p.y)}`).join("");
+    const sg = (v) => (v < 0 ? -1 : 1), t = new Array(n);
+    for (let i = 1; i < n - 1; i++) {
+      const h0 = pts[i].x - pts[i - 1].x, h1 = pts[i + 1].x - pts[i].x;
+      const s0 = (pts[i].y - pts[i - 1].y) / (h0 || 1e-9), s1 = (pts[i + 1].y - pts[i].y) / (h1 || 1e-9), p = (s0 * h1 + s1 * h0) / (h0 + h1);
+      t[i] = (sg(s0) + sg(s1)) * Math.min(Math.abs(s0), Math.abs(s1), 0.5 * Math.abs(p)) || 0;
+    }
+    const fim = (a, b, tt) => { const hx = b.x - a.x; return hx ? ((3 * (b.y - a.y)) / hx - tt) / 2 : tt; };
+    t[0] = fim(pts[0], pts[1], t[1]); t[n - 1] = fim(pts[n - 2], pts[n - 1], t[n - 2]);
+    let d = `M${r(pts[0].x)},${r(pts[0].y)}`;
+    for (let i = 0; i < n - 1; i++) { const a = pts[i], b = pts[i + 1], dx = (b.x - a.x) / 3; d += `C${r(a.x + dx)},${r(a.y + dx * t[i])},${r(b.x - dx)},${r(b.y - dx * t[i + 1])},${r(b.x)},${r(b.y)}`; }
+    return d;
+  }
+  const evoNum = (v) => (Math.round(v * 10) / 10).toLocaleString("pt-BR");
+  /* o: { titulo, un, pts: [{ v, data (texto do balão) }], per: [[rótulo, nº de pontos ou 0 = todos]], perPadrao,
+          total: "soma" | "ultimo" | "melhor", fmt, menorMelhor, meta, rodape: "esta semana" } */
+  function metricCard(id, o) {
+    const per = o.per || [["Tudo", 0]], pi = Math.min(EVO.per[id] ?? o.perPadrao ?? per.length - 1, per.length - 1), n = per[pi][1];
+    const pts = n ? o.pts.slice(-n) : o.pts, vista = EVO.vista[id] || o.vista || "curva", fmt = o.fmt || evoNum;
+    const head = `<div class="mc-head"><div class="mc-head-a"><h3>${esc(o.titulo)}</h3>
+        <div class="mc-toggle" role="group" aria-label="Tipo de gráfico">${[["curva", "M3 3v16a2 2 0 0 0 2 2h16M19 9l-5 5-4-4-3 3"], ["barras", "M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"]].map(([v, d]) =>
+          `<button type="button" data-mc-vista="${id}|${v}" aria-pressed="${vista === v}" aria-label="${v === "curva" ? "Curva" : "Barras"}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg></button>`).join("")}</div></div>
+      ${per.length > 1 ? `<div class="mc-per" role="group" aria-label="Período">${per.map(([l], i) => `<button type="button" data-mc-per="${id}|${i}" aria-pressed="${i === pi}">${esc(l)}</button>`).join("")}</div>` : ""}</div>`;
+    if (pts.length < 2 || !pts.some((p) => p.v)) return `<div class="mc" data-mc="${id}">${head}<div class="mc-vazio"><strong>Ainda sem dados</strong><span>${esc(o.vazio || "O gráfico aparece depois de alguns registros.")}</span></div></div>`;
+    const vals = pts.map((p) => p.v), last = vals[vals.length - 1], prev = vals[vals.length - 2];
+    // parcial: o último ponto é a semana em andamento; a tendência compara a média da 2ª metade com a da 1ª, sem ele
+    const base = o.parcial ? vals.slice(0, -1) : vals, meio = Math.floor(base.length / 2) || 1;
+    const first = o.parcial ? soma(base.slice(0, meio)) / meio : vals[0], fim = o.parcial ? soma(base.slice(meio)) / (base.length - meio || 1) : last;
+    const net = o.menorMelhor ? first - fim : fim - first, pct = first ? (net / first) * 100 : fim ? 100 : 0;
+    const tend = Math.abs(pct) < (o.parcial ? 3 : 0.5) ? "flat" : net > 0 ? "up" : "down", [cor, corTxt] = EVO_COR[tend];
+    const tot = o.total === "ultimo" ? last : o.total === "melhor" ? (o.menorMelhor ? Math.min(...vals.filter(Boolean)) : Math.max(...vals)) : soma(vals);
+    const passo = (o.menorMelhor ? prev - last : last - prev);
+    // a escala: a curva usa do mínimo −14% ao máximo +2%; as barras partem do zero com 8% de folga em cima
+    const W = 240, H = 150, topo = 46, meta = o.meta || 0;
+    const hi = Math.max(...vals, meta), lo = Math.min(...vals, meta || Infinity);
+    const [d0, d1] = vista === "barras" ? [0, hi + (hi || 1) * 0.08] : [lo - (hi - lo || hi || 1) * 0.14, hi + (hi - lo || hi || 1) * 0.06];
+    const y = (v) => topo + ((d1 - v) / (d1 - d0 || 1)) * (H - topo);
+    const band = W / pts.length, xs = vista === "barras" ? pts.map((_, i) => (i + 0.5) * band) : pts.map((_, i) => (pts.length > 1 ? 6 + (i * (W - 14)) / (pts.length - 1) : W / 2));
+    const ys = vals.map(y);
+    let grafico;
+    if (vista === "barras") {
+      const bw = Math.min(26, band * 0.62);
+      grafico = pts.map((p, i) => { const top = ys[i], h = Math.max(p.v ? 3 : 1.5, H - top), rr = Math.min(6, bw / 2, h);
+        const x = xs[i] - bw / 2, yy = H - h;
+        return `<path class="mc-bar${i === pts.length - 1 ? " on" : ""}" style="--d:${i * 30}ms" d="M${x},${yy + rr}A${rr},${rr},0,0,1,${x + rr},${yy}L${x + bw - rr},${yy}A${rr},${rr},0,0,1,${x + bw},${yy + rr}L${x + bw},${H}L${x},${H}Z" fill="url(#mcb-${id})"/>`; }).join("");
+    } else {
+      const linha = curvaMonotone(xs.map((x, i) => ({ x, y: ys[i] })));
+      grafico = `<path d="${linha}L${W},${H}L0,${H}Z" fill="url(#mcg-${id})" class="mc-area"/><path d="${linha}" pathLength="1" class="mc-linha" fill="none" stroke="${cor}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>`;
+    }
+    const yMeta = meta ? y(meta) : 0;
+    const unDe1 = (v) => (o.un ? " " + (v === 1 && o.un1 ? o.un1 : o.un) : "");
+    const dados = { x: xs.map((x) => +(x / W * 100).toFixed(2)), y: ys.map((v) => +(v / H * 100).toFixed(2)), v: vals.map((v) => `${fmt(v)}${unDe1(v)}`), d: pts.map((p, i) => p.data + (o.parcial && i === pts.length - 1 ? " (em andamento)" : "")) };
+    const pctTxt = `${Math.abs(pct).toFixed(1).replace(".", ",")}%`;
+    const seta = tend === "flat" ? "M5 12h14M12 5l7 7-7 7" : tend === "down" ? "M12 5v14M19 12l-7 7-7-7" : "M5 12l7-7 7 7M12 19V5";
+    const iUlt = pts.length - 1;
+    return `<div class="mc" data-mc="${id}" style="--mc:${cor};--mc-t:${corTxt}">
+      <div class="mc-area-graf">
+        <div class="mc-brilho"></div><div class="mc-pontos"></div>
+        <svg class="mc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" data-mc-dados='${esc(JSON.stringify(dados))}' role="img" aria-label="${esc(o.titulo)}: ${esc(dados.v.join(", "))}">
+          <defs><linearGradient id="mcg-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${cor}" stop-opacity=".3"/><stop offset="60%" stop-color="${cor}" stop-opacity=".07"/><stop offset="100%" stop-color="${cor}" stop-opacity="0"/></linearGradient>
+            <linearGradient id="mcb-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${cor}" stop-opacity=".9"/><stop offset="100%" stop-color="${cor}" stop-opacity=".3"/></linearGradient></defs>
+          ${grafico}
+          ${meta ? `<line x1="0" x2="${W}" y1="${yMeta}" y2="${yMeta}" class="mc-meta" vector-effect="non-scaling-stroke"/>` : ""}
+        </svg>
+        ${meta ? `<span class="mc-meta-rot" style="top:${(yMeta / H * 100).toFixed(1)}%">meta ${fmt(meta)}</span>` : ""}
+        <span class="mc-ponto${vista === "barras" ? " barra" : ""}" style="left:${dados.x[iUlt]}%;top:${vista === "barras" ? 100 : dados.y[iUlt]}%"></span>
+        <div class="mc-tip" style="left:${dados.x[iUlt]}%;top:${Math.max(38, Math.min(70, dados.y[iUlt]))}%"><b>${esc(dados.v[iUlt])}</b><small>${esc(dados.d[iUlt])}</small></div>
+      </div>
+      ${head}
+      <div class="mc-total">${esc(o.fmtTotal ? o.fmtTotal(tot) : fmt(tot))}<small>${esc(o.totalRot || "")}</small></div>
+      <div class="mc-trend"><span class="mc-pct"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${seta}"/></svg>${pctTxt}</span><small>${esc(o.compRot || "no período")}</small></div>
+      <div class="mc-foot"><span>${o.parcial ? `<b style="color:#0f172a">${esc(fmt(last))}</b>` : `<b>${passo >= 0 ? "+" : "−"}${esc(fmt(Math.abs(passo)))}</b>`} ${esc(o.rodape || "no último")}</span>
+        <span class="mc-stats"><b>${esc(fmt(Math.max(...vals)))}</b> máx · <b>${esc(fmt(Math.min(...vals)))}</b> mín · <b>${esc(fmt(Math.round(soma(vals) / vals.length * 10) / 10))}</b> média</span></div>
+    </div>`;
+  }
+  // O balão e o ponto seguem o dedo ou o mouse; ao sair, voltam para o último ponto
+  function mcMarcar(svg, i) {
+    const c = svg.closest(".mc"), d = JSON.parse(svg.dataset.mcDados), n = d.x.length;
+    i = Math.max(0, Math.min(n - 1, i ?? n - 1));
+    const p = c.querySelector(".mc-ponto"), t = c.querySelector(".mc-tip");
+    p.style.left = t.style.left = d.x[i] + "%";
+    if (!p.classList.contains("barra")) p.style.top = d.y[i] + "%";
+    t.style.top = Math.max(38, Math.min(70, d.y[i])) + "%";
+    t.classList.toggle("dir", d.x[i] < 45);
+    t.innerHTML = `<b>${esc(d.v[i])}</b><small>${esc(d.d[i])}</small>`;
+    c.querySelectorAll(".mc-bar").forEach((b, j) => b.classList.toggle("on", j === i));
+  }
+  document.addEventListener("pointermove", (e) => {
+    const svg = e.target.closest?.(".mc-area-graf")?.querySelector(".mc-svg");
+    if (!svg) return;
+    const r = svg.getBoundingClientRect(), d = JSON.parse(svg.dataset.mcDados), f = ((e.clientX - r.left) / r.width) * 100;
+    let best = 0; d.x.forEach((x, i) => { if (Math.abs(x - f) < Math.abs(d.x[best] - f)) best = i; });
+    mcMarcar(svg, best);
+  });
+  document.addEventListener("pointerout", (e) => { const a = e.target.closest?.(".mc-area-graf"); if (a && !a.contains(e.relatedTarget)) mcMarcar(a.querySelector(".mc-svg")); });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest?.("[data-mc-vista],[data-mc-per],[data-evo-ex],[data-cal-mes]");
+    if (!b) return;
+    if (b.dataset.mcVista) { const [id, v] = b.dataset.mcVista.split("|"); EVO.vista[id] = v; }
+    else if (b.dataset.mcPer) { const [id, i] = b.dataset.mcPer.split("|"); EVO.per[id] = Number(i); }
+    else if (b.dataset.evoEx) EVO.ex = b.dataset.evoEx;
+    else EVO.mes = Math.min(0, EVO.mes + Number(b.dataset.calMes));
+    const y = window.scrollY, box = b.closest("[data-evo-bloco]");
+    if (box) box.outerHTML = EVO_BLOCOS[box.dataset.evoBloco](); else render();
+    window.scrollTo(0, y);
+  });
+
+  /* Calendário de consistência: o mês com os dias da semana, cada dia treinado na cor do tipo de treino */
+  const CAL_TIPO = (p) => (p === "corrida" || p === "run" ? "cardio" : VP[p] ? "video" : p === "cf" ? "cf" : "forca");
+  const CAL_ROT = { forca: "Força", video: "Vídeo", cf: "CrossFit", cardio: "Corrida" };
+  function calendarioEvo() {
+    const rows = feitas(linhasLocais()), ini = new Date(hoje.getFullYear(), hoje.getMonth() + EVO.mes, 1);
+    const fim = new Date(ini.getFullYear(), ini.getMonth() + 1, 0), off = (ini.getDay() + 6) % 7;
+    const porDia = {}; rows.forEach((r) => (porDia[r.data] ||= new Set()).add(CAL_TIPO(r.programa)));
+    const cel = [];
+    for (let i = 0; i < off; i++) cel.push(`<span class="cal-d vazio"></span>`);
+    let feitosMes = 0, passados = 0;
+    for (let d = 1; d <= fim.getDate(); d++) {
+      const dt = new Date(ini.getFullYear(), ini.getMonth(), d), k = keyOf(dt), tps = [...(porDia[k] || [])];
+      if (dt <= hoje) passados++;
+      if (tps.length) feitosMes++;
+      cel.push(`<span class="cal-d${tps.length ? " on t-" + tps[0] : parcial(k) ? " meio" : ""}${k === hojeKey ? " hoje" : ""}${dt > hoje ? " fut" : ""}" title="${ddmm(k)}${tps.length ? " · " + tps.map((t) => CAL_ROT[t]).join(" + ") : ""}">${d}${tps.length > 1 ? "<i></i>" : ""}</span>`);
+    }
+    // semanas do mês que bateram a meta semanal
+    const meta = metaSemana(), semanas = {};
+    rows.forEach((r) => { const s = keyOf(mondayOf(parseKey(r.data))); (semanas[s] ||= new Set()).add(r.data); });
+    const segs = []; for (let s = mondayOf(ini); s <= fim; s = addDays(s, 7)) if (s <= hoje) segs.push(keyOf(s));
+    const naMeta = segs.filter((s) => (semanas[s]?.size || 0) >= meta).length, sq = sequencias(linhasLocais());
+    const tipos = [...new Set(rows.map((r) => CAL_TIPO(r.programa)))];
+    return `<div class="cal" data-evo-bloco="cal">
+      <div class="cal-head"><button type="button" class="icon-btn" data-cal-mes="-1" aria-label="Mês anterior">${icon("chevron-left.svg", 20)}</button>
+        <strong>${["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"][ini.getMonth()]} ${ini.getFullYear()}</strong>
+        <button type="button" class="icon-btn" data-cal-mes="1" aria-label="Próximo mês" ${EVO.mes >= 0 ? "disabled" : ""}>${icon("chevron-left.svg", 20).replace("<img", '<img style="transform:scaleX(-1)"')}</button></div>
+      <div class="cal-sem">${["S", "T", "Q", "Q", "S", "S", "D"].map((x) => `<span>${x}</span>`).join("")}</div>
+      <div class="cal-grade">${cel.join("")}</div>
+      ${tipos.length ? `<div class="cal-leg">${tipos.map((t) => `<span><i class="t-${t}"></i>${CAL_ROT[t]}</span>`).join("")}</div>` : ""}
+      <div class="cal-resumo"><span><b>${feitosMes}</b> de ${passados} dias</span><span><b>${naMeta}</b> de ${segs.length} semanas na meta (${meta}/sem)</span><span><b>${sq.atual}</b> dias seguidos</span></div>
+    </div>`;
+  }
+
+  /* Radar: eixos com 0 a 100, a forma de agora (azul) por cima da de antes (cinza tracejada) */
+  function radarSvg(eixos, agora, antes, rot = ["Agora", "Antes"]) {
+    const n = eixos.length, R = 96, cx = 160, cy = 128, ang = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    const pt = (i, v) => [cx + Math.cos(ang(i)) * R * (v / 100), cy + Math.sin(ang(i)) * R * (v / 100)];
+    const poli = (vs) => vs.map((v, i) => pt(i, Math.max(3, v)).map((c) => c.toFixed(1)).join(",")).join(" ");
+    const aneis = [25, 50, 75, 100].map((v) => `<polygon points="${poli(eixos.map(() => v))}" class="rd-anel"/>`).join("");
+    const raios = eixos.map((_, i) => { const [x, y] = pt(i, 100); return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="rd-raio"/>`; }).join("");
+    const rots = eixos.map((e, i) => { const [x, y] = pt(i, 122), a = Math.cos(ang(i)); const anc = Math.abs(a) < 0.2 ? "middle" : a > 0 ? "start" : "end";
+      return `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${anc}" class="rd-rot">${esc(e.nome)}</text><text x="${x.toFixed(1)}" y="${(y + 18).toFixed(1)}" text-anchor="${anc}" class="rd-val ${e.cls || ""}">${esc(e.txt || "")}</text>`; }).join("");
+    return `<svg class="radar" viewBox="-24 0 368 262" role="img" aria-label="${esc(eixos.map((e) => `${e.nome} ${e.txt || ""}`).join(", "))}">
+      ${aneis}${raios}
+      ${antes ? `<polygon points="${poli(antes)}" class="rd-antes"/>` : ""}
+      <polygon points="${poli(agora)}" class="rd-agora"/>
+      ${agora.map((v, i) => { const [x, y] = pt(i, Math.max(3, v)); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" class="rd-pt"/>`; }).join("")}
+      ${rots}</svg>
+      <div class="rd-leg"><span><i class="agora"></i>${esc(rot[0])}</span>${antes ? `<span><i class="antes"></i>${esc(rot[1])}</span>` : ""}</div>`;
+  }
+  const deltaTxt = (a, b) => { if (!b && !a) return ["—", ""]; if (!b) return ["novo", "up"]; const p = Math.round(((a - b) / b) * 100); return [`${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p)}%`, p > 4 ? "up" : p < -4 ? "down" : ""]; };
+
+  /* Radar 1, equilíbrio: volume por padrão de movimento (séries de força, movimentos do WOD, minutos de cardio) */
+  const PADROES = [["empurrar", "Empurrar"], ["puxar", "Puxar"], ["pernas", "Pernas"], ["core", "Core"], ["cardio", "Cardio"]];
+  const GRUPO_PADRAO = { peito: "empurrar", ombros: "empurrar", triceps: "empurrar", dorsais: "puxar", biceps: "puxar", trapezio: "puxar", antebraco: "puxar",
+    quadriceps: "pernas", gluteos: "pernas", posteriores: "pernas", panturrilha: "pernas", abdomen: "core", obliquos: "core", lombar: "core" };
+  const CAT_PADRAO = { empurrar: "empurrar", ombros: "empurrar", superior: ["empurrar", "puxar"], puxar: "puxar", core: "core", estabilidade: "core", inferiores: "pernas", gluteos: "pernas", panturrilha: "pernas", pernas: "pernas", forca: "pernas", corpo: ["empurrar", "puxar", "pernas", "core"], luta: ["empurrar", "core"] };
+  const GRUPO_CAT = (g) => ({ Peito: "empurrar", Ombros: "empurrar", "Tríceps": "empurrar", Costas: "puxar", "Bíceps": "puxar", Pernas: "pernas", "Glúteos": "pernas", Panturrilha: "pernas", "Força do corredor": "pernas", "Abdômen": "core", Core: "core" }[g] || "cardio");
+  function volumePadroes(rows) {
+    const v = { empurrar: 0, puxar: 0, pernas: 0, core: 0, cardio: 0 }, add = (c, x) => { (Array.isArray(c) ? c : [c]).forEach((k) => (v[k] += x / (Array.isArray(c) ? c.length : 1))); };
+    for (const r of feitas(rows)) {
+      const d = r.detalhes || {};
+      if (r.programa === "calistenia") for (const [id, s] of Object.entries(d.sets || {})) {
+        if (!s.length) continue;
+        const e = EXI[id];
+        if (e?.un === "min" || ["trote", "caminhada", "tiro-200"].includes(id)) add("cardio", e?.un === "min" ? soma(s) / 4 : s.length * 1.5);
+        else add(CAT_PADRAO[MUSC_EX[id]?.[0]] || "core", s.length);
+      }
+      else if (VP[r.programa]) for (const id of d.feitos || []) { const vd = INSV[id], m = vd?.min || 30; add("cardio", m / 4); add(CAT_PADRAO[vd?.mapa] || ["empurrar", "puxar", "pernas", "core"], m / 10); }
+      else if (IA[r.programa]) for (const [id, s] of Object.entries(d.sets || {})) {
+        if (!s.length) continue;
+        const e = IA[r.programa].ci[id], cat = GRUPO_CAT(e?.grupo);
+        if (cat === "cardio") { const w = e && cfMovMusc(e.nome); if (w && e.grupo === "Híbrido") { const t = soma(Object.values(w)); for (const [g, x] of Object.entries(w)) add(GRUPO_PADRAO[g], (x / t) * s.length); } else add("cardio", unDe(r.programa, e || { id }) === "min" ? soma(s.map((x) => x.r || 0)) / 4 : s.length * 1.5); }
+        else add(cat, s.length);
+      }
+      else if (r.programa === "cf") {
+        for (const p of d.wod?.partes || []) for (const m of p.movimentos || []) {
+          const w = cfMovMusc(m.nome); if (!w) continue;
+          const t = soma(Object.values(w));
+          for (const [g, x] of Object.entries(w)) add(GRUPO_PADRAO[g], (x / t) * 3);
+          if (/corrida|run|row|remo|bike|ski|double|under|corda|burpee|sprint/.test(cfNome(m.nome))) add("cardio", 2);
+        }
+        add("cardio", (r.minutos || 0) / 6);
+      }
+      else if (r.programa === "corrida") add("cardio", (r.minutos || 0) / 4);
+    }
+    return v;
+  }
+  function radarEquilibrio() {
+    const rows = linhasLocais(), a = keyOf(addDays(hoje, -27)), b = keyOf(addDays(hoje, -55));
+    const agora = volumePadroes(rows.filter((r) => r.data >= a && r.data <= hojeKey)), antes = volumePadroes(rows.filter((r) => r.data >= b && r.data < a));
+    const max = Math.max(...Object.values(agora), ...Object.values(antes));
+    if (!max) return `<p class="note">Treine algumas vezes e aqui aparece o equilíbrio entre empurrar, puxar, pernas, core e cardio.</p>`;
+    const temAntes = Object.values(antes).some(Boolean);
+    const eixos = PADROES.map(([k, nome]) => { const [txt, cls] = temAntes ? deltaTxt(agora[k], antes[k]) : [`${Math.round((agora[k] / max) * 100)}`, ""]; return { nome, txt, cls }; });
+    const fraco = PADROES.filter(([k]) => agora[k] < max * 0.25).map(([, n]) => n.toLowerCase());
+    return `<div class="rd-card">${radarSvg(eixos, PADROES.map(([k]) => (agora[k] / max) * 100), temAntes ? PADROES.map(([k]) => (antes[k] / max) * 100) : null, ["Últimas 4 semanas", "4 semanas antes"])}
+      <p class="note small">Volume de treino por padrão de movimento: séries de força, movimentos dos WODs e minutos de cardio.${fraco.length ? ` Pouco trabalhado: <b>${esc(fraco.join(", "))}</b>.` : ""}</p></div>`;
+  }
+
+  /* Radar 2, movimentos: a melhor marca de agora (últimos 3 registros) contra a do começo, por exercício.
+     Também serve de lista para o cartão "Progresso por exercício". */
+  function seriesExercicios() {
+    const out = [];
+    for (const e of TODOS_EX) { const h = historico(e.id); if (!h.length || e.un === "min") continue;
+      const tiro = e.un === "tiro"; out.push({ id: "c|" + e.id, nome: e.nome, un: tiro ? "s" : UN[e.un] || "reps", menor: tiro, pts: h.map((x) => ({ v: tiro ? x.best : x.best, data: ddmm(x.k) })), total: h.map((x) => x.total) }); }
+    for (const pk of IAK) for (const id of new Set(Object.values(S[pk].logs).flatMap((l) => Object.keys(l.sets || {})))) {
+      const e = IA[pk].ci[id], h = iaHist(pk, id); if (!e || !h.length) continue;
+      const u = unDe(pk, e); if (u === "min") continue;
+      const kg = h.some((x) => x.sets.some((s) => s.kg > 0));
+      out.push({ id: pk + "|" + id, nome: e.nome, un: kg ? "kg" : u === "s" ? "s" : "reps", pts: h.map((x) => ({ v: Math.max(0, ...x.sets.map((s) => (kg ? s.kg || 0 : s.r || 0))), data: ddmm(x.k) })) });
+    }
+    const prs = {}; for (const x of S.cf?.prs || []) (prs[cfNome(x.mov)] ||= { nome: x.mov, itens: [] }).itens.push(x);
+    for (const [k, g] of Object.entries(prs)) { const it = g.itens.filter((x) => x.kg > 0).sort((a, b) => a.k.localeCompare(b.k)); if (it.length) out.push({ id: "pr|" + k, nome: g.nome, un: "kg", pts: it.map((x) => ({ v: x.kg, data: `${ddmm(x.k)} · ${x.reps}RM` })) }); }
+    return out.filter((x) => x.pts.some((p) => p.v > 0)).sort((a, b) => b.pts.length - a.pts.length);
+  }
+  function radarMovimentos() {
+    const cands = seriesExercicios().filter((x) => x.pts.length >= 2).slice(0, 6);
+    const ft = fitTests(linhasLocais());
+    if (cands.length < 3) {
+      if (ft.length < 2) return `<p class="note">Com 3 exercícios registrados em pelo menos 2 treinos, este radar compara a sua melhor marca de agora com a do começo.</p>`;
+      const P = VP[ft[0].p], a = ft[ft.length - 1].fit, b = ft[0].fit, mx = P.fitTest.map((_, i) => Math.max(Number(a[i]) || 0, Number(b[i]) || 0) || 1);
+      return `<div class="rd-card">${radarSvg(P.fitTest.map((m, i) => { const [txt, cls] = deltaTxt(Number(a[i]) || 0, Number(b[i]) || 0); return { nome: m.length > 14 ? m.slice(0, 13) + "…" : m, txt, cls }; }),
+        mx.map((m, i) => ((Number(a[i]) || 0) / m) * 100), mx.map((m, i) => ((Number(b[i]) || 0) / m) * 100), [`Fit Test ${ddmm(ft[ft.length - 1].k)}`, `1º teste ${ddmm(ft[0].k)}`])}
+        <p class="note small">Repetições em cada movimento do Fit Test: o último contra o primeiro.</p></div>`;
+    }
+    const val = (x, fim) => { const vs = (fim ? x.pts.slice(-3) : x.pts.slice(0, 1)).map((p) => p.v).filter(Boolean); return vs.length ? (x.menor ? Math.min(...vs) : Math.max(...vs)) : 0; };
+    const eixos = [], agora = [], antes = [];
+    for (const x of cands) {
+      const a = val(x, true), b = val(x, false), mx = Math.max(a, b) || 1;
+      const [txt, cls] = x.menor ? deltaTxt(b, a) : deltaTxt(a, b);
+      eixos.push({ nome: x.nome.length > 14 ? x.nome.slice(0, 13).trim() + "…" : x.nome, txt: `${evoNum(a)} ${x.un} · ${txt}`, cls });
+      agora.push(x.menor ? (Math.min(a, b) / a) * 100 : (a / mx) * 100); antes.push(x.menor ? (Math.min(a, b) / b) * 100 : (b / mx) * 100);
+    }
+    return `<div class="rd-card">${radarSvg(eixos, agora, antes, ["Melhor marca agora", "No começo"])}
+      <p class="note small">Os ${cands.length} exercícios com mais registros: a melhor marca dos 3 últimos treinos contra a do primeiro.</p></div>`;
+  }
+
+  /* Os cartões do painel */
+  const PER_SEM = [["4 sem", 4], ["8 sem", 8], ["12 sem", 12]];
+  const semRot = (k) => `semana de ${ddmm(k)}`;
+  function cartaoTreinos() {
+    const rows = linhasLocais(), sem = porSemana(rows, 12);
+    return `<div data-evo-bloco="treinos">${metricCard("treinos", { titulo: "Treinos por semana", un: "treinos", pts: sem.map((x) => ({ v: x.v, data: semRot(x.k) })), per: PER_SEM, perPadrao: 1,
+      meta: metaSemana(), un1: "treino", parcial: true, totalRot: " treinos", rodape: "nesta semana", compRot: "média recente × anterior", vista: "barras", vazio: "Conclua treinos e acompanhe a semana contra a sua meta." })}</div>`;
+  }
+  function cartaoMinutos() {
+    const rows = linhasLocais(), sem = porSemana(rows, 12, "minutos");
+    return `<div data-evo-bloco="minutos">${metricCard("minutos", { titulo: "Tempo treinando", un: "min", pts: sem.map((x) => ({ v: x.v, data: semRot(x.k) })), per: PER_SEM, perPadrao: 1,
+      fmtTotal: (v) => fmtMin(Math.round(v)), fmt: (v) => String(Math.round(v)), parcial: true, rodape: "min nesta semana", compRot: "média recente × anterior" })}</div>`;
+  }
+  function cartaoExercicio() {
+    const xs = seriesExercicios();
+    if (!xs.length) return `<div data-evo-bloco="ex"><p class="note">Registre as repetições ou as cargas das séries. Aqui você vê a evolução treino a treino em cada exercício. 💪</p></div>`;
+    if (!xs.some((x) => x.id === EVO.ex)) EVO.ex = xs[0].id;
+    const x = xs.find((y) => y.id === EVO.ex);
+    return `<div data-evo-bloco="ex"><div class="chips evo-chips">${xs.slice(0, 24).map((y) => `<button class="chip${y.id === EVO.ex ? " primary" : ""}" data-evo-ex="${esc(y.id)}">${esc(y.nome)}</button>`).join("")}</div>
+      ${metricCard("ex-" + x.id.replace(/[^a-z0-9]/gi, ""), { titulo: x.nome, un: x.un, pts: x.pts, per: [["Últimos 5", 5], ["Últimos 10", 10], ["Tudo", 0]], perPadrao: 2, total: "melhor", menorMelhor: x.menor,
+        totalRot: ` ${x.un} · melhor`, rodape: "no último treino", compRot: "1º × último registro", vazio: "Faça este exercício mais uma vez para ver a curva." })}</div>`;
+  }
+  function cartaoMaxOut() {
+    const mx = maxOuts(linhasLocais());
+    if (!mx.length) return `<div data-evo-bloco="max"><p class="note">Registre o Max Out nos vídeos do ${esc(NOMES_MAXOUT)} para ver aqui em que minuto você cansou em cada treino. 🥵</p></div>`;
+    const vids = [...new Set(mx.map((m) => m.v))];
+    if (!vids.includes(evoMax)) evoMax = vids[0];
+    const h = mx.filter((m) => m.v === evoMax).sort((a, b) => a.k.localeCompare(b.k));
+    return `<div data-evo-bloco="max"><div class="chips evo-chips">${vids.map((v) => `<button class="chip${v === evoMax ? " primary" : ""}" data-evo-max="${v}">${esc(INSV[v].nome)}</button>`).join("")}</div>
+      ${metricCard("max-" + evoMax.replace(/[^a-z0-9]/gi, ""), { titulo: "Max Out", pts: h.map((m) => ({ v: m.s, data: ddmm(m.k) })), per: [["Tudo", 0]], total: "melhor", fmt: (v) => mmss(Math.round(v)),
+        meta: (INSV[evoMax].min || 0) * 60 || 0, totalRot: " melhor", rodape: "no último", compRot: "1º × último registro", vazio: "Registre o Max Out deste vídeo de novo para ver a curva." })}</div>`;
+  }
+  const EVO_BLOCOS = { treinos: cartaoTreinos, minutos: cartaoMinutos, ex: cartaoExercicio, max: cartaoMaxOut, cal: calendarioEvo };
+  function resumoEvo() {
+    const rows = linhasLocais(), mes = kpis(noPeriodo(rows, "mes")), sq = sequencias(rows);
+    return `<div class="evo-kpis">${[["circle-check.svg", mes.treinos, "treinos no mês"], ["hourglass.svg", fmtMin(mes.minutos), "no mês"], ["flame.svg", sq.melhor, "melhor sequência"], ["circle-percent.svg", taxaConclusao() + "%", "dias com treino"]]
+      .map(([ic, v, l]) => `<div class="evo-kpi"><span class="stat-ico">${icon(ic, 16)}</span><strong>${esc(String(v))}</strong><small>${esc(l)}</small></div>`).join("")}</div>`;
+  }
+
   /* ---------- Minha evolução: KPIs e gráficos ---------- */
   let evoMax = null;
   function painelPessoal() {
@@ -4710,7 +5008,7 @@
       const g = grupoSel();
       if (!confirm(`Sair do grupo ${g.nome}?${g.dono === uid ? " Você criou este grupo; ele continua para os outros." : ""}`)) return;
       sb.from("membros").delete().eq("grupo_id", g.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui sair do grupo."); else { G.sel = null; carregarGrupos(true); toast("Você saiu do grupo."); } });
-    } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = graficoMaxOut(); }
+    } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = cartaoMaxOut(); }
     else if (t.id === "sair") { if (sb && uid) sb.auth.signOut(); uid = null; S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
     else if (t.id === "iniciar") t.textContent = toggleTimer();
     else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true, t.closest(".ex.ins")?.dataset.ins).then((ok) => { if (ok) toast("Vídeos carregados ✓ Toque em Assistir."); else t.disabled = false; }); }
@@ -4857,10 +5155,13 @@
     if (!chatLog.length) chatLog.push({ html: chatPapel === "nutri"
       ? `Oi, ${esc(primeiroNome())}! Sou a Nutri AI 🥗 Posso te ajudar com o que comer, quando e quanto, de acordo com os seus treinos e objetivos.`
       : `Olá, ${esc(primeiroNome())}! O que vamos fazer hoje? 💪`, me: false });
-    msgsEl.innerHTML = chatLog.map(bubbleHTML).join("");
+    const analisar = chatPapel === "coach" && !pergunta && !iaChat && chatLog.length === 1 && !chatLog[0].analise && ultimoTreinoInfo();
+    if (analisar) chatLog[0] = { html: `Olá, ${esc(primeiroNome())}! Dei uma olhada no seu último treino (${esc(analisar.quando)} · ${esc(analisar.titulo)}). 👀`, me: false, analise: true };
+    msgsEl.innerHTML = chatLog.filter((m) => !m.oculto).map(bubbleHTML).join("");
     msgsEl.scrollTop = msgsEl.scrollHeight;
     if (!chipsEl.children.length) setChips(chipsEl, chatPapel === "nutri" ? CHIPS_NUTRI : CHIPS_HOJE);
-    if (pergunta) send(pergunta);
+    if (analisar) analisarUltimo(analisar);
+    else if (pergunta) send(pergunta);
     else if (matchMedia("(hover: hover)").matches) $("#chat-input").focus();
   }
   function closeChat(instant = false) {
@@ -4890,6 +5191,32 @@
     addMsg(msgsEl, r.html, false, chatLog);
     setChips(chipsEl, r.chips || CHIPS_PADRAO);
     busy = false;
+  }
+  /* O Coach começa sempre pela análise do último treino concluído (de qualquer programa). A análise fica guardada
+     por treino: reabrir o chat mostra a mesma sem gastar o limite; um treino novo (ou editado) pede outra. */
+  const NOME_PROGRAMA = (p) => ({ calistenia: NOME_PROG, cf: "CrossFit", corrida: "Atividade pelo print" }[p] || progDe(p)?.nome || VP[p]?.nome || IA[p]?.nome || p);
+  function ultimoTreinoInfo() {
+    const rows = feitas(linhasLocais());
+    if (!rows.length) return null;
+    const k = rows.map((r) => r.data).sort().pop(), doDia = rows.filter((r) => r.data === k);
+    const dif = diffDays(parseKey(k), hoje);
+    return { k, quando: dif === 0 ? "hoje" : dif === 1 ? "ontem" : `${DIAS[parseKey(k).getDay() === 0 ? 6 : parseKey(k).getDay() - 1]}, ${ddmm(k)}`,
+      titulo: doDia.map((r) => r.titulo).join(" + ").slice(0, 70),
+      assin: k + "|" + doDia.map((r) => `${r.programa}:${r.minutos}:${JSON.stringify(r.detalhes).length}`).join(","),
+      texto: doDia.map((r) => `- ${NOME_PROGRAMA(r.programa)} · ${r.titulo} · ${r.minutos} min. Registro: ${JSON.stringify(r.detalhes).slice(0, 1800)}`).join("\n") };
+  }
+  async function analisarUltimo(u) {
+    const salva = S.coachAnalise?.assin === u.assin ? S.coachAnalise.txt : "";
+    const pedido = { html: "", me: true, oculto: true, txt: `Analise o meu último treino concluído (${u.k}, ${u.quando}):\n${u.texto}\n\nCompare com os treinos anteriores do mesmo tipo que estão no contexto (cargas, repetições, tempos, resultado do WOD, ritmo). Diga em poucas linhas: como foi, o que evoluiu ou caiu (com números), 1 ponto forte, 1 ponto a melhorar e o que fazer no próximo treino. Termine perguntando o que vamos fazer hoje.` };
+    if (salva) { chatLog.push(pedido, { html: md(salva), txt: salva, me: false }); msgsEl.insertAdjacentHTML("beforeend", bubbleHTML(chatLog[chatLog.length - 1])); msgsEl.scrollTop = msgsEl.scrollHeight; return; }
+    const desistir = () => { const i = chatLog.indexOf(pedido); if (i >= 0) chatLog.splice(i, 1); addMsg(msgsEl, "O que vamos fazer hoje? 💪", false, chatLog); };
+    if (iaOff) { desistir(); return; }
+    busy = true; chatLog.push(pedido);
+    const ok = await coachIA();
+    const resp = chatLog[chatLog.length - 1];
+    if (ok && resp && !resp.me && resp.txt) { S.coachAnalise = { assin: u.assin, txt: resp.txt.slice(0, 4000) }; save(); }
+    else desistir();
+    setChips(chipsEl, CHIPS_HOJE); busy = false;
   }
   // Link de reel no chat do Coach: monta o desafio do grupo e oferece lançar ou editar
   async function desafioNoChat(texto) {
