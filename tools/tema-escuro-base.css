@@ -1,4 +1,4 @@
-/* FIT.AI — tema escuro. Liga com <html data-tema="escuro"> (Perfil → Aparência: Claro, Escuro ou Automático).
+/* FIT.AI — tema escuro. Liga com <html data-tema="escuro"> (Perfil → Aparência: Escuro, o padrão, Claro ou Automático).
    Esta parte é a manual (cores-base, ícones e o painel de Evolução); o resto vem do tools/tema-escuro.py. */
 html[data-tema="escuro"] {
   color-scheme: dark;

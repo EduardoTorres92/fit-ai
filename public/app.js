@@ -4236,7 +4236,7 @@
   }
 
   /* ---------- Tema claro, escuro ou automático (segue o sistema). O <head> do app.html já aplica antes de pintar. ---------- */
-  const temaEscolhido = () => { try { return localStorage.getItem("fitai-tema") || "claro"; } catch { return "claro"; } };
+  const temaEscolhido = () => { try { return localStorage.getItem("fitai-tema") || "escuro"; } catch { return "escuro"; } };
   const MQ_ESCURO = matchMedia("(prefers-color-scheme: dark)");
   function aplicarTema() {
     const t = temaEscolhido(), esc_ = t === "escuro" || (t === "auto" && MQ_ESCURO.matches);
