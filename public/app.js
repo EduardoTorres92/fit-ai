@@ -233,15 +233,27 @@
   const diasVideo = () => [...VKEYS.flatMap((p) => Object.keys(S[p].logs)), ...iaDiasComLog(), ...Object.keys(S.cf?.logs || {})]; // dias dos programas fora da calistenia
   const principal = () => (S.principal && progDe(S.principal) ? S.principal : "plano");
 
-  function sequencia() {
-    let d = feito(hojeKey) ? hoje : addDays(hoje, -1), c = 0;
-    while (feito(keyOf(d))) { c++; d = addDays(d, -1); }
-    return c;
+  // Sequência com folga: em todas as modalidades, 1 dia sem treino por semana (seg a dom) é descanso e não quebra a sequência
+  // (conta como dia da sequência, igual ao descanso do calendário do Insanity). Hoje sem treino ainda não quebra.
+  function seqFolga(tem, dias) {
+    const ks = dias.filter(tem).sort();
+    if (!ks.length) return { atual: 0, melhor: 0 };
+    let run = 0, folga = 0, semFolga = "", melhor = 0;
+    for (let d = parseKey(ks[0]); d < hoje; d = addDays(d, 1)) {
+      const k = keyOf(d), sem = keyOf(mondayOf(d));
+      if (tem(k)) { run += 1 + folga; folga = 0; }
+      else if (run && !folga && semFolga !== sem) { folga = 1; semFolga = sem; }
+      else { run = 0; folga = 0; }
+      melhor = Math.max(melhor, run);
+    }
+    const atual = run + folga + (tem(hojeKey) ? 1 : 0);
+    return { atual: run || tem(hojeKey) ? atual : 0, melhor: Math.max(melhor, run || tem(hojeKey) ? atual : 0) };
   }
+  const sequencia = () => seqFolga(feito, [...new Set([...Object.keys(S.logs), ...diasVideo(), hojeKey])]).atual;
   const treinosFeitos = () => [...new Set([...Object.keys(S.logs), ...diasVideo()])].filter(feito).length;
   const tempoTotal = () => soma(Object.values(S.logs).map((l) => l.dur || 0)) + soma(VKEYS.flatMap((p) => Object.values(S[p].logs)).map((l) => minVideo(l) * 60)) + iaMinTotal() * 60;
   function taxaConclusao() {
-    const dias = diffDays(parseKey(S.inicio), hoje) + (feito(hojeKey) ? 1 : 0);
+    const corridos = diffDays(parseKey(S.inicio), hoje) + (feito(hojeKey) ? 1 : 0), dias = corridos - Math.floor(corridos / 7); // 1 descanso por semana
     if (dias <= 0) return treinosFeitos() ? 100 : 0;
     return Math.min(100, Math.round((treinosFeitos() / dias) * 100));
   }
@@ -3088,11 +3100,7 @@
   const feitas = (rows) => rows.filter((r) => r.concluido);
   function sequencias(rows) {
     const dias = new Set(feitas(rows).map((r) => r.data));
-    let d = dias.has(hojeKey) ? hoje : addDays(hoje, -1), atual = 0;
-    while (dias.has(keyOf(d))) { atual++; d = addDays(d, -1); }
-    let melhor = 0, run = 0, prev = null;
-    for (const k of [...dias].sort()) { run = prev && diffDays(parseKey(prev), parseKey(k)) === 1 ? run + 1 : 1; melhor = Math.max(melhor, run); prev = k; }
-    return { atual, melhor };
+    return seqFolga((k) => dias.has(k), [...dias]);
   }
   const maxOuts = (rows) => rows.filter((r) => VP[r.programa]?.maxOut)
     .flatMap((r) => Object.entries(r.detalhes?.max || {}).map(([v, s]) => ({ k: r.data, v, s: Number(s) || 0 }))).filter((m) => m.s > 0 && INSV[m.v]);
