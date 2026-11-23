@@ -6138,22 +6138,22 @@
      cada sessão conta pelos minutos (mínimo 20) no tipo dela. Um tipo com 50% ou mais dá o estilo; sem isso, Ronin (híbrido).
      ========================================================== */
   const ESTILOS = {
-    monge: { nome: "Monge", ic: "🥋", tipo: "corpo", desc: "treina com o peso do corpo" },
+    monge: { nome: "Monge", ic: "🥋", tipo: "corpo", desc: "treina com o peso do corpo (calistenia e Insanity)" },
     gladiador: { nome: "Gladiador", ic: "🛡️", tipo: "carga", desc: "treina com carga" },
     batedor: { nome: "Batedor", ic: "🏹", tipo: "cardio", desc: "corre e faz cardio" },
-    berserker: { nome: "Berserker", ic: "🪓", tipo: "metcon", desc: "vive de WODs e treinos intensos" },
+    berserker: { nome: "Berserker", ic: "🪓", tipo: "metcon", desc: "vive de WODs" },
     ronin: { nome: "Ronin", ic: "⚔️", tipo: null, desc: "equilibra força e cardio" },
   };
-  const TIPOS_TREINO = [["corpo", "Peso do corpo", "#4fd2ff"], ["carga", "Carga", "#ffb45e"], ["cardio", "Cardio", "#4ee39b"], ["metcon", "WOD e vídeos", "#ff6b8b"]];
+  const TIPOS_TREINO = [["corpo", "Peso do corpo", "#4fd2ff"], ["carga", "Carga", "#ffb45e"], ["cardio", "Cardio", "#4ee39b"], ["metcon", "WOD", "#ff6b8b"]];
   function estiloAtual() {
     const a = keyOf(addDays(hoje, -27)), rows = feitas(linhasLocais()).filter((r) => r.data >= a && r.data <= hojeKey);
     const t = { corpo: 0, carga: 0, cardio: 0, metcon: 0 }, add = (k, m) => (t[k] += m);
     for (const r of rows) {
       const m = Math.max(20, r.minutos || 0), pr = r.programa;
-      if (pr === "calistenia" || pr === "c21") add("corpo", m);
+      if (pr === "calistenia" || pr === "c21" || VP[pr]) add("corpo", m); // Insanity é peso do corpo em vídeo
       else if (pr === "hiper") add("carga", m);
       else if (pr === "run") { add("cardio", m * 0.6); add("carga", m * 0.4); }
-      else if (pr === "cf" || VP[pr]) add("metcon", m);
+      else if (pr === "cf") add("metcon", m);
       else if (pr === "corrida") add("cardio", m);
     }
     const total = soma(Object.values(t)), pct = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, total ? Math.round((v / total) * 100) : 0]));
