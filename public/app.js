@@ -638,7 +638,7 @@
           <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
           <button type="submit" class="btn btn-blue">Max Out</button>
         </form>` : ""}
-        <button class="btn btn-outline${ok ? " done" : ""} ins-feito" data-ins-feito="${id}" data-p="${p}" data-k="${kk}" data-av="${av ? 1 : 0}">${ok ? "Feito ✓" : "Marcar feito"}</button>
+        ${ok && P.maxOut && l.max?.[id] ? `<span class="btn btn-outline done ins-feito travado" title="Registrado com Max Out: não dá para desmarcar">Feito ✓</span>` : `<button class="btn btn-outline${ok ? " done" : ""} ins-feito" data-ins-feito="${id}" data-p="${p}" data-k="${kk}" data-av="${av ? 1 : 0}">${ok ? "Feito ✓" : "Marcar feito"}</button>`}
       </div>
     </div>`;
   }
@@ -2863,7 +2863,8 @@
     if (l.max?.[id]) { toast("Esse Max Out já foi registrado. 🔒"); return; }
     if (!txt.trim()) return;
     if (seg === null || seg > 60 * 60) { toast("Digite o tempo como mm:ss (ex.: 12:30)."); return; }
-    if (!confirm(`Salvar Max Out de ${mmss(seg)} em ${INSV[id].nome}? Depois de salvo não dá para alterar.`)) return;
+    const bt = f.querySelector("button");
+    if (f.dataset.conf !== String(seg)) { f.dataset.conf = String(seg); bt.textContent = `Confirmar ${mmss(seg)} 🔒`; bt.classList.add("conf"); toast("Confira e toque de novo para travar. 🔒"); return; }
     const antes = insMaxHist(p, id).filter((h) => h.k !== k).map((h) => h.seg);
     l.max[id] = seg;
     marcarVideo(p, l, id);
@@ -5103,6 +5104,7 @@
     else if (t.hasAttribute("data-vt-edit")) vtAjustar(t.closest(".vtimer"));
     else if (t.dataset.insFeito) {
       const p = t.dataset.p, id = t.dataset.insFeito, k = t.dataset.k, l = insLogDe(p, k), era = insFeito(p, k);
+      if (l.max?.[id] && (l.feitos.includes(id) || (l.avulso || []).includes(id))) { toast("Esse vídeo já tem Max Out registrado. 🔒"); return; }
       const arr = t.dataset.av === "1" ? (l.avulso = l.avulso || []) : l.feitos, i = arr.indexOf(id);
       i >= 0 ? arr.splice(i, 1) : arr.push(id);
       save();
