@@ -5727,7 +5727,7 @@
     abdominal: { re: /abdomina|crunch|sit.?up|canivete|v.?up/, nao: /pendurad/ },
     canivete: { re: /canivete|v.?up|jackknife/ },
     abdPend: { re: /pendurad|hanging|elevacao de (pernas|joelhos) na barra|knee.?raise|leg raise/, facil: /joelho|knee/ },
-    pulos: { re: /pulo|polichinelo|jumping|corda|salto/ },
+    pulos: { re: /pulo|polichinelo|jumping|corda|salto|double.?under|single.?under|box jump/ },
     ponte: { re: /ponte|glute bridge|elevacao pelvica/ }, panturrilha: { re: /panturrilha|calf/ },
     lsit: { re: /l.?sit/, seg: true }, dragon: { re: /dragon/ }, hollow: { re: /hollow/, seg: true },
     prancha: { re: /^prancha$|rkc|^plank/, seg: true },
@@ -5754,11 +5754,29 @@
   ];
   const FERA_NV = ["", "Ativação", "Volume", "Densidade", "Vascularização"];
   // Séries de calistenia por dia, a partir das linhas (minhas ou de um membro): { data: [{ nome, v, seg }] }
+  // Séries de peso do corpo de um WOD concluído: cada volta (ou cada número do esquema 21-15-9) vira uma série de cada movimento.
+  // Movimento com carga, distância, calorias ou tempo fica de fora.
+  function cfSeries(det) {
+    const out = [], res = det?.res || {};
+    for (const [pi, pt] of (det?.wod?.partes || []).entries()) {
+      const movs = (pt.movimentos || []).map((m) => { const ok = !(/\d\s*(m|km|cal|s|seg|min)\b|kg/i.test(String(m.reps || "")) || m.carga); return { nome: m.nome, ok, n: ok ? Number(String(m.reps || "").match(/\d+/)?.[0]) || 0 : 0 }; });
+      const esq = String(pt.esquema || "").match(/\d+/g)?.map(Number) || [];
+      const pontuada = pi === (det.wod.pontuado || 0);
+      if (esq.length > 1) { for (const n of esq) for (const m of movs) if (m.ok) out.push({ nome: m.nome, v: m.n || n }); continue; }
+      let voltas = pt.rodadas || 1, parcial = 0;
+      if (pontuada && (pt.tipo === "amrap" || res.cap) && (res.voltas || res.reps)) { voltas = res.voltas || 0; parcial = res.reps || 0; }
+      else if (pt.tipo === "emom" && pt.minutos) voltas = pt.minutos;
+      for (let v = 0; v < voltas; v++) for (const m of movs) if (m.n) out.push({ nome: m.nome, v: m.n });
+      for (const m of movs) { if (parcial <= 0) break; if (!m.n) continue; const x = Math.min(m.n, parcial); out.push({ nome: m.nome, v: x }); parcial -= x; }
+    }
+    return out;
+  }
   function seriesCaliPorDia(rows) {
     const out = {};
     for (const r of rows) {
       const d = r.detalhes || {}, add = (nome, v, seg) => v > 0 && (out[r.data] ||= []).push({ nome: norm(nome || ""), v, seg });
       if (r.programa === "calistenia") for (const [id, s] of Object.entries(d.sets || {})) { const e = EXI[id]; for (const v of s || []) add(e?.nome || id, Number(v) || 0, e?.un === "s" || e?.un === "min" ? true : e?.un === "tiro" ? "tiro" : false); }
+      else if (r.programa === "cf" && r.concluido) for (const x of cfSeries(d)) add(x.nome, x.v, false);
       else if (IA[r.programa] && r.programa !== "hiper") for (const [id, s] of Object.entries(d.sets || {})) {
         const e = IA[r.programa].ci[id]; if (!e) continue; const un = e.med === "s" ? "s" : unDe(r.programa, e);
         for (const x of s || []) if (x && !x.kg) add(e.nome, Number(x.r) || 0, un === "s" || un === "min");
@@ -5950,7 +5968,7 @@
   }
   // Seções das ligas no Perfil (as que fazem sentido para a pessoa) e no perfil de membro (as que têm alguma insígnia)
   function ligasPerfilHtml(rows, eu, o) {
-    return LIGAS.filter((L) => (eu ? L.vis() : true)).map((L) => ligaHtml(L, rows, eu, o)).join("") +
+    return LIGAS.filter((L) => (eu ? L.vis() || L.ins(rows, o).some((x) => x.tier) : true)).map((L) => ligaHtml(L, rows, eu, o)).join("") +
       (eu ? `<p class="note small">Cada liga tem insígnias de bronze, prata e ouro, e um chefe que cai quando todas são conquistadas, em qualquer faixa. Tudo sai dos seus treinos registrados.</p>` : "");
   }
 
