@@ -70,13 +70,18 @@ export default async (req, context) => {
 
   try {
     const r = await new Anthropic().messages.create({
-      model: "claude-sonnet-5-5", max_tokens: 800, system: SISTEMA, tools: [FERRAMENTA], tool_choice: { type: "tool", name: "salvar_atividade" },
+      model: "claude-sonnet-5-5", max_tokens: 800, system: SISTEMA, tools: [FERRAMENTA], tool_choice: { type: "auto" }, // o Sonnet 5.5 não aceita forçar a ferramenta
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imagem } },
         { type: "text", text: `Transcreva a atividade deste print.${hoje ? ` Hoje é ${hoje}.` : ""}` },
       ] }],
     });
-    const atividade = limparAtividade(r.content.find((b) => b.type === "tool_use")?.input);
+    let entrada = r.content.find((b) => b.type === "tool_use")?.input;
+    if (!entrada) {
+      const t = r.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+      try { entrada = JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)); } catch {}
+    }
+    const atividade = limparAtividade(entrada);
     return json(200, atividade ? { atividade } : { erro: "ilegivel" });
   } catch (e) {
     const status = e instanceof Anthropic.APIError ? e.status : 0;

@@ -104,10 +104,14 @@ export async function montarDesafio(linkTxt, notaTxt = "") {
     img ? "A imagem acima é a capa do vídeo." : "(sem imagem de capa)"].filter(Boolean).join("\n");
   try {
     const r = await new Anthropic().messages.create({
-      model: "claude-sonnet-5-5", max_tokens: 1200, system: SISTEMA, tools: [FERRAMENTA], tool_choice: { type: "tool", name: "criar_desafio" },
+      model: "claude-sonnet-5-5", max_tokens: 1200, system: SISTEMA, tools: [FERRAMENTA], tool_choice: { type: "auto" }, // o Sonnet 5.5 não aceita forçar a ferramenta; o sistema pede para chamá-la
       messages: [{ role: "user", content: [...(img ? [{ type: "image", source: { type: "base64", ...img } }] : []), { type: "text", text: texto }] }],
     });
-    const d = r.content.find((b) => b.type === "tool_use")?.input;
+    let d = r.content.find((b) => b.type === "tool_use")?.input;
+    if (!d) { // respondeu em texto: tenta achar o JSON
+      const t = r.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+      try { d = JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)); } catch {}
+    }
     if (!d || !txt(d.titulo, 80)) return { erro: "ia" };
     return {
       desafio: { titulo: txt(d.titulo, 80), descricao: txt(d.descricao, 500), medida: MEDIDAS.includes(d.medida) ? d.medida : "feito" },
