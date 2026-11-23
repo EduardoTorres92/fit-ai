@@ -296,7 +296,9 @@
     if (!l) return false;
     if ((l.avulso || []).length) return true; // vídeo feito fora do calendário (extra, bônus ou de outro dia) conta como treino
     const t = insDia(p, l.w, l.d);
-    return !!(t && t.ids.length && t.ids.every((id) => l.feitos.includes(id) || (insAlt(p, l.w, id) && l.feitos.includes(insAlt(p, l.w, id)))));
+    // O treino do dia é o vídeo principal: o ABS (Ab Maximizer etc.) é missão à parte e não segura o dia (só conta se o dia for só de abdômen)
+    const principais = (t?.ids || []).filter((id) => INSV[id]?.tipo !== "Abdômen");
+    return !!(t && t.ids.length && (principais.length ? principais : t.ids).every((id) => l.feitos.includes(id) || (insAlt(p, l.w, id) && l.feitos.includes(insAlt(p, l.w, id)))));
   }
   const insParcial = (p, k) => !!(S[p].logs[k] && (S[p].logs[k].feitos.length || (S[p].logs[k].avulso || []).length));
   const vidsDe = (l) => [...(l.feitos || []), ...(l.avulso || [])];
