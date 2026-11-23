@@ -1492,3 +1492,6 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .tp-pop-txt .btn { width: 100%; margin-top: 4px; }
 .tp-pop-txt .lnk-btn { color: #a9b4e0; }
 .tp-pop-txt .lnk-btn { align-self: center; }
+.tp-home-wrap .tp-boss { margin-top: 8px; }
+.tp-boss em { color: #ff8fa6; font-size: 13px; }
+.ins-max-ok { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 999px; background: rgba(240, 192, 48, 0.14); border: 1px solid rgba(240, 192, 48, 0.5); color: #f0c030; font-weight: 700; font-size: 14px; white-space: nowrap; }

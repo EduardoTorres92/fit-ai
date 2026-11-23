@@ -634,7 +634,7 @@
       </form>` : ""}
       ${av ? `<p class="ex-obs avulso">Fora do calendário de hoje: se fizer, conta como treino de hoje.</p>` : ""}
       <div class="ins-row">
-        ${P.maxOut ? `<form class="add-set ins-max" data-max="${id}" data-p="${p}" data-k="${kk}">
+        ${P.maxOut && l.max?.[id] ? `<span class="ins-max-ok" title="Registrado: não dá para alterar">🔒 Max Out ${mmss(l.max[id])}</span>` : P.maxOut ? `<form class="add-set ins-max" data-max="${id}" data-p="${p}" data-k="${kk}">
           <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
           <button type="submit" class="btn btn-blue">Max Out</button>
         </form>` : ""}
@@ -2860,8 +2860,10 @@
     const p = f.dataset.p, id = f.dataset.max, k = f.dataset.k;
     const txt = f.querySelector("input").value, seg = segDe(txt);
     const l = insLogDe(p, k), era = insFeito(p, k);
-    if (!txt.trim()) { delete l.max[id]; save(); insRefazer(p, id); return; }
+    if (l.max?.[id]) { toast("Esse Max Out já foi registrado. 🔒"); return; }
+    if (!txt.trim()) return;
     if (seg === null || seg > 60 * 60) { toast("Digite o tempo como mm:ss (ex.: 12:30)."); return; }
+    if (!confirm(`Salvar Max Out de ${mmss(seg)} em ${INSV[id].nome}? Depois de salvo não dá para alterar.`)) return;
     const antes = insMaxHist(p, id).filter((h) => h.k !== k).map((h) => h.seg);
     l.max[id] = seg;
     marcarVideo(p, l, id);
@@ -3209,7 +3211,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -6107,6 +6109,12 @@
     if (liga && uid && G.grupos?.length && G.membros?.length) { const l = tabelaTemporada(t).filter((x) => x.liga === liga).sort((a, b) => b.total - a.total), i = l.findIndex((x) => x.id === uid); if (i >= 0) pos = ` · ${i + 1}º de ${l.length}`; }
     const txt = t.fase === "antes" ? `Começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`} · ${ddmm(t.ini)} a ${ddmm(t.fim)}` : t.fase === "fim" ? "Temporada encerrada" : `Semana ${t.semana} de 8${liga ? ` · Liga ${LIGA_T[liga].nome}${pos}` : " · treine para entrar numa liga"}`;
     const p = liga && t.fase !== "antes" ? pontosTemporada(rows, liga, meuOpts(), t).total : null;
+    const bk = liga === "insanity" ? (VP.insanity && (principal() === "insanity" || !VP.insanity60) ? "shaunt-cc" : "shaunt-ft") : liga ? LIGAS.find((L) => L.k === liga)?.chefe : null;
+    const boss = bk && chefes().find((c) => c.k === bk);
+    const bossHtml = boss && t.fase !== "fim" ? `<a class="tp-srq tp-boss" href="#/chefes"><img src="${boss.img}" alt=""><span><b>${esc(boss.nome)}${boss.derrotado ? " · derrotado!" : ""}</b><span class="ch-hp"><i style="width:${boss.hp}%"></i></span></span><em>HP ${boss.hp}%</em></a>` : "";
+    return bossHtml ? `<div class="tp-home-wrap">${temporadaCard(t, liga, txt, p)}${bossHtml}</div>` : temporadaCard(t, liga, txt, p);
+  }
+  function temporadaCard(t, liga, txt, p) {
     return `<a class="tp-home" href="#/grupo"><img src="${LIGA_T[liga || "hibrido"].img}" alt=""><span><b>${esc(t.nome)} · ${esc(t.sub)}</b><small>${esc(txt)}</small></span>${p != null ? `<strong>${p}<small>pts</small></strong>` : ""}</a>`;
   }
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-tp-liga]"); if (b) { G.ligaSel = b.dataset.tpLiga; render(); } });
@@ -6189,16 +6197,15 @@
   ];
   const CHEFES = [
     // Chefe do Insanity: só aparece para quem faz o programa (trilha Insanos ou Híbridos, ou já tem registro nele)
-    { k: "shaunt-cc", nome: "Canguru · Cardio Challenge", tag: "Chefe do Insanity", vis: () => VP.insanity && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity?.logs || {}).length > 0), img: "assets/chefes/canguru-rosto.webp", banner: "assets/chefes/canguru.webp", prog: "insanity", met: "s",
-      desc: "Chegar ao fim do Cardio Challenge sem Max Out", meta: () => (INSV["cardio-challenge"]?.min || 30) * 60,
-      calc: () => { const h = maxOuts(linhasLocais()).filter((m) => m.v === "cardio-challenge").sort((a, b) => a.k.localeCompare(b.k)), meta = (INSV["cardio-challenge"]?.min || 30) * 60;
-        return { tem: h.length > 0, melhor: Math.max(0, ...h.map((m) => m.s)), em: h.find((m) => m.s >= meta)?.k || null }; } },
-    { k: "shaunt-ft", nome: "Canguru · Fit Test", tag: "Chefe do Insanity", vis: () => VP.insanity60 && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity60?.logs || {}).length > 0), img: "assets/chefes/canguru-rosto.webp", banner: "assets/chefes/canguru.webp", prog: "insanity60", met: "pct",
-      desc: "Melhorar 25% no total do Fit Test", meta: () => 25,
-      calc: () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60"); if (!ft.length) return { tem: false, melhor: 0, em: null };
-        const base = ft[0].total || 1; let melhor = 0, em = null;
-        for (const x of ft.slice(1)) { const v = Math.round(((x.total - base) / base) * 100); if (v > melhor) melhor = v; if (!em && v >= 25) em = x.k; }
-        return { tem: true, melhor, em }; } },
+    // Canguru: cada sessão do programa é um golpe; ele só cai no fim (formatura: 80% das sessões + a última). Max Out ou Fit Test melhor no fim = bônus
+    { k: "shaunt-cc", nome: "Canguru · MAX:30", tag: "Chefe do Insanity", vis: () => VP.insanity && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity?.logs || {}).length > 0), img: "assets/chefes/canguru-rosto.webp", banner: "assets/chefes/canguru.webp", prog: "insanity", met: "sess",
+      desc: "Cada sessão do MAX:30 é um golpe; o golpe final é o Cardio Challenge do fim", meta: () => 1,
+      calc: () => canguruCalc("insanity", () => { const h = maxOuts(linhasLocais()).filter((m) => m.v === "cardio-challenge").sort((a, b) => a.k.localeCompare(b.k));
+        return h.length >= 2 && h[h.length - 1].s > h[0].s ? `Max Out do Cardio Challenge: ${mmss(h[0].s)} → ${mmss(h[h.length - 1].s)}` : null; }) },
+    { k: "shaunt-ft", nome: "Canguru · Insanity", tag: "Chefe do Insanity", vis: () => VP.insanity60 && (["insanos", "hibrido"].includes(trilha()) || Object.keys(S.insanity60?.logs || {}).length > 0), img: "assets/chefes/canguru-rosto.webp", banner: "assets/chefes/canguru.webp", prog: "insanity60", met: "sess",
+      desc: "Cada sessão do Insanity é um golpe; o golpe final é o último Fit Test", meta: () => 1,
+      calc: () => canguruCalc("insanity60", () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60");
+        return ft.length >= 2 && ft[ft.length - 1].total > ft[0].total ? `Fit Test: ${ft[0].total} → ${ft[ft.length - 1].total} repetições` : null; }) },
     // Sr. Q: chefe da temporada, inspirado nos desafios do grupo. Cada desafio semanal cumprido dentro da temporada é um golpe (8 semanas = 8 golpes)
     { k: "sr-q", nome: "Sr. Q", tag: "Chefe da temporada", img: "assets/chefes/sr-q-rosto.webp", banner: "assets/chefes/sr-q.webp", met: "ins",
       desc: "Cumprir os desafios do grupo da temporada, um por semana", vis: () => !!(uid && G.grupos?.length),
@@ -6211,11 +6218,17 @@
       calc: () => { const ins = L.ins(linhasLocais(), meuOpts()), f = ins.filter((x) => x.tier);
         return { tem: f.length > 0, melhor: f.length, meta: ins.length, em: f.length === ins.length ? (f.map((x) => x.em).filter(Boolean).sort().pop() || hojeKey) : null }; } })),
   ];
+  // Vida do Canguru: proporcional às sessões feitas do calendário; fica em 1% até a formatura do programa
+  function canguruCalc(p, bonusFn) {
+    const g = progVideo(p), em = g.ok ? (Object.keys(S[p]?.logs || {}).filter((k) => insFeito(p, k)).sort().pop() || hojeKey) : null;
+    const hp = g.total ? (g.ok ? 0 : Math.max(1, Math.round((1 - g.feitas / g.total) * 100))) : 100;
+    return { tem: g.feitas > 0, melhor: g.feitas, meta: g.total || 1, em, hp, bonus: em ? bonusFn() : null };
+  }
   function chefes() {
     if (CACHE_CHEFES) return CACHE_CHEFES;
     CACHE_CHEFES = CHEFES.filter((c) => !c.k.startsWith("shaunt") || (c.k === "shaunt-cc" ? VP.insanity : VP.insanity60)).map((c) => {
       const r = c.calc(), meta = r.meta ?? c.meta();
-      return { ...c, metaV: meta, ...r, rel: !!c.vis(), hp: r.tem ? Math.max(0, Math.round((1 - Math.min(1, r.melhor / meta)) * 100)) : 100, derrotado: !!r.em };
+      return { ...c, metaV: meta, ...r, rel: !!c.vis(), hp: r.hp ?? (r.tem ? Math.max(0, Math.round((1 - Math.min(1, r.melhor / meta)) * 100)) : 100), derrotado: !!r.em };
     });
     return CACHE_CHEFES;
   }
@@ -6232,11 +6245,11 @@
     CACHE_RECORDES = { v: chefes(), l };
     return l;
   }
-  const marcaChefe = (c) => (c.k === "sr-q" ? `${c.melhor}/${c.metaV} desafios` : c.met === "ins" ? `${c.melhor}/${c.metaV} insígnias` : c.met === "s" && c.k.startsWith("shaunt") ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor));
+  const marcaChefe = (c) => (c.met === "sess" ? `${c.melhor}/${c.metaV} sessões` : c.k === "sr-q" ? `${c.melhor}/${c.metaV} desafios` : c.met === "ins" ? `${c.melhor}/${c.metaV} insígnias` : c.met === "s" && c.k.startsWith("shaunt") ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor));
   const fmtMarca = (met, v) => (met === "ins" ? `${v} insígnias` : met === "pct" ? `${v > 0 ? "+" : ""}${v}%` : met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
   // Bônus de veterano: treinou antes do começo da Temporada 1
   const veterano = () => feitas(linhasLocais()).some((r) => r.data < TEMPORADAS[0].ini);
-  const chefesXp = () => (chefes().filter((c) => c.derrotado).length + recordes().filter((c) => c.derrotado).length) * XP.chefe;
+  const chefesXp = () => (chefes().filter((c) => c.derrotado).length + recordes().filter((c) => c.derrotado).length) * XP.chefe + chefes().filter((c) => c.bonus).length * XP.chefeBonus;
   function chefeCard(c) {
     const cls = c.derrotado ? "ch-ok" : c.tem ? "" : "ch-novo";
     return `<div class="ch-card ${cls}">
@@ -6298,7 +6311,7 @@
   }
   const videosDia = (k) => soma(VKEYS.map((p) => (S[p].logs[k]?.feitos || []).length));
   const MISSOES = {
-    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
+    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) || VKEYS.some((p) => (S[p].logs[k]?.feitos || []).some((id) => INSV[id]?.tipo !== "Abdômen")) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
     minutos: { ic: "⏱️", t: "Treine 30 minutos", v: minutosDia, alvo: () => 30, fmt: (v, a) => `${Math.min(v, a)}/${a} min` },
     series: { ic: "🔁", t: "Registre 15 séries", v: seriesDia, alvo: () => 15, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
     abs: { ic: "🔥", t: "Faça um vídeo de abdômen", v: absDia, alvo: () => 1, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
