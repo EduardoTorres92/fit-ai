@@ -2973,7 +2973,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -4774,6 +4774,7 @@
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
       if (perfil.config.arte && !S.arte) S.arte = perfil.config.arte;
       if (perfil.config.missoes) { S.missoes = S.missoes || {}; for (const [k, n] of Object.entries(perfil.config.missoes)) S.missoes[k] = Math.max(S.missoes[k] || 0, Number(n) || 0); }
+      if (perfil.config.missoesTot) S.missoesTot = { ...(S.missoesTot || {}), ...perfil.config.missoesTot };
       if (perfil.config.missoesXpAnt > (S.missoesXpAnt || 0)) S.missoesXpAnt = perfil.config.missoesXpAnt;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
@@ -6309,6 +6310,13 @@
     const n = diffDays(parseKey(S[p].inicio), hoje), t = n >= 0 ? insDia(p, Math.floor(n / 7), n % 7) : null;
     return Math.max(1, (t?.ids || []).length);
   }
+  // O calendário do dia tem vídeo de abdômen (ex.: Ab Maximizer no MAX:30)? Aí o ABS vira missão própria, além do treino
+  function absNoCalendario(k) {
+    const p = VP[principal()] ? principal() : VP.insanity ? "insanity" : null;
+    if (!p || !S[p]?.inicio) return false;
+    const n = diffDays(parseKey(S[p].inicio), parseKey(k)), t = n >= 0 ? insDia(p, Math.floor(n / 7), n % 7) : null;
+    return !!t && (t.ids || []).some((id) => INSV[id]?.tipo === "Abdômen");
+  }
   const videosDia = (k) => soma(VKEYS.map((p) => (S[p].logs[k]?.feitos || []).length));
   const MISSOES = {
     treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) || VKEYS.some((p) => (S[p].logs[k]?.feitos || []).some((id) => INSV[id]?.tipo !== "Abdômen")) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
@@ -6333,19 +6341,25 @@
     if (pend) lista.push("desafio");
     const resto = pool.filter((x) => !lista.includes(x) && !(descanso && ["minutos", "series"].includes(x)));
     while (lista.length < 3 && resto.length) lista.push(resto.splice((h >>>= 3) % resto.length, 1)[0]);
-    return lista.map((id) => { const m = MISSOES[id], alvo = m.alvo(), v = m.v(k); return { id, ...m, alvoV: alvo, valor: v, ok: v >= alvo, pct: Math.min(100, Math.round((v / alvo) * 100)) }; });
+    // Dia com ABS no calendário: o treino de ABS entra como missão a mais (4 no total)
+    if (!descanso && absNoCalendario(k)) {
+      if (!lista.includes("abs")) lista.splice(1, 0, "abs");
+      else if (resto.length) lista.push(resto.splice((h >>>= 3) % resto.length, 1)[0]);
+    }
+    return lista.filter(Boolean).map((id) => { const m = id === "abs" && absNoCalendario(k) ? { ...MISSOES.abs, t: "Faça o treino de ABS do dia" } : MISSOES[id], alvo = m.alvo(), v = m.v(k); return { id, ...m, alvoV: alvo, valor: v, ok: v >= alvo, pct: Math.min(100, Math.round((v / alvo) * 100)) }; });
   }
   // Guarda quantas missões foram cumpridas hoje (só aumenta) e o XP das que saíram da janela de 30 dias
   function registrarMissoes() {
-    const n = missoesDe(hojeKey).filter((m) => m.ok).length;
-    S.missoes = S.missoes || {};
+    const ms = missoesDe(hojeKey), n = ms.filter((m) => m.ok).length;
+    S.missoes = S.missoes || {}; S.missoesTot = S.missoesTot || {};
+    if (ms.length > 3) S.missoesTot[hojeKey] = ms.length;
     if (n > (S.missoes[hojeKey] || 0)) S.missoes[hojeKey] = n; else return false;
     const lim = keyOf(addDays(hoje, -30));
-    for (const k of Object.keys(S.missoes)) if (k < lim) { S.missoesXpAnt = (S.missoesXpAnt || 0) + xpMissoesN(S.missoes[k]); delete S.missoes[k]; }
+    for (const k of Object.keys(S.missoes)) if (k < lim) { S.missoesXpAnt = (S.missoesXpAnt || 0) + xpMissoesN(S.missoes[k], S.missoesTot?.[k]); delete S.missoes[k]; if (S.missoesTot) delete S.missoesTot[k]; }
     return true;
   }
-  const xpMissoesN = (n) => n * XP.missao + (n >= 3 ? XP.missoesTodas : 0);
-  const missoesXp = () => soma(Object.values(S.missoes || {}).map(xpMissoesN)) + (S.missoesXpAnt || 0);
+  const xpMissoesN = (n, tot = 3) => n * XP.missao + (n >= (tot || 3) ? XP.missoesTodas : 0);
+  const missoesXp = () => soma(Object.entries(S.missoes || {}).map(([k, n]) => xpMissoesN(n, S.missoesTot?.[k]))) + (S.missoesXpAnt || 0);
   function renovaEm() { const m = Math.max(0, Math.round((addDays(hoje, 1) - Date.now()) / 60000)); return `${Math.floor(m / 60)}h${pad(m % 60)}`; }
   function missoesHome() {
     const ms = missoesDe(hojeKey), feitas = ms.filter((m) => m.ok).length, cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
@@ -6353,7 +6367,7 @@
     return `<div class="ms-card">
       <div class="ms-head"><span class="ms-k">Missões do dia</span><span class="ms-t" data-renova>renovam em ${renovaEm()}</span></div>
       ${ms.map((m) => `<div class="ms-row${m.ok ? " ok" : ""}"><span class="ms-ic">${m.ok ? "✓" : m.ic}</span><div class="ms-txt"><b>${esc(m.t)}</b><span class="ms-bar"><i style="width:${m.pct}%"></i></span></div><span class="ms-v">${m.ok ? `+${XP.missao} XP` : esc(m.fmt(m.valor, m.alvoV))}</span></div>`).join("")}
-      <p class="ms-bonus">${feitas >= 3 ? `🏆 Todas cumpridas: +${XP.missoesTodas} XP de bônus!` : `Cumpra as 3 e ganhe <b>+${XP.missoesTodas} XP</b> de bônus (${feitas}/3)`}</p>
+      <p class="ms-bonus">${feitas >= ms.length ? `🏆 Todas cumpridas: +${XP.missoesTodas} XP de bônus!` : `Cumpra as ${ms.length} e ganhe <b>+${XP.missoesTodas} XP</b> de bônus (${feitas}/${ms.length})`}</p>
       <a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.img ? `<img class="ms-ch-img" src="${prox.img}" alt="">` : prox.ic || ""} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>
     </div>`;
   }
