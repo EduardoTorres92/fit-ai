@@ -1497,3 +1497,26 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .ins-max-ok { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 999px; background: rgba(240, 192, 48, 0.14); border: 1px solid rgba(240, 192, 48, 0.5); color: #f0c030; font-weight: 700; font-size: 14px; white-space: nowrap; }
 .ins-max .btn.conf { background: #f0c030; color: #2a1d00; }
 .ins-feito.travado { cursor: default; opacity: 0.9; }
+
+/* ---------- Ficha de herói no topo do Perfil ---------- */
+.pf-ficha { display: block; padding: 14px; border-radius: 20px; border: 1px solid #8a6d22; background: linear-gradient(180deg, #16245e, #0a1130); color: #f4f6ff; text-decoration: none; }
+.pf-ficha.vazia { display: flex; align-items: center; gap: 12px; }
+.pf-ficha.vazia .rk { flex: 0 0 48px; height: 48px; display: grid; place-items: center; border-radius: 12px; background: #0b1230; font-size: 28px; }
+.pf-ficha.vazia strong { display: block; font-size: 15px; }
+.pf-ficha.vazia small { color: #a9b4e0; font-size: 12.5px; }
+.pf-ir { margin-left: auto; font-size: 24px; color: #ffd76a; }
+.pf-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.pf-top .fc-av { flex: 0 0 64px; height: 64px; border-radius: 14px; }
+.pf-id { flex: 1; min-width: 0; }
+.pf-k { color: #ffd76a; font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; }
+.pf-id strong { display: block; font-size: 17px; margin-top: 2px; }
+.pf-id small { color: #a9b4e0; font-size: 12.5px; }
+.pf-rank { display: flex; flex-direction: column; align-items: center; padding: 6px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.35); }
+.pf-rank .rk { font-size: 34px; }
+.pf-rank small { font-size: 11px; color: #a9b4e0; }
+.pf-rank small b { font-family: Georgia, serif; font-size: 14px; }
+.pf-attr { display: grid; grid-template-columns: 40px 1fr 30px; align-items: center; gap: 10px; margin: 6px 0; }
+.pf-attr b { color: #4fd2ff; font-size: 13px; font-weight: 800; }
+.pf-attr strong { text-align: right; font-size: 14px; }
+.pf-attr .fc-bar { height: 8px; }
+.pf-ver { display: block; margin-top: 8px; text-align: right; color: #ffd76a; font-size: 13px; font-weight: 600; }

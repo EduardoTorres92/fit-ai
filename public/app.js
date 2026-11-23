@@ -825,6 +825,7 @@
             <button class="foto-btn" id="trocar-foto" aria-label="Trocar foto de perfil"><img src="${esc(fotoPerfil())}" alt="Foto de ${esc(nomeCompleto())}" referrerpolicy="no-referrer"><span class="foto-cam" aria-hidden="true">📷</span><img class="foto-classe" src="${classeImg(meuNivel().slug)}" alt="" aria-hidden="true"></button>
             <input type="file" id="foto-arquivo" accept="image/*" hidden>
             <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
+          ${fichaPerfil()}
           ${nivelCard()}
           ${temporadaPerfilHtml()}
           ${ligasPerfilHtml(linhasLocais(), true, meuOpts())}
@@ -6625,6 +6626,17 @@
     if (!S.ficha || p1 === "quiz") return `<section class="screen quiz" id="quiz"></section>`;
     return `<section class="screen quiz fc-tela" id="ficha">${fichaHtml("pagina")}</section>`;
   };
+  // Ficha no topo do Perfil: avatar da classe, rank, meta e os 4 atributos (toque abre a ficha completa)
+  function fichaPerfil() {
+    if (!S.ficha) return `<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
+    const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual();
+    return `<a class="pf-ficha" href="#/ficha">
+      <div class="pf-top"><span class="fc-av metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt=""></span>
+        <div class="pf-id"><span class="pf-k">Ficha de herói</span><strong>${esc(n.classe)}${e.slug ? ` · ${esc(e.nome)}` : ""}</strong><small>Nível ${n.nivel}</small></div>
+        <div class="pf-rank"><b class="rk rk-${f.rank}">${f.rank}</b><small>meta <b class="rk-${F.meta}">${F.meta}</b></small></div></div>
+      ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
+      <span class="pf-ver">Ver ficha completa ›</span></a>`;
+  }
   function fichaMini() {
     if (!S.ficha) return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de atleta</strong><span class="t">${QUIZ.length} perguntas rápidas, +${XP.ficha} XP: rank, atributos e uma meta de 30 dias.</span></span></a>`;
     const f = fichaAtual();
