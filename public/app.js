@@ -234,19 +234,19 @@
   const principal = () => (S.principal && progDe(S.principal) ? S.principal : "plano");
 
   // Sequência com folga: em todas as modalidades, 1 dia sem treino por semana (seg a dom) é descanso e não quebra a sequência
-  // (conta como dia da sequência, igual ao descanso do calendário do Insanity). Hoje sem treino ainda não quebra.
+  // (não soma na sequência, só não zera; o segundo dia sem treino zera). Hoje sem treino ainda não quebra.
   function seqFolga(tem, dias) {
     const ks = dias.filter(tem).sort();
     if (!ks.length) return { atual: 0, melhor: 0 };
     let run = 0, folga = 0, semFolga = "", melhor = 0;
     for (let d = parseKey(ks[0]); d < hoje; d = addDays(d, 1)) {
       const k = keyOf(d), sem = keyOf(mondayOf(d));
-      if (tem(k)) { run += 1 + folga; folga = 0; }
+      if (tem(k)) { run += 1; folga = 0; }
       else if (run && !folga && semFolga !== sem) { folga = 1; semFolga = sem; }
       else { run = 0; folga = 0; }
       melhor = Math.max(melhor, run);
     }
-    const atual = run + folga + (tem(hojeKey) ? 1 : 0);
+    const atual = run + (tem(hojeKey) ? 1 : 0);
     return { atual: run || tem(hojeKey) ? atual : 0, melhor: Math.max(melhor, run || tem(hojeKey) ? atual : 0) };
   }
   const sequencia = () => seqFolga(feito, [...new Set([...Object.keys(S.logs), ...diasVideo(), hojeKey])]).atual;
