@@ -3550,7 +3550,7 @@
     const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, prox = CLASSES[n.ci + 1], T = TRILHAS[trilha()];
     const etapas = etapasDe(), f = formaturas();
     return `<div class="nivel-card metal-${n.metal}">
-      <div class="nc-crest nc-arte metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt="Classe ${esc(n.classe)}"></div>
+      ${S.ficha ? "" : `<div class="nc-crest nc-arte metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt="Classe ${esc(n.classe)}"></div>`}
       <div class="nc-txt"><span class="nc-k">Nível ${n.nivel}${n.nivel >= NIVEL_MAX ? " · máximo" : ""} · ${T.ic} ${esc(T.nome)}</span><strong>${esc(n.classe)}${estiloTxt() ? ` <span class="nc-estilo">${esc(estiloTxt())}</span>` : ""}</strong>
         <span class="xp-bar"><i style="width:${n.pct}%"></i></span>
         <small>${n.xp.toLocaleString("pt-BR")} XP${n.nivel < NIVEL_MAX ? ` · faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} para o nível ${n.nivel + 1}` : ""}${prox ? ` · ${esc(prox[1])} no nível ${(n.ci + 1) * 5 + 1}` : ""}</small></div></div>
