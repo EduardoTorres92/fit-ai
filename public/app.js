@@ -651,7 +651,7 @@
       if (loginModo) return telaLoginEmail();
       return `<section class="screen login">
         <div class="login-photo"><img src="${A("login-hero.jpg")}" alt="Atleta fazendo flexão"></div>
-        <img class="login-logo" src="${A("logo-fitai.svg")}" width="85" height="38" alt="FIT.AI">
+        <img class="login-logo" src="assets/icone-192.png" width="88" height="88" alt="FIT.AI">
         <div class="login-panel">
           <div class="top">
             <h1>O app que vai transformar a forma como você treina.</h1>
@@ -4683,7 +4683,7 @@
     const cad = loginModo === "cadastro";
     return `<section class="screen login">
       <div class="login-photo"><img src="${A("login-hero.jpg")}" alt=""></div>
-      <img class="login-logo" src="${A("logo-fitai.svg")}" width="85" height="38" alt="FIT.AI">
+      <img class="login-logo" src="assets/icone-192.png" width="88" height="88" alt="FIT.AI">
       <div class="login-panel form-mode">
         <div class="seg seg-login" role="tablist">
           <button type="button" role="tab" aria-selected="${!cad}" class="${cad ? "" : "on"}" data-modo="entrar">Entrar</button>
