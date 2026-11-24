@@ -33,6 +33,7 @@
   <noscript><style>.vaga--o,.vaga--rodape{border-radius:50%;box-shadow:inset 0 0 0 .24em}</style></noscript>
   <script type="module" crossorigin src="./lp/index-Bnb6GbLX.js"></script>
   <link rel="stylesheet" crossorigin href="./lp/index-B-A_9NYo.css">
+  <link rel="stylesheet" href="./lp-classes.css">
 </head>
 <body>
   <a class="pular" href="#sobre">Pular para o conteúdo</a>
@@ -152,6 +153,51 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+
+    <section class="classes" id="classes" data-classes aria-labelledby="classes-titulo">
+  <div class="gc-shell" aria-roledescription="carrossel" aria-label="Classes do FIT.AI">
+    <div class="gc-atmosphere" aria-hidden="true"></div>
+    <header class="classes__cabeca">
+      <span class="rotulo">Classes</span>
+      <h2 class="classes__titulo" id="classes-titulo">Seu treino vira classe</h2>
+      <p class="classes__lead">O app olha o que você treinou e te dá a classe que combina com isso. Cada classe compete numa liga da temporada.</p>
+      <div class="classes__sexo" role="group" aria-label="Arte das cartas">
+        <button type="button" data-sexo="m" aria-pressed="true">Herói</button>
+        <button type="button" data-sexo="f" aria-pressed="false">Heroína</button>
+      </div>
+    </header>
+    <div class="gc-stage"><div class="gc-floor" aria-hidden="true"></div></div>
+    <div class="gc-bottom">
+      <div class="gc-active-info"><h2>Ninja</h2><p></p></div>
+      <div class="gc-dock" role="group" aria-label="Controles do carrossel">
+        <span class="gc-position" aria-hidden="true"><span>01</span><span>/</span><span>06</span></span>
+        <div class="gc-transport">
+          <button type="button" data-ant aria-label="Anterior"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button type="button" class="gc-play-toggle" aria-label="Tocar o carrossel" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path class="toca" d="M6 4l14 8-14 8z"/><path class="pausa" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+          <button type="button" data-prox aria-label="Próximo"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+      <p class="gc-hint">Arraste para explorar ou use ← → para navegar</p>
+    </div>
+    <p class="gc-sr-only" aria-live="polite" aria-atomic="true"></p>
+    <dialog class="gc-dialog" aria-labelledby="classes-carta-titulo">
+      <div class="gc-dialog-panel">
+        <div class="gc-dialog-bar"><span><i></i> Carta da classe</span><button type="button" data-fechar>✕ Fechar</button></div>
+        <div class="gc-carta">
+          <img alt="">
+          <div class="gc-dialog-caption">
+            <h2 id="classes-carta-titulo"></h2>
+            <p data-liga></p>
+            <p data-desc></p>
+            <div class="gc-regra"><b>Como virar</b><p data-regra></p></div>
+            <a class="gc-external" href="./app">Descobrir a minha classe →</a>
+          </div>
+        </div>
+      </div>
+    </dialog>
   </div>
 </section>
 
@@ -327,5 +373,6 @@
 
   <!-- a peça 3D: um canvas só, por cima da página inteira, sem roubar clique -->
   <canvas class="peca" aria-hidden="true"></canvas>
+<script src="./lp-classes.js" defer></script>
 </body>
 </html>
