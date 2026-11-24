@@ -2913,7 +2913,9 @@
     l.max[id] = v.min * 60; l.fim = { ...(l.fim || {}), [id]: true };
     marcarVideo(p, l, id);
     save(); insRefazer(p, id);
-    toast(antes.length && l.max[id] > Math.max(...antes) ? `Até o fim em ${v.nome}, sem Max Out! Novo recorde 🏆` : `Até o fim, sem Max Out! 🏆`, 3500);
+    const primeira = !Object.keys(fimVideos(linhasLocais().filter((r) => r.data !== k))).includes(id);
+    toast(primeira ? `🏆 Conquista: ${v.nome} até o fim! +${XP.fimVideo} XP` : antes.length && l.max[id] > Math.max(...antes) ? `Até o fim em ${v.nome}, sem Max Out! Novo recorde 🏆` : `Até o fim, sem Max Out! 🏆`, 3500);
+    if (primeira) autoPost(`fim:${id}`, `🏆 Fui até o fim no ${v.nome} sem Max Out!`);
     if (insFeito(p, k) !== era) render();
   });
   function salvarMaxOut(f) {
@@ -3153,6 +3155,17 @@
   }
   const maxOuts = (rows) => rows.filter((r) => VP[r.programa]?.maxOut)
     .flatMap((r) => Object.entries(r.detalhes?.max || {}).map(([v, s]) => ({ k: r.data, v, s: Number(s) || 0 }))).filter((m) => m.s > 0 && INSV[m.v]);
+  // Vídeos feitos até o fim, sem Max Out: { id: primeira data }
+  function fimVideos(rows) {
+    const out = {};
+    rows.filter((r) => VP[r.programa]?.maxOut).sort((a, b) => a.data.localeCompare(b.data))
+      .forEach((r) => Object.keys(r.detalhes?.fim || {}).forEach((v) => { if (INSV[v] && r.detalhes.fim[v] && !out[v]) out[v] = r.data; }));
+    return out;
+  }
+  const VIDS_FIM = () => Object.values(INSV).filter((v) => v.min && VPROGS.some((P) => P.maxOut && P.semanas?.some((sm) => sm.dias.some((t) => t.ids.includes(v.id))) )).map((v) => v.id);
+  const FIM_TIERS = [[1, 0], [5, 100], [10, 200]];
+  const fimXp = (rows = linhasLocais()) => { const n = Object.keys(fimVideos(rows)).length, todos = VIDS_FIM().length;
+    return n * XP.fimVideo + soma(FIM_TIERS.filter(([q]) => n >= q).map(([, b]) => b)) + (todos && n >= todos ? XP.fimTodos : 0); };
   // Fit Tests das linhas (Insanity): [{ k, p, fit, total }] em ordem de data
   const fitTests = (rows) => rows.filter((r) => VP[r.programa]?.fitTest && Array.isArray(r.detalhes?.fit) && r.detalhes.fit.some((n) => n > 0))
     .map((r) => ({ k: r.data, p: r.programa, fit: r.detalhes.fit, total: soma(r.detalhes.fit.map((n) => Number(n) || 0)) })).sort((a, b) => a.k.localeCompare(b.k));
@@ -3226,7 +3239,7 @@
     let recordes = 0; const best = {};
     mx.forEach((m) => { if (best[m.v] && m.s > best[m.v]) recordes++; best[m.v] = Math.max(best[m.v] || 0, m.s); });
     return { treinos: f.length, melhor: sequencias(rows).melhor, horas: Math.floor(soma(f.map((r) => r.minutos || 0)) / 60),
-      melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes,
+      melhorSemana: Math.max(0, ...Object.values(semanas)), maxouts: mx.length, recordes, fim: Object.keys(fimVideos(rows)).length, fimTodos: VIDS_FIM().length,
       insanity: f.filter((r) => VP[r.programa]).length, grupos: (G.grupos || []).length, fits: fitTests(rows).length,
       fitEvo: (() => { const ft = fitTests(rows); return ft.length > 1 ? ft[ft.length - 1].total - ft[0].total : 0; })(), desafios: G.meusDesafios || 0, ...aguaMetricas(),
       max30s1: (() => { const P = VP.insanity; if (!P) return 0; const ds = new Set(f.filter((r) => r.programa === "insanity" && r.detalhes?.w === 0).map((r) => r.detalhes.d)); return P.semanas[0].dias.every((t, d) => !t.ids.length || ds.has(d)) ? 1 : 0; })(),
@@ -3268,7 +3281,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50, pesagem: 15 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50, pesagem: 15, fimVideo: 50, fimTodos: 500 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3440,7 +3453,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + fimXp() + (veterano() ? XP.veterano : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -3642,6 +3655,10 @@
     ["h50", "⌛", "50 horas de treino", (m) => [m.horas, 50]],
     ["maxout", "🥵", "Primeiro Max Out", (m) => [m.maxouts, 1]],
     ["maxrec", "📈", "Recorde de Max Out", (m) => [m.recordes, 1]],
+    ["fim1", "🏆", "Primeiro treino até o fim, sem Max Out", (m) => [m.fim, 1]],
+    ["fim5", "🦘", "5 vídeos até o fim (+100 XP)", (m) => [m.fim, 5]],
+    ["fim10", "🔥", "10 vídeos até o fim (+200 XP)", (m) => [m.fim, 10]],
+    ["fimtodos", "👑", "Todos os vídeos até o fim (+500 XP)", (m) => [m.fim, m.fimTodos || 99]],
     ["ins24", "🌀", "24 treinos de Insanity", (m) => [m.insanity, 24]],
     ["ins48", "💀", "Insanity completo (48)", (m) => [m.insanity, 48]],
     ["fit1", "📋", "Primeiro Fit Test", (m) => [m.fits, 1]],
@@ -3694,10 +3711,17 @@
         .then(({ error }) => { if (!error) { todas.forEach((c) => (enviados[`${uid}|conq|${c}`] = "1")); guardarEnviados(); } });
     }
   }
+  // Um selo por vídeo do MAX:30: acende quando a pessoa vai até o fim sem Max Out (+50 XP cada)
+  function fimGrade() {
+    const ids = VIDS_FIM(); if (!ids.length) return "";
+    const fz = fimVideos(linhasLocais()), n = ids.filter((id) => fz[id]).length;
+    return `<div class="fim-box"><div class="fim-head"><b>🏆 Até o fim · sem Max Out</b><small>${n}/${ids.length} vídeos · +${XP.fimVideo} XP cada</small></div>
+      <div class="fim-grid">${ids.map((id) => `<div class="fim-v${fz[id] ? " on" : ""}" title="${esc(INSV[id].nome)}"><span>${fz[id] ? "🏆" : "🔒"}</span><strong>${esc(INSV[id].nome)}</strong><small>${fz[id] ? ddmm(fz[id]) : `+${XP.fimVideo} XP`}</small></div>`).join("")}</div></div>`;
+  }
   function medalhas() {
     const m = metricasConquista(linhasLocais()), S2 = S.conquistas || {};
     const ganhas = CONQ.filter(([id]) => S2[id]).length;
-    return `<p class="note small">${ganhas} de ${CONQ.length} conquistas</p><div class="badges">${CONQ.map(([id, ic, nome, f]) => {
+    return `${fimGrade()}<p class="note small">${ganhas} de ${CONQ.length} conquistas</p><div class="badges">${CONQ.map(([id, ic, nome, f]) => {
       const [v, alvo] = f(m), ok = !!S2[id];
       return `<div class="badge${ok ? " on" : ""}" title="${esc(nome)}"><span class="b-ic">${conqIc(id, ic)}</span><strong>${esc(nome)}</strong><small>${ok ? `Desde ${ddmm(S2[id])}` : `${Math.min(v, alvo)}/${alvo}`}</small></div>`;
     }).join("")}</div>`;
