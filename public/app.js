@@ -635,8 +635,8 @@
       </div>
       <div class="ex-tags">
         ${v.min ? `<span class="pill gray">${v.min} min</span>` : ""}<span class="pill gray">${esc(v.tipo)}</span>
-        ${ant ? `<span class="pill gray">Último Max Out ${mmss(ant.seg)}</span>` : ""}
-        ${best ? `<span class="pill gray">${icon("zap.svg")}Melhor ${mmss(best)}</span>` : ""}
+        ${ant ? `<span class="pill gray">Último Max Out ${v.min && ant.seg >= v.min * 60 ? "até o fim 🏆" : mmss(ant.seg)}</span>` : ""}
+        ${best ? `<span class="pill gray">${icon("zap.svg")}Melhor ${v.min && best >= v.min * 60 ? "até o fim" : mmss(best)}</span>` : ""}
         ${fitAnt ? `<span class="pill gray">Fit Test anterior: ${soma(fitAnt.fit.map((n) => n || 0))} reps</span>` : ""}
       </div>
       <p class="ex-obs">${esc(v.desc)}</p>
@@ -650,12 +650,13 @@
       </form>` : ""}
       ${av ? `<p class="ex-obs avulso">Fora do calendário de hoje: se fizer, conta como treino de hoje.</p>` : ""}
       <div class="ins-row">
-        ${P.maxOut && l.max?.[id] ? `<span class="ins-max-ok" title="Registrado: não dá para alterar">🔒 Max Out ${mmss(l.max[id])}</span>` : P.maxOut ? `<form class="add-set ins-max" data-max="${id}" data-p="${p}" data-k="${kk}">
+        ${P.maxOut && l.max?.[id] ? `<span class="ins-max-ok" title="Registrado: não dá para alterar">${l.fim?.[id] ? "🏆 Sem Max Out · até o fim" : `🔒 Max Out ${mmss(l.max[id])}`}</span>` : P.maxOut ? `<form class="add-set ins-max" data-max="${id}" data-p="${p}" data-k="${kk}">
           <input type="text" inputmode="numeric" maxlength="5" placeholder="mm:ss" value="${l.max?.[id] ? mmss(l.max[id]) : ""}" aria-label="Tempo do Max Out em ${esc(v.nome)} (minutos:segundos)">
           <button type="submit" class="btn btn-blue">Max Out</button>
         </form>` : ""}
         ${ok && P.maxOut && l.max?.[id] ? `<span class="btn btn-outline done ins-feito travado" title="Registrado com Max Out: não dá para desmarcar">Feito ✓</span>` : `<button class="btn btn-outline${ok ? " done" : ""} ins-feito" data-ins-feito="${id}" data-p="${p}" data-k="${kk}" data-av="${av ? 1 : 0}">${ok ? "Feito ✓" : "Marcar feito"}</button>`}
       </div>
+      ${P.maxOut && !l.max?.[id] && v.min && editavel ? `<button class="lnk-btn ins-fim" data-ins-fim="${id}" data-p="${p}" data-k="${kk}">🏆 Não parei: fui até o fim</button>` : ""}
     </div>`;
   }
 
@@ -2900,6 +2901,21 @@
     const rot = el.querySelector(".ins-rot")?.textContent || "";
     el.outerHTML = insVideoCard(p, id, el.dataset.kc || null, el.dataset.ed === "1", rot);
   }
+  // Sem Max Out: a pessoa foi até o fim do vídeo. Vale o tempo do vídeo inteiro (o melhor Max Out possível) e trava.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ins-fim]");
+    if (!b) return;
+    const p = b.dataset.p, id = b.dataset.insFim, k = b.dataset.k, v = INSV[id];
+    const l = insLogDe(p, k), era = insFeito(p, k);
+    if (l.max?.[id]) return;
+    if (!b.dataset.conf) { b.dataset.conf = "1"; b.textContent = "Confirmar: fui até o fim sem parar 🔒"; b.classList.add("conf"); toast("Toque de novo para confirmar. 🔒"); return; }
+    const antes = insMaxHist(p, id).filter((h) => h.k !== k).map((h) => h.seg);
+    l.max[id] = v.min * 60; l.fim = { ...(l.fim || {}), [id]: true };
+    marcarVideo(p, l, id);
+    save(); insRefazer(p, id);
+    toast(antes.length && l.max[id] > Math.max(...antes) ? `Até o fim em ${v.nome}, sem Max Out! Novo recorde 🏆` : `Até o fim, sem Max Out! 🏆`, 3500);
+    if (insFeito(p, k) !== era) render();
+  });
   function salvarMaxOut(f) {
     const p = f.dataset.p, id = f.dataset.max, k = f.dataset.k;
     const txt = f.querySelector("input").value, seg = segDe(txt);
@@ -2958,7 +2974,7 @@
       const t = insDia(p, l.w, l.d), av = (l.avulso || []).map((id) => INSV[id]?.nome || id);
       const titulo = t && t.ids.length && l.feitos.length ? t.titulo + (av.length ? ` + ${av.join(" + ")}` : "") : av.length ? av.join(" + ") : t ? t.titulo : VP[p].nome;
       out.push({ data: k, programa: p, titulo: titulo.slice(0, 120), concluido: insFeito(p, k), minutos: Math.min(600, minVideo(l)),
-        detalhes: { w: l.w, d: l.d, feitos: l.feitos, max: l.max || {}, ...(l.avulso?.length ? { avulso: l.avulso } : {}), ...(l.dur ? { dur: l.dur } : {}), ...(l.fit ? { fit: l.fit } : {}) } });
+        detalhes: { w: l.w, d: l.d, feitos: l.feitos, max: l.max || {}, ...(l.avulso?.length ? { avulso: l.avulso } : {}), ...(l.dur ? { dur: l.dur } : {}), ...(l.fit ? { fit: l.fit } : {}), ...(l.fim ? { fim: l.fim } : {}) } });
     }
     for (const pk of IAK) for (const [k, l] of Object.entries(S[pk].logs)) {
       const t = iaSessao(pk, l.d, l.w ?? 0);
@@ -3084,7 +3100,7 @@
       if (VP[r.programa] && !S[r.programa].logs[r.data]) {
         S[r.programa].logs[r.data] = { w: Number(d.w) || 0, d: Number(d.d) || 0, feitos: Array.isArray(d.feitos) ? d.feitos.filter((x) => INSV[x]) : [], max: d.max && typeof d.max === "object" ? d.max : {},
           ...(Array.isArray(d.fit) ? { fit: d.fit.map((n) => (Number.isFinite(n) ? n : null)) } : {}),
-          ...(Array.isArray(d.avulso) ? { avulso: d.avulso.filter((x) => INSV[x]) } : {}), ...(Number(d.dur) > 0 ? { dur: Number(d.dur) } : {}) }; mudou = true;
+          ...(Array.isArray(d.avulso) ? { avulso: d.avulso.filter((x) => INSV[x]) } : {}), ...(Number(d.dur) > 0 ? { dur: Number(d.dur) } : {}), ...(d.fim && typeof d.fim === "object" ? { fim: d.fim } : {}) }; mudou = true;
       }
     }
     try {

@@ -1585,3 +1585,5 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .pz-card em { font-style: normal; font-weight: 700; }
 .pz-card em.bom { color: #12a150; }
 .pz-card em.ruim { color: #d9822b; }
+.ins-fim { display: block; margin: 10px auto 0; font-size: 14px; font-weight: 600; color: #c99a1a; }
+.ins-fim.conf { color: #f0c030; text-decoration: underline; }
