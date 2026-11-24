@@ -3570,7 +3570,13 @@
         <li>Corrida ou esteira pelo print: ${ATIV.corrida.base} + ${ATIV.corrida.porKm} por km (até +${ATIV.corrida.max}) · Bike: ${ATIV.bike.base} + ${ATIV.bike.porKm} por km · Caminhada: ${ATIV.caminhada.base} + ${ATIV.caminhada.porKm} por km</li>
         <li>Meta de água: +${XP.agua} · Desafio do grupo: +${XP.desafio} · 2º treino no mesmo dia vale metade</li>
         <li>Formatura de cada etapa: +${XP.formatura}</li>
-        <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>`;
+        <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>
+      <details class="xp-regras"><summary>O que é cada coisa</summary><ul class="note small">
+        <li><b>Nível</b>: quanto você treina. Sobe com o XP, do 1 ao ${NIVEL_MAX}.</li>
+        <li><b>Classe</b>: o título do seu nível, com carta nova a cada 5 níveis (Recruta, Escudeiro…).</li>
+        <li><b>Estilo</b>: como você treina, e também a sua liga na temporada: ${Object.values(ESTILOS).map((e) => `${e.ic} ${e.nome} (${LIGA_T[e.liga].nome})`).join(", ")}. Duas modalidades com 25% ou mais dos treinos fazem de você Ronin.</li>
+        <li><b>Trilha</b>: o plano que o app te passa (etapas e formaturas).</li>
+        <li><b>Grupo</b>: os amigos com quem você compete no ranking e nos desafios.</li></ul></details>`;
   }
   // Selo pequeno de nível (ranking do grupo, perfil de membro)
   const nivelSelo = (cfg) => (cfg && cfg.nivel_xp ? `<span class="nv-selo metal-${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][2])}" title="${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][1])}${ESTILOS[cfg.estilo] ? ` · ${ESTILOS[cfg.estilo].nome}` : ""}"><img src="${classeImg(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][0])}" alt="" width="16" height="16">${Number(cfg.nivel_xp) || 1}${ESTILOS[cfg.estilo] ? `<span class="nv-es">${ESTILOS[cfg.estilo].ic}</span>` : ""}</span>` : "");
@@ -5613,7 +5619,7 @@
     { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
       out.push(`Chefes (metas de recorde): ${cs.filter((c) => c.derrotado).length} de ${cs.length} derrotados.${vivos.length ? ` Mais perto: ${vivos.map((c) => `${c.nome} (${c.desc}; marco ${fmtMarca(c.met, c.melhor)}, HP ${c.hp}%)`).join("; ")}.` : ""} Missões de hoje: ${missoesDe(hojeKey).map((m) => `${m.t} ${m.ok ? "(feita)" : `(${m.fmt(m.valor, m.alvoV)})`}`).join("; ")}.`); }
     out.push(temporadaContexto());
-    { const e = estiloAtual(); out.push(`Estilo de treino (últimos 28 dias): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
+    { const e = estiloAtual(); out.push(`Estilo de treino na temporada (é também a liga dele): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
     if (S.ficha) { const f = fichaAtual(); out.push(`Ficha de atleta: rank ${f.rank} (meta ${S.ficha.meta} até ${ddmm(keyOf(addDays(parseKey(S.ficha.metaIni), 30)))}), ${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(", ")} (0 a 100). Use os atributos mais baixos para sugerir o que treinar.`); }
     { const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, T = TRILHAS[trilha()];
       const libs = CATALOGO.filter((x) => liberado(x.k)).map((x) => x.nome).join(", ");
@@ -6012,13 +6018,8 @@
   };
   const noIntervalo = (rows, a, b) => rows.filter((r) => r.data >= a && r.data <= b);
   // Liga da pessoa na temporada: modalidade com 2+ treinos e 25%+ do total conta; duas ou mais = Híbrido
-  function ligaTemporada(rows, t = temporada()) {
-    const fe = feitas(noIntervalo(rows, t.herda ? "0000" : t.ini, t.fim)), n = {}; // Temporada 1: o que já foi feito antes também conta
-    for (const r of fe) { const m = MOD_DE(r.programa); if (m) n[m] = (n[m] || 0) + 1; }
-    const total = soma(Object.values(n)); if (!total) return null;
-    const contam = Object.entries(n).filter(([, v]) => v >= 2 && v / total >= 0.25);
-    return contam.length >= 2 ? "hibrido" : Object.entries(n).sort((a, b) => b[1] - a[1])[0][0];
-  }
+  // Liga da pessoa na temporada = o estilo dela (mesma regra, ver estiloDe)
+  const ligaTemporada = (rows, t = temporada()) => estiloDe(rows, t).liga;
   const PTS_TIER = [0, 10, 20, 30];
   function pontosTemporada(rows, liga, o, t = temporada()) {
     const ate = t.fase === "fim" ? t.fim : hojeKey, desde = t.herda ? "0000" : t.ini; // herda: quem já treinava parte de onde parou
@@ -6067,7 +6068,7 @@
     return `<div class="section tp-box">
       <div class="tp-head"><img src="${L.img}" alt=""><div><span class="tp-k">${esc(t.nome)} · ${esc(t.sub)}</span><b>Liga ${esc(L.nome)}</b><small>${quando}</small></div></div>
       ${(() => { const q = chefes().find((c) => c.k === "sr-q"); return q && t.fase !== "antes" ? `<a class="tp-srq" href="#/chefes"><img src="${q.img}" alt=""><span><b>Sr. Q · desafios do grupo</b><span class="ch-hp"><i style="width:${q.hp}%"></i></span></span><em>${q.melhor}/8</em></a>` : ""; })()}
-      <div class="chips tp-ligas">${(ligas.length ? ligas : Object.keys(LIGA_T)).map((k) => `<button class="chip${k === sel ? " primary" : ""}" data-tp-liga="${k}">${esc(LIGA_T[k].nome)}${k === minha ? " · você" : ""}</button>`).join("")}</div>
+      <div class="chips tp-ligas">${(ligas.length ? ligas : Object.keys(LIGA_T)).map((k) => `<button class="chip${k === sel ? " primary" : ""}" data-tp-liga="${k}">${ESTILOS[ESTILO_DA_LIGA[k]].ic} ${esc(LIGA_T[k].nome)}${k === minha ? " · você" : ""}</button>`).join("")}</div>
       ${t.fase === "antes" ? `<p class="note small">A temporada começa na segunda, ${ddmm(t.ini)}, e vai até ${ddmm(t.fim)}. Cada pessoa entra numa liga pelo que treinar: quem fizer duas ou mais modalidades entra no Híbrido.</p>`
         : lista.length ? `<ol class="tp-rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}"><span class="tp-pos">${i + 1}º</span>${avatar(G.perfis[x.id], 32)}<span class="tp-nome"><b>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</b><small>${x.treinos} ${sel === "insanity" ? (x.treinos === 1 ? "vídeo" : "vídeos") : x.treinos === 1 ? "treino" : "treinos"}${x.ins ? ` · +${x.ins} insígnias` : ""}${x.max ? ` · ${x.max} Max Out` : ""}${x.chefes ? ` · ${x.chefes} chefe` : ""}</small></span><strong>${x.total}</strong></li>`).join("")}</ol>`
         : `<p class="note small">Ninguém nesta liga ainda.</p>`}
@@ -6135,42 +6136,39 @@
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-tp-liga]"); if (b) { G.ligaSel = b.dataset.tpLiga; render(); } });
 
   /* ==========================================================
-     Estilo de treino: soma-se à classe de nível ("Escudeiro · Monge"). Vem dos treinos dos últimos 28 dias:
-     cada sessão conta pelos minutos (mínimo 20) no tipo dela. Um tipo com 50% ou mais dá o estilo; sem isso, Ronin (híbrido).
+     Estilo = como você treina. É a mesma coisa que a liga da temporada ("Escudeiro · 🥷 Ninja" compete na Liga Insanity).
+     Regra única: conta as sessões da temporada por modalidade; entra toda modalidade com 2+ treinos e 25%+ do total.
+     Uma modalidade dá o estilo dela; duas ou mais, Ronin (Híbrido).
      ========================================================== */
   const ESTILOS = {
-    monge: { nome: "Monge", ic: "🥋", tipo: "corpo", desc: "treina com o peso do corpo (calistenia e Insanity)" },
-    gladiador: { nome: "Gladiador", ic: "🛡️", tipo: "carga", desc: "treina com carga" },
-    batedor: { nome: "Batedor", ic: "🏹", tipo: "cardio", desc: "corre e faz cardio" },
-    berserker: { nome: "Berserker", ic: "🪓", tipo: "metcon", desc: "vive de WODs" },
-    ronin: { nome: "Ronin", ic: "⚔️", tipo: null, desc: "equilibra força e cardio" },
+    ninja: { nome: "Ninja", ic: "🥷", liga: "insanity", desc: "vive dos vídeos do Insanity", arte: false },
+    monge: { nome: "Monge", ic: "🥋", liga: "calistenia", desc: "treina calistenia com o peso do corpo" },
+    gladiador: { nome: "Gladiador", ic: "🛡️", liga: "hipertrofia", desc: "treina com carga na academia" },
+    batedor: { nome: "Batedor", ic: "🏹", liga: "corrida", desc: "corre" },
+    berserker: { nome: "Berserker", ic: "🪓", liga: "cross", desc: "vive de WODs" },
+    ronin: { nome: "Ronin", ic: "⚔️", liga: "hibrido", desc: "mistura duas ou mais modalidades" },
   };
-  const TIPOS_TREINO = [["corpo", "Peso do corpo", "#4fd2ff"], ["carga", "Carga", "#ffb45e"], ["cardio", "Cardio", "#4ee39b"], ["metcon", "WOD", "#ff6b8b"]];
-  function estiloAtual() {
-    const a = keyOf(addDays(hoje, -27)), rows = feitas(linhasLocais()).filter((r) => r.data >= a && r.data <= hojeKey);
-    const t = { corpo: 0, carga: 0, cardio: 0, metcon: 0 }, add = (k, m) => (t[k] += m);
-    for (const r of rows) {
-      const m = Math.max(20, r.minutos || 0), pr = r.programa;
-      if (pr === "calistenia" || pr === "c21" || VP[pr]) add("corpo", m); // Insanity é peso do corpo em vídeo
-      else if (pr === "hiper") add("carga", m);
-      else if (pr === "run") { add("cardio", m * 0.6); add("carga", m * 0.4); }
-      else if (pr === "cf") add("metcon", m);
-      else if (pr === "corrida") add("cardio", m);
-    }
-    const total = soma(Object.values(t)), pct = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, total ? Math.round((v / total) * 100) : 0]));
-    if (rows.length < 3) return { slug: null, pct, treinos: rows.length };
-    const [top] = Object.entries(pct).sort((x, y) => y[1] - x[1]);
-    const slug = top[1] >= 50 ? Object.keys(ESTILOS).find((k) => ESTILOS[k].tipo === top[0]) : "ronin";
-    return { slug, ...ESTILOS[slug], pct, treinos: rows.length, top: top[0] };
+  const ESTILO_DA_LIGA = Object.fromEntries(Object.entries(ESTILOS).map(([k, e]) => [e.liga, k]));
+  const TIPOS_TREINO = [["insanity", "Insanity", "#ff6b8b"], ["calistenia", "Calistenia", "#4fd2ff"], ["hipertrofia", "Academia", "#ffb45e"], ["corrida", "Corrida", "#4ee39b"], ["cross", "Cross", "#c78bff"]];
+  function estiloDe(rows, t = temporada()) {
+    const fe = feitas(noIntervalo(rows, t.herda ? "0000" : t.ini, t.fim)), n = {}; // Temporada 1: o que já foi feito antes também conta
+    for (const r of fe) { const m = MOD_DE(r.programa); if (m) n[m] = (n[m] || 0) + 1; }
+    const total = soma(Object.values(n)), pct = Object.fromEntries(TIPOS_TREINO.map(([k]) => [k, total ? Math.round(((n[k] || 0) / total) * 100) : 0]));
+    if (!total) return { slug: null, liga: null, pct, treinos: 0 };
+    const contam = Object.entries(n).filter(([, v]) => v >= 2 && v / total >= 0.25), top = Object.entries(n).sort((x, y) => y[1] - x[1])[0][0];
+    const liga = contam.length >= 2 ? "hibrido" : top, slug = ESTILO_DA_LIGA[liga];
+    return { slug, ...ESTILOS[slug], pct, treinos: total, top, contam: contam.map(([k]) => k) };
   }
+  const estiloAtual = () => estiloDe(linhasLocais());
   // Barra empilhada com a divisão do treino e o que falta para mudar de estilo
   function estiloHtml() {
     const e = estiloAtual();
     const barra = `<span class="es-bar">${TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("")}</span>
       <span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span>`;
-    if (!e.slug) return `<div class="es-box"><div class="es-top"><span class="es-ic">❔</span><div><b>Estilo: a descobrir</b><small>Faça ${3 - e.treinos} ${3 - e.treinos === 1 ? "treino" : "treinos"} a mais e ele aparece, pelo que você realmente treina.</small></div></div>${e.treinos ? barra : ""}</div>`;
-    const nota = e.slug === "ronin" ? "Nenhum tipo passa de 50%: você é híbrido." : `Mais de 50% do seu treino é ${esc(TIPOS_TREINO.find(([k]) => k === e.top)[1].toLowerCase())}. Se outro tipo passar de 50%, o estilo muda; se nenhum passar, vira Ronin.`;
-    return `<div class="es-box"><div class="es-top"><span class="es-ic">${e.ic}</span><div><b>Estilo: ${esc(e.nome)}</b><small>Você ${esc(e.desc)} · últimos 28 dias</small></div></div>${barra}<p class="es-nota">${nota}</p></div>`;
+    if (!e.slug) return `<div class="es-box"><div class="es-top"><span class="es-ic">❔</span><div><b>Estilo: a descobrir</b><small>Faça o primeiro treino e ele aparece, pelo que você realmente treina. O estilo também é a sua liga na temporada.</small></div></div></div>`;
+    const nome = (k) => TIPOS_TREINO.find(([x]) => x === k)[1];
+    const nota = e.slug === "ronin" ? `${e.contam.map(nome).join(" e ")} passam de 25% do seu treino: você é híbrido e compete na Liga Híbrido.` : `Você compete na Liga ${esc(LIGA_T[e.liga].nome)}. Se outra modalidade chegar a 25% (com 2 treinos ou mais), você vira Ronin.`;
+    return `<div class="es-box"><div class="es-top"><span class="es-ic">${e.ic}</span><div><b>Estilo: ${esc(e.nome)}</b><small>Você ${esc(e.desc)} · nesta temporada</small></div></div>${barra}<p class="es-nota">${nota}</p></div>`;
   }
   const estiloTxt = () => { const e = estiloAtual(); return e.slug ? `${e.ic} ${e.nome}` : ""; };
 
@@ -6719,7 +6717,8 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
   function fichaPerfil() {
     if (!S.ficha) return `<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
     const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual(), g = sexoArte();
-    const arte = e.slug ? `assets/estilos/${e.slug}-${g}` : cartaClasse(n.slug, g).replace(/\.webp$/, "");
+    const comArte = e.slug && e.arte !== false; // Ninja ainda sem arte: usa a carta da classe
+    const arte = comArte ? `assets/estilos/${e.slug}-${g}` : cartaClasse(n.slug, g).replace(/\.webp$/, "");
     const barra = TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("");
     const back = `<div class="pf-verso">
         <span class="pf-k">Ficha de herói</span>
@@ -6727,9 +6726,9 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
         <small class="pf-sub">${esc(n.classe)} · Nível ${n.nivel}</small>
         <div class="pf-rank"><b class="rk rk-${f.rank}">${f.rank}</b><small>meta <b class="rk-${F.meta}">${F.meta}</b></small></div>
         ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
-        ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? `${esc(e.desc)} · 28 dias` : `Estilo aparece em ${3 - e.treinos} ${3 - e.treinos === 1 ? "treino" : "treinos"}`}</small>` : ""}
+        ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? `${esc(e.desc)} · nesta temporada` : "Estilo aparece no primeiro treino"}</small>` : ""}
         <a class="pf-ver" href="#/ficha">Ver ficha completa ›</a></div>`;
-    return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: e.slug ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
+    return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: comArte ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
   }
   function fichaMini() {
     if (!S.ficha) return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de atleta</strong><span class="t">${QUIZ.length} perguntas rápidas, +${XP.ficha} XP: rank, atributos e uma meta de 30 dias.</span></span></a>`;
