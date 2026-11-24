@@ -63,7 +63,7 @@
   const C = (n) => `cards/${n}.jpg`;
   const varia = (lista, chave) => { let h = 0; for (const ch of String(chave)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return lista[h % lista.length]; };
   const IMG = { Empurrar: ["calistenia-paralelas"], Superior: ["calistenia-paralelas", "calistenia-barra"], Puxar: ["calistenia-barra"], Pernas: ["forca-1", "potencia-1"],
-    Perna: ["forca-1", "potencia-1"], Inferior: ["forca-1", "potencia-1"], Core: ["core-1", "core-2"], Tiro: ["cardio-2", "cardio-1"] };
+    Perna: ["forca-1", "potencia-1"], Inferior: ["forca-1", "potencia-1"], Core: ["core-1", "core-2"], Tiro: ["corrida-2", "corrida-1"] };
   const imgDe = (t) => A(C(varia(IMG[t.foco] || ["forca-1", "calistenia-barra", "core-2"], t.titulo)));
   const TODOS_EX = [...new Map(PROGRAMA.flatMap((s) => s.dias).concat([EMERGENCIA]).flatMap((d) => d.ex || []).reverse().map((e) => [e.id, e])).values()].reverse();
   const EXI = Object.fromEntries(TODOS_EX.map((e) => [e.id, e]));
@@ -925,7 +925,7 @@
   if (RUNC.length) {
     const ids = new Set([...RUNC, ...CAL21].map((e) => e.id));
     IA.run = {
-      k: "run", nome: "Corrida e Híbrido", rotulo: "Corrida", cat: [...RUNC, ...CAL21, ...ACAD.filter((e) => !ids.has(e.id))], banner: "cards/cardio-1.jpg", semanas: 0, carga: true,
+      k: "run", nome: "Corrida e Híbrido", rotulo: "Corrida", cat: [...RUNC, ...CAL21, ...ACAD.filter((e) => !ids.has(e.id))], banner: "cards/corrida-1.jpg", semanas: 0, carga: true,
       cargaEx: (c) => ["barra", "halter", "maquina", "polia"].includes(c?.equip),
       convite: "Corrida ou treino híbrido feito para você", resumoConvite: "O Coach AI faz {n} perguntas (nível, objetivo, prova, dias, onde treina força…) e monta a sua semana misturando corrida (rodagem, tiros, longão) com força na academia ou com o peso do corpo. Você anota os minutos de cada corrida e o tempo de cada tiro, e manda o print do Strava ou do relógio para virar XP.",
       intro: "Bora montar sua corrida", oQue: "sua semana de corrida e força, no seu nível",
@@ -1049,7 +1049,8 @@
   }
   const iaSessFeita = (pk, t) => Object.entries(S[pk].logs).some(([k, l]) => l.done && l.d === t.dia && (t.semana != null ? (l.w ?? 0) === t.semana : k >= keyOf(mondayOf(hoje))));
   const IA_IMG = { // [academia, calistenia/corrida]
-    corrida: [/corr|run\b|tiro|long[aã]o|rodagem|fartlek|\d\s?km|h[ií]brid|hyrox/i, ["cardio-1", "cardio-2"], ["cardio-2", "cardio-1"]],
+    hibrido: [/h[ií]brid|hyrox/i, ["hibrido-1"], ["hibrido-1"]],
+    corrida: [/corr|run\b|tiro|long[aã]o|rodagem|fartlek|\d\s?km/i, ["corrida-1", "corrida-2"], ["corrida-2", "corrida-1"]],
     costas: [/costa|puxar|pull|barra|remada/i, ["academia-costas"], ["calistenia-barra"]], pernas: [/perna|inferior|gl[uú]te|lower|leg|agach/i, ["academia-pernas"], ["forca-1", "potencia-1"]],
     core: [/abd|core/i, ["core-1", "core-2"], ["core-2", "core-1"]], bracos: [/bra[çc]|b[ií]ceps|tr[ií]ceps/i, ["academia-bracos"], ["calistenia-paralelas"]],
     peito: [/peito|ombro|superior|push|upper|empurr|flex/i, ["academia-peito"], ["calistenia-paralelas"]], cardio: [/cardio|corpo|full|circuito|hiit/i, ["cross-1", "cardio-1"], ["potencia-2", "cardio-2"]] };
