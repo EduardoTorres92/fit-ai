@@ -712,6 +712,7 @@
           ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
           ${temporadaHome()}
           ${missoesHome()}
+          ${pesagemHome()}
           ${ativHome()}
           ${desafioHome()}
           ${grupoHome()}
@@ -836,6 +837,7 @@
             ${stat("user-small.svg", P.idade || "—", "Idade (anos)", { edit: "idade" })}
             ${stat("circle-check.svg", treinosFeitos(), "Treinos feitos")}
           </div>
+          ${evolucaoCorpoHtml()}
           ${trilhaHtml()}
           <div class="field">
             <span class="field-lbl">Aparência</span>
@@ -3013,7 +3015,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3247,7 +3249,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50, pesagem: 15 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3419,7 +3421,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + (veterano() ? XP.veterano : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -4818,6 +4820,8 @@
     uid = u.id;
     let perfil = null;
     try { perfil = (await sb.from("perfis").select("nome, foto_url, config").eq("id", uid).maybeSingle()).data; } catch {}
+    // Sem peso no aparelho e nem na conta: usa o último peso das fotos de evolução
+    setTimeout(() => { if (!S.perfil.peso && uid) sb.from("evolucao").select("peso, data").eq("usuario_id", uid).order("data", { ascending: false }).limit(10).then(({ data }) => { const v = (data || []).find((x) => Number(x.peso) > 0)?.peso; if (v && !S.perfil.peso) { S.perfil.peso = String(Number(v)); save(); if (location.hash.startsWith("#/perfil")) render(); } }, () => {}); }, 2000);
     const meta = u.user_metadata || {};
     const nome = (perfil?.nome || meta.nome || meta.full_name || meta.name || u.email.split("@")[0]).trim();
     const user = { id: uid, nome, primeiro: nome.split(" ")[0], foto: perfil?.foto_url || meta.avatar_url || null, email: u.email };
@@ -4834,6 +4838,9 @@
       if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
       if (perfil.config.arte && !S.arte) S.arte = perfil.config.arte;
+      if (perfil.config.perfil) for (const [k, v] of Object.entries(perfil.config.perfil)) if (v && !S.perfil[k]) S.perfil[k] = v;
+      if (Array.isArray(perfil.config.medidas)) { const por = Object.fromEntries((S.medidas || []).map((m) => [m.d, m])); perfil.config.medidas.forEach((m) => { if (m?.d && !por[m.d]) por[m.d] = m; }); S.medidas = Object.values(por).sort((a, b) => a.d.localeCompare(b.d)); }
+      if (perfil.config.pesagemPulada && !S.pesagemPulada) S.pesagemPulada = perfil.config.pesagemPulada;
       if (perfil.config.missoes) { S.missoes = S.missoes || {}; for (const [k, n] of Object.entries(perfil.config.missoes)) S.missoes[k] = Math.max(S.missoes[k] || 0, Number(n) || 0); }
       if (perfil.config.missoesTot) S.missoesTot = { ...(S.missoesTot || {}), ...perfil.config.missoesTot };
       if (perfil.config.missoesXpAnt > (S.missoesXpAnt || 0)) S.missoesXpAnt = perfil.config.missoesXpAnt;
@@ -5223,7 +5230,12 @@
       const campo = t.dataset.edit;
       const lbl = { peso: "Seu peso (kg)", altura: "Sua altura (cm)", idade: "Sua idade" }[campo];
       const v = prompt(lbl, S.perfil[campo] || "");
-      if (v !== null) { S.perfil[campo] = v.trim().replace(",", ".").slice(0, 6); save(); render(); }
+      if (v !== null) {
+        S.perfil[campo] = v.trim().replace(",", ".").slice(0, 6);
+        const pz = numBr(v);
+        if (campo === "peso" && pz) { const ant = (S.medidas || []).find((m) => m.d === hojeKey) || {}; S.medidas = [...(S.medidas || []).filter((m) => m.d !== hojeKey), { ...ant, d: hojeKey, peso: pz }].sort((a, b) => a.d.localeCompare(b.d)); }
+        save(); render();
+      }
     } else if (t.dataset.semana !== undefined) {
       S.inicio = keyOf(addDays(mondayOf(hoje), -Number(t.dataset.semana) * 7));
       planoSemana = null; save(); render();
@@ -5656,6 +5668,7 @@
     const P = S.perfil, out = [];
     out.push(`Hoje: ${DIAS[hojeDia]}, ${hojeKey}. ${nomeSemana(w)}, ciclo ${cicloDe(hoje)}. Treino de hoje: ${t ? t.titulo : "—"}.`);
     out.push(`Perfil: ${P.peso || "?"} kg, ${P.altura || "?"} cm, ${P.idade || "?"} anos. Sequência atual: ${sequencia()} dias. Treinos concluídos: ${treinosFeitos()}.`);
+    { const ms = medidas().slice(-8); if (ms.length) out.push(`Pesagens semanais (data: peso kg, medidas cm): ${ms.map((m) => `${m.d}: ${m.peso ?? "?"}${CORPO_MED.filter(([k]) => m[k]).map(([k, l]) => ` ${l.toLowerCase()} ${m[k]}`).join("")}`).join("; ")}. Comente a tendência quando fizer sentido.`); }
     out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
     if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
     { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
@@ -6416,6 +6429,69 @@
   const xpMissoesN = (n, tot = 3) => n * XP.missao + (n >= (tot || 3) ? XP.missoesTodas : 0);
   const missoesXp = () => soma(Object.entries(S.missoes || {}).map(([k, n]) => xpMissoesN(n, S.missoesTot?.[k]))) + (S.missoesXpAnt || 0);
   function renovaEm() { const m = Math.max(0, Math.round((addDays(hoje, 1) - Date.now()) / 60000)); return `${Math.floor(m / 60)}h${pad(m % 60)}`; }
+  /* ---------- Pesagem da semana: peso e medidas, uma vez por semana (vale XP), com a evolução no Perfil ---------- */
+  const CORPO_MED = [["cintura", "Cintura"], ["braco", "Braço"], ["peito", "Peito"], ["quadril", "Quadril"], ["coxa", "Coxa"]];
+  const medidas = () => (S.medidas || []).slice().sort((a, b) => a.d.localeCompare(b.d));
+  const ultMedida = () => medidas().slice(-1)[0] || null;
+  const semanaKey = (k) => keyOf(mondayOf(parseKey(k)));
+  const pesagemXp = () => new Set(medidas().map((m) => semanaKey(m.d))).size * XP.pesagem;
+  const pesagemPendente = () => { const u = ultMedida(); return (!u || semanaKey(u.d) < semanaKey(hojeKey)) && S.pesagemPulada !== semanaKey(hojeKey); };
+  const numBr = (v) => { const n = Number(String(v ?? "").replace(",", ".")); return n > 0 ? Math.round(n * 10) / 10 : null; };
+  const fmt1 = (v) => String(v).replace(".", ",");
+  function pesagemForm(compacto) {
+    const u = ultMedida(), extras = CORPO_MED.filter(([k]) => u?.[k]);
+    const campo = ([k, l]) => `<label>${l} (cm)<input name="${k}" inputmode="decimal" placeholder="${u?.[k] ? fmt1(u[k]) : "—"}"></label>`;
+    return `<form class="pz-form" data-pesagem>
+      <label class="pz-peso">Peso (kg)<input name="peso" inputmode="decimal" required placeholder="${u?.peso ? fmt1(u.peso) : S.perfil.peso || "ex.: 80,5"}"></label>
+      <div class="pz-grid">${(compacto && extras.length ? extras : CORPO_MED.slice(0, 2)).map(campo).join("")}</div>
+      <details class="pz-mais"><summary>Mais medidas (opcional)</summary><div class="pz-grid">${CORPO_MED.filter(([k]) => !(compacto && extras.length ? extras : CORPO_MED.slice(0, 2)).some(([x]) => x === k)).map(campo).join("")}</div></details>
+      <p class="pz-dica">Meça sempre do mesmo jeito: de manhã, em jejum, antes de treinar. Fita métrica na altura do umbigo para a cintura.</p>
+      <div class="pz-acoes"><button type="submit" class="btn btn-blue">Salvar · +${XP.pesagem} XP</button>${compacto ? `<button type="button" class="lnk-btn" data-pesagem-pular>Pular esta semana</button>` : ""}</div>
+    </form>`;
+  }
+  function pesagemHome() {
+    if (!pesagemPendente()) return "";
+    const u = ultMedida();
+    return `<div class="pz-card"><div class="pz-head"><span class="pz-ic">⚖️</span><div><b>Pesagem da semana</b><small>${u ? `Última: ${fmt1(u.peso)} kg em ${ddmm(u.d)}. Como está hoje?` : "Anote seu peso e medidas para ver a evolução semana a semana."}</small></div></div>${pesagemForm(true)}</div>`;
+  }
+  // Linha do peso (SVG) e a diferença de cada medida entre a primeira e a última pesagem
+  function evolucaoCorpoHtml() {
+    const ms = medidas();
+    if (!ms.length) return `<div class="pz-card"><div class="pz-head"><span class="pz-ic">⚖️</span><div><b>Evolução do corpo</b><small>Registre peso e medidas uma vez por semana e acompanhe aqui.</small></div></div>${pesagemForm(false)}</div>`;
+    const ps = ms.filter((m) => m.peso), a = ms[0], z = ms[ms.length - 1];
+    const dif = (k) => { const pr = ms.find((m) => m[k]), ul = [...ms].reverse().find((m) => m[k]); return pr && ul && pr !== ul ? Math.round((ul[k] - pr[k]) * 10) / 10 : null; };
+    // verde quando a mudança vai na direção do objetivo (cintura e quadril descendo; peso descendo, ou subindo para quem quer massa)
+    const sinal = (v, un, k = "peso") => { if (v == null) return ""; const quer = k === "peso" ? (S.quiz?.objetivo === "massa" ? 1 : -1) : k === "cintura" || k === "quadril" ? -1 : 0; return `<em class="${v && quer ? (Math.sign(v) === quer ? "bom" : "ruim") : ""}">${v > 0 ? "+" : ""}${fmt1(v)} ${un}</em>`; };
+    let svg = "";
+    if (ps.length > 1) {
+      const W = 300, H = 80, min = Math.min(...ps.map((m) => m.peso)) - 0.5, max = Math.max(...ps.map((m) => m.peso)) + 0.5;
+      const pts = ps.map((m, i) => [Math.round((i / (ps.length - 1)) * (W - 12)) + 6, Math.round(H - 8 - ((m.peso - min) / (max - min)) * (H - 16))]);
+      svg = `<svg class="pz-linha" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Peso de ${fmt1(ps[0].peso)} a ${fmt1(ps[ps.length - 1].peso)} kg"><polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.5"/>`).join("")}</svg>`;
+    }
+    const linhas = [["peso", "Peso", "kg"], ...CORPO_MED.map(([k, l]) => [k, l, "cm"])].filter(([k]) => ms.some((m) => m[k]));
+    return `<div class="pz-card">
+      <div class="pz-head"><span class="pz-ic">⚖️</span><div><b>Evolução do corpo</b><small>${ms.length} ${ms.length === 1 ? "pesagem" : "pesagens"} · desde ${ddmm(a.d)}</small></div></div>
+      <div class="pz-resumo"><span><small>Peso atual</small><b>${z.peso ? fmt1(z.peso) + " kg" : "—"}</b></span><span><small>Desde o início</small><b>${sinal(dif("peso"), "kg") || "—"}</b></span></div>
+      ${svg}
+      ${linhas.length > 1 ? `<table class="pz-tab"><thead><tr><th></th><th>Início</th><th>Agora</th><th></th></tr></thead><tbody>${linhas.map(([k, l, un]) => { const pr = ms.find((m) => m[k]), ul = [...ms].reverse().find((m) => m[k]); return `<tr><th>${l}</th><td>${fmt1(pr[k])}</td><td>${fmt1(ul[k])}</td><td>${sinal(dif(k), un, k)}</td></tr>`; }).join("")}</tbody></table>` : ""}
+      ${pesagemPendente() ? pesagemForm(true) : `<p class="pz-dica">Próxima pesagem na segunda-feira.</p>`}
+    </div>`;
+  }
+  document.addEventListener("submit", (ev) => {
+    const f = ev.target.closest("[data-pesagem]");
+    if (!f) return;
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(f)), peso = numBr(d.peso);
+    if (!peso || peso < 25 || peso > 350) { toast("Confira o peso."); return; }
+    const reg = { d: hojeKey, peso };
+    for (const [k] of CORPO_MED) { const v = numBr(d[k]); if (v && v > 10 && v < 250) reg[k] = v; }
+    const ant = ultMedida();
+    S.medidas = [...(S.medidas || []).filter((m) => m.d !== hojeKey), reg].sort((a, b) => a.d.localeCompare(b.d)).slice(-104);
+    S.perfil.peso = String(peso); save(); render();
+    const dp = ant?.peso ? Math.round((peso - ant.peso) * 10) / 10 : null;
+    toast(dp == null ? "Pesagem salva! ⚖️" : dp < 0 ? `${fmt1(-dp)} kg a menos desde ${ddmm(ant.d)}! 🔥` : dp > 0 ? `+${fmt1(dp)} kg desde ${ddmm(ant.d)}. Anotado ✍️` : "Mesmo peso da última vez. Anotado ✍️", 3500);
+  });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-pesagem-pular]")) { S.pesagemPulada = semanaKey(hojeKey); save(); render(); } });
   function missoesHome() {
     const ms = missoesDe(hojeKey), feitas = ms.filter((m) => m.ok).length, cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
     const prox = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp)[0];

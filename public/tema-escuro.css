@@ -96,6 +96,9 @@ html[data-tema="escuro"] .rd-rot { fill: var(--fg); }
 html[data-tema="escuro"] .nc-crest.nc-arte.metal-prata { border-color: color-mix(in srgb, #cfd6e6 30%, var(--bg)); }
 html[data-tema="escuro"] .xp-serie { background: color-mix(in srgb, #fff4d6 18%, var(--bg)); }
 html[data-tema="escuro"] .post-auto { background: color-mix(in srgb, #fff4d6 18%, var(--bg)); }
+html[data-tema="escuro"] .pz-card { border: 1px solid var(--line, var(--line)); background: var(--card, var(--card)); }
+html[data-tema="escuro"] .pz-form input { border: 1px solid var(--line, var(--line)); }
+html[data-tema="escuro"] .pz-tab th, html[data-tema="escuro"] .pz-tab td { border-bottom: 1px solid var(--line, var(--line)); }
 
 /* FIT.AI — tema escuro. Liga com <html data-tema="escuro"> (Perfil → Aparência: Escuro, o padrão, Claro ou Automático).
    Esta parte é a manual (cores-base, ícones e o painel de Evolução); o resto vem do tools/tema-escuro.py. */
