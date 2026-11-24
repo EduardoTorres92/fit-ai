@@ -10,7 +10,7 @@ import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/li
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 const txt = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 const num = (v, min, max) => { const n = Number(v); return Number.isFinite(n) && n >= min && n <= max ? n : null; };
-export const TIPOS_ATIV = ["corrida", "caminhada", "bike", "esteira"];
+export const TIPOS_ATIV = ["corrida", "caminhada", "bike", "esteira", "obstaculos", "hyrox"];
 
 const FERRAMENTA = {
   name: "salvar_atividade",
@@ -19,7 +19,7 @@ const FERRAMENTA = {
     type: "object",
     properties: {
       legivel: { type: "boolean", description: "false se a imagem não mostra uma atividade com distância ou tempo legíveis." },
-      tipo: { type: "string", enum: TIPOS_ATIV, description: "corrida (ao ar livre), caminhada (ou trilha/hike), bike (pedal, ciclismo, bike ergométrica) ou esteira (corrida/caminhada em esteira)." },
+      tipo: { type: "string", enum: TIPOS_ATIV, description: "corrida (ao ar livre), caminhada (ou trilha/hike), bike (pedal, ciclismo, bike ergométrica), esteira (corrida/caminhada em esteira), obstaculos (corrida com obstáculos: Spartan, Bravus, OCR, mud run) ou hyrox (prova ou simulado de Hyrox: corrida + estações)." },
       data: { type: "string", description: "Data da atividade em AAAA-MM-DD, só se aparecer na imagem (resolva 'hoje'/'ontem' só se a data de hoje for informada). Omitir se não aparecer." },
       distancia_km: { type: "number", description: "Distância em km (converta milhas: 1 mi = 1,609 km)." },
       tempo_s: { type: "integer", description: "Tempo em movimento (moving time) em segundos; se só houver tempo total, use ele." },

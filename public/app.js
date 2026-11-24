@@ -3249,14 +3249,17 @@
   // Corrida (prints e plano de Corrida e Híbrido): maior corrida, km no total, 5 km mais rápido, semana, bike e dia híbrido
   function corridaMetricas(rows) {
     const it = rows.filter((r) => r.programa === "corrida").flatMap((r) => (Array.isArray(r.detalhes?.itens) ? r.detalhes.itens : []).map((a) => ({ ...a, data: r.data })));
-    const runs = it.filter((a) => a.tipo === "corrida" || a.tipo === "esteira"), sem = {};
+    const runs = it.filter((a) => ehCorrida(a.tipo)), sem = {};
     const planoRun = rows.filter((r) => r.programa === "run" && r.concluido);
     [...runs.map((a) => a.data), ...planoRun.map((r) => r.data)].forEach((d) => { const k = keyOf(mondayOf(parseKey(d))); (sem[k] = sem[k] || new Set()).add(d); });
-    const cincoK = runs.filter((a) => a.km >= 5 && a.tempo > 0).map((a) => (a.tempo / a.km) * 5);
+    const cincoK = runs.filter((a) => (a.tipo === "corrida" || a.tipo === "esteira") && a.km >= 5 && a.tempo > 0).map((a) => (a.tempo / a.km) * 5);
+    const tipoN = (t) => it.filter((a) => a.tipo === t).length, hy = it.filter((a) => a.tipo === "hyrox" && a.tempo > 0).map((a) => a.tempo);
     const forca = new Set(rows.filter((r) => r.concluido && r.programa !== "corrida").map((r) => r.data));
     return { corridas: runs.length + planoRun.length, maiorCorrida: Math.floor(Math.max(0, ...runs.map((a) => a.km || 0)) * 10) / 10, kmCorrida: Math.floor(soma(runs.map((a) => a.km || 0))),
       melhor5k: cincoK.length ? Math.min(...cincoK) : 0, corridasSemana: Math.max(0, ...Object.values(sem).map((x) => x.size)),
       maiorBike: Math.floor(Math.max(0, ...it.filter((a) => a.tipo === "bike").map((a) => a.km || 0))), planoRun: planoRun.length,
+      maiorElev: Math.max(0, ...runs.map((a) => a.elev || 0)), elevTotal: soma(runs.map((a) => a.elev || 0)),
+      esteiras: tipoN("esteira"), obstaculos: tipoN("obstaculos"), hyrox: tipoN("hyrox"), melhorHyrox: hy.length ? Math.min(...hy) : 0,
       diaHibrido: runs.some((a) => forca.has(a.data)) || planoRun.some((r) => (r.detalhes?.sets && Object.keys(r.detalhes.sets).some((id) => !/^run-/.test(id)) && Object.keys(r.detalhes.sets).some((id) => /^run-/.test(id)))) ? 1 : 0 };
   }
   // Água: melhor semana (litros), total e maior sequência de dias batendo a meta
@@ -3289,7 +3292,11 @@
     esteira: { nome: "Esteira", ic: "🏃", base: 30, porKm: 8, max: 40, minKm: 6 },
     caminhada: { nome: "Caminhada", ic: "🚶", base: 20, porKm: 4, max: 20, minKm: 12 },
     bike: { nome: "Bike", ic: "🚴", base: 30, porKm: 2, max: 40, minKm: 2.5 },
+    obstaculos: { nome: "Obstáculos", ic: "🧗", base: 40, porKm: 10, max: 60, minKm: 10 },
+    hyrox: { nome: "Hyrox", ic: "🏋️", base: 80, porKm: 5, max: 40, minKm: 10 },
   };
+  // Tudo que é correr: conta nos km, nas insígnias e nas conquistas de distância (o pace de 5 km só vale na rua e na esteira)
+  const ehCorrida = (t) => t === "corrida" || t === "esteira" || t === "obstaculos" || t === "hyrox";
   XP.ativMax = 120;
   function xpAtiv(a) {
     const t = ATIV[a?.tipo]; if (!t) return 0;
@@ -3318,7 +3325,7 @@
     const dias = Object.entries(S.corrida.logs).filter(([, l]) => l.itens?.length).sort((a, b) => b[0].localeCompare(a[0]));
     if (!dias.length) return "";
     const todas = dias.flatMap(([k, l]) => l.itens.map((a, i) => ({ k, i, a })));
-    const kmTot = soma(todas.map((x) => x.a.km || 0)), runs = todas.filter((x) => x.a.tipo === "corrida" || x.a.tipo === "esteira");
+    const kmTot = soma(todas.map((x) => x.a.km || 0)), runs = todas.filter((x) => ehCorrida(x.a.tipo));
     const kmR = soma(runs.map((x) => x.a.km || 0)), tR = soma(runs.filter((x) => x.a.km).map((x) => x.a.tempo || 0));
     return `<div class="section"><div class="sec-head"><h2>Corridas e pedaladas</h2><span class="strava-tag">pelo print</span></div>
       <div class="stats-row">${stat("circle-check.svg", todas.length, "Atividades")}${stat("zap.svg", km(kmTot * 1000), "Km no total")}${stat("timer.svg", kmR && tR ? ritmo(tR, kmR * 1000) : "—", "Ritmo médio")}</div>
@@ -3678,7 +3685,9 @@
     ["barra1", "🧗", "Primeira barra registrada", (m) => [m.barras, 1]],
     ["grad30", "🎓", "Formado no MAX:30", (m) => [m.grad, 1]],
     ["run1", "👟", "Primeira corrida", (m) => [m.corridas, 1]],
+    ["run3k", "🌱", "3 km numa corrida", (m) => [m.maiorCorrida, 3]],
     ["run5k", "🥉", "5 km numa corrida", (m) => [m.maiorCorrida, 5]],
+    ["run7k", "🎽", "7 km numa corrida", (m) => [m.maiorCorrida, 7]],
     ["run10k", "🥈", "10 km numa corrida", (m) => [m.maiorCorrida, 10]],
     ["run21k", "🥇", "Meia maratona (21 km)", (m) => [m.maiorCorrida, 21]],
     ["run42k", "🏅", "Maratona (42 km)", (m) => [m.maiorCorrida, 42]],
@@ -3688,6 +3697,16 @@
     ["km100", "🌎", "100 km correndo", (m) => [m.kmCorrida, 100]],
     ["km250", "🚀", "250 km correndo", (m) => [m.kmCorrida, 250]],
     ["runsem3", "📆", "3 corridas numa semana", (m) => [m.corridasSemana, 3]],
+    ["elev100", "⛰️", "100 m de subida numa corrida", (m) => [m.maiorElev, 100]],
+    ["elev300", "🏔️", "300 m de subida numa corrida", (m) => [m.maiorElev, 300]],
+    ["elev1000", "🦅", "Rei da montanha: 1.000 m de subida no total", (m) => [m.elevTotal, 1000]],
+    ["esteira1", "🏃", "Primeira corrida na esteira", (m) => [m.esteiras, 1]],
+    ["esteira10", "⚙️", "10 corridas na esteira", (m) => [m.esteiras, 10]],
+    ["obst1", "🧗", "Primeira corrida com obstáculos", (m) => [m.obstaculos, 1]],
+    ["obst3", "🪢", "3 corridas com obstáculos", (m) => [m.obstaculos, 3]],
+    ["hyrox1", "🏋️", "Primeiro Hyrox", (m) => [m.hyrox, 1]],
+    ["hyrox90", "⏱️", "Hyrox abaixo de 1h30", (m) => [m.melhorHyrox && m.melhorHyrox < 5400 ? 1 : 0, 1]],
+    ["hyrox75", "🚀", "Hyrox abaixo de 1h15", (m) => [m.melhorHyrox && m.melhorHyrox < 4500 ? 1 : 0, 1]],
     ["bike50", "🚴", "50 km de bike numa saída", (m) => [m.maiorBike, 50]],
     ["hibrido1", "🦾", "Dia híbrido: corrida + força", (m) => [m.diaHibrido, 1]],
     ["planorun10", "🧭", "10 treinos do plano de corrida", (m) => [m.planoRun, 10]],
@@ -6289,7 +6308,7 @@
       for (const x of s || []) { if (!x) continue; out.push({ data: k, nome: e.nome, kg: x.kg || 0, ...(un === "s" ? { s: x.r || 0 } : un === "reps" ? { reps: x.r || 0 } : {}) }); }
     }
     for (const pr of S.cf?.prs || []) out.push({ data: pr.k || hojeKey, nome: pr.mov || "", kg: pr.kg || 0, reps: pr.reps || 0 });
-    for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (/corrida|esteira/.test(a.tipo || "") && a.km) out.push({ data: k, nome: "corrida", km: a.km });
+    for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (ehCorrida(a.tipo) && a.km) out.push({ data: k, nome: "corrida", km: a.km });
     return out;
   }
   // Recordes que antes eram chefes: hoje são insígnias das ligas (o XP de quem já bateu continua)
