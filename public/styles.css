@@ -145,7 +145,7 @@ a { color: inherit; text-decoration: none; }
 }
 .banner-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .banner-bg img { position: absolute; max-width: none; }
-.banner-bg .home-img { left: 0; width: 100%; height: 184.2%; top: -64.07%; }
+.banner-bg .home-img { inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 70% center; }
 .banner-bg .plano-img { inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .banner-bg::after { content: ""; position: absolute; inset: 0; background: var(--grad); }
 .banner > :not(.banner-bg) { position: relative; }
