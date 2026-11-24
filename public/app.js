@@ -416,7 +416,8 @@
   const check = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
   const primeiroNome = () => (S.user && S.user.primeiro) || "Atleta";
   const nomeCompleto = () => (S.user && S.user.nome) || "Visitante";
-  const fotoPerfil = () => (S.user && S.user.foto) || S.fotoLocal || A("avatar.jpg");
+  // Sem foto própria: o avatar da classe atual (Recruta no começo), no lugar da foto genérica
+  const fotoPerfil = () => (S.user && S.user.foto) || S.fotoLocal || (() => { try { return avatarClasse(meuNivel().slug || "recruta"); } catch { return "assets/classes/avatar/recruta-m.webp"; } })();
 
   function toast(msg, ms = 2500) {
     document.querySelectorAll(".toast").forEach((t) => t.remove());
