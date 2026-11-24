@@ -6141,7 +6141,7 @@
      Uma modalidade dá o estilo dela; duas ou mais, Ronin (Híbrido).
      ========================================================== */
   const ESTILOS = {
-    ninja: { nome: "Ninja", ic: "🥷", liga: "insanity", desc: "vive dos vídeos do Insanity", arte: false },
+    ninja: { nome: "Ninja", ic: "🥷", liga: "insanity", desc: "vive dos vídeos do Insanity" },
     monge: { nome: "Monge", ic: "🥋", liga: "calistenia", desc: "treina calistenia com o peso do corpo" },
     gladiador: { nome: "Gladiador", ic: "🛡️", liga: "hipertrofia", desc: "treina com carga na academia" },
     batedor: { nome: "Batedor", ic: "🏹", liga: "corrida", desc: "corre" },
@@ -6717,7 +6717,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
   function fichaPerfil() {
     if (!S.ficha) return `<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
     const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual(), g = sexoArte();
-    const comArte = e.slug && e.arte !== false; // Ninja ainda sem arte: usa a carta da classe
+    const comArte = !!e.slug;
     const arte = comArte ? `assets/estilos/${e.slug}-${g}` : cartaClasse(n.slug, g).replace(/\.webp$/, "");
     const barra = TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("");
     const back = `<div class="pf-verso">
