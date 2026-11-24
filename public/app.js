@@ -3460,7 +3460,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + fimXp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + (veterano() ? XP.veterano : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -3715,6 +3715,10 @@
   const CONQ_IMG = { seq7: "sequencia-7", maxrec: "recorde-max-out", aguaseq7: "hidratado-7", max30s1: "max30-semana-1", barra1: "primeira-barra", grad30: "graduado-max30" };
   const conqIc = (id, ic) => (CONQ_IMG[id] ? `<img class="b-img" src="assets/emblemas/${CONQ_IMG[id]}.svg" alt="" width="44" height="44">` : ic);
   const CONQI = Object.fromEntries(CONQ.map((c) => [c[0], c]));
+  // XP das conquistas de corrida (uma vez cada)
+  const CONQ_XP = { run1: 20, run3k: 25, run5k: 40, run7k: 50, run10k: 75, run21k: 150, run42k: 300, sub30: 50, sub25: 75, km50: 50, km100: 100, km250: 200, runsem3: 40,
+    elev100: 30, elev300: 60, elev1000: 100, esteira1: 20, esteira10: 50, obst1: 60, obst3: 100, hyrox1: 100, hyrox90: 100, hyrox75: 150, planorun10: 50 };
+  const conqXp = () => soma(Object.keys(S.conquistas || {}).map((k) => CONQ_XP[k] || 0));
   function verificarConquistas(silencioso = false) {
     const m = metricasConquista(linhasLocais());
     S.conquistas = S.conquistas || {};
@@ -3722,7 +3726,7 @@
     novas.forEach(([id]) => (S.conquistas[id] = hojeKey));
     if (novas.length) {
       try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {}
-      if (!silencioso) novas.slice(0, 2).forEach(([, ic, nome], i) => setTimeout(() => toast(`${ic} Nova conquista: ${nome}!`), i * 2600));
+      if (!silencioso) novas.slice(0, 2).forEach(([id, ic, nome], i) => setTimeout(() => toast(`${ic} Nova conquista: ${nome}!${CONQ_XP[id] ? ` +${CONQ_XP[id]} XP` : ""}`), i * 2600));
     }
     if (uid && sb) {
       const todas = Object.keys(S.conquistas).filter((c) => CONQI[c] && enviados[`${uid}|conq|${c}`] !== "1");
@@ -3742,7 +3746,7 @@
     const ganhas = CONQ.filter(([id]) => S2[id]).length;
     return `${fimGrade()}<p class="note small">${ganhas} de ${CONQ.length} conquistas</p><div class="badges">${CONQ.map(([id, ic, nome, f]) => {
       const [v, alvo] = f(m), ok = !!S2[id];
-      return `<div class="badge${ok ? " on" : ""}" title="${esc(nome)}"><span class="b-ic">${conqIc(id, ic)}</span><strong>${esc(nome)}</strong><small>${ok ? `Desde ${ddmm(S2[id])}` : `${Math.min(v, alvo)}/${alvo}`}</small></div>`;
+      return `<div class="badge${ok ? " on" : ""}" title="${esc(nome)}"><span class="b-ic">${conqIc(id, ic)}</span><strong>${esc(nome)}</strong><small>${ok ? `Desde ${ddmm(S2[id])}` : `${Math.min(v, alvo)}/${alvo}`}</small>${CONQ_XP[id] ? `<em class="b-xp">+${CONQ_XP[id]} XP</em>` : ""}</div>`;
     }).join("")}</div>`;
   }
 
