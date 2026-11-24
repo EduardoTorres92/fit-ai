@@ -4675,6 +4675,7 @@
     if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
     if (rota === "home" || rota === "chefes") setTimeout(chefesNovos, 700);
     if (rota === "home") setTimeout(popTemporada, 1400);
+    htcInit();
     const tab = document.querySelector(".wtab.on");
     if (tab) tab.scrollIntoView({ inline: "center", block: "nearest" });
     const aba = document.querySelector(".seg.prog.rolar a.on");
@@ -6626,16 +6627,109 @@
     if (!S.ficha || p1 === "quiz") return `<section class="screen quiz" id="quiz"></section>`;
     return `<section class="screen quiz fc-tela" id="ficha">${fichaHtml("pagina")}</section>`;
   };
-  // Ficha no topo do Perfil: avatar da classe, rank, meta e os 4 atributos (toque abre a ficha completa)
+  /* ==========================================================
+     Carta holográfica (Holo Trading Card do ProfitizeBuild, adaptado para JS puro): frente em WebGL2 com o foil que
+     muda com a inclinação, verso em HTML. Toque vira a carta. A imagem da frente vai escurecida (curva 1,6, arquivo -g)
+     porque o shader clareia no fim. Fora da tela ou fora do DOM, para de desenhar.
+     ========================================================== */
+  const HTC_FRAG = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform vec2 uRes; uniform vec3 uView; uniform float uTime; uniform float uFoil; uniform float uPattern; uniform float uHasBg;
+uniform sampler2D tBg;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 spectrum(float phase) { return 0.66 + 0.25 * cos(6.28318 * (phase + vec3(0.0, 0.33, 0.67))); }
+float grating(vec2 uv) { vec2 p = (uv - vec2(0.5, 0.46)) * vec2(uRes.x / uRes.y, 1.0); return atan(p.y, p.x) * 3.0 + length(p) * 6.0; }
+vec3 film(vec2 uv) { float phase = uv.x * 0.85 + uv.y * 0.55 + uView.x * 1.5 - uView.y * 0.9 + grating(uv) * uPattern; return spectrum(phase); }
+float sweep(vec2 uv) { return pow(0.5 + 0.5 * sin((uv.x * 0.72 + uv.y * 0.45 + uView.x * 1.2 + uView.y * 0.6) * 6.283), 10.0); }
+void main() {
+  vec2 uv = vec2(gl_FragCoord.x / uRes.x, 1.0 - gl_FragCoord.y / uRes.y);
+  vec3 col = uHasBg > 0.5 ? texture(tBg, clamp(uv, 0.0, 1.0)).rgb : vec3(0.03, 0.03, 0.06);
+  vec3 foil = film(uv);
+  float amount = uFoil;
+  float luminance = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  float band = sweep(uv);
+  col *= 1.0 - amount * 0.21 * (1.0 - foil) * (0.2 + band * 0.8);
+  col += foil * amount * band * (0.065 + 0.11 * (1.0 - luminance));
+  float edge = 1.0 - smoothstep(0.015, 0.06, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)));
+  col = mix(col, foil * 0.75 + 0.21, edge * amount * 0.3);
+  vec2 cell = floor(uv * vec2(480.0, 720.0));
+  float flake = step(0.994, hash(cell)) * pow(0.5 + 0.5 * sin(hash(cell + 8.0) * 30.0 + uView.x * 20.0 + uTime * 0.6), 10.0);
+  col += foil * flake * amount * 0.13;
+  fragColor = vec4(pow(clamp(col, 0.0, 1.0), vec3(1.0 / 1.6)), 1.0);
+}`;
+  const HTC_VERT = `#version 300 es
+void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0; gl_Position = vec4(p, 0.0, 1.0); }`;
+  const htcView = (ax, ay) => { const rx = (ax * Math.PI) / 180, ry = (ay * Math.PI) / 180, x = Math.sin(ry) * Math.cos(rx), y = -Math.sin(rx), z = Math.cos(ry) * Math.cos(rx), l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l]; };
+  // HTML da carta: img (a arte normal, usada se não houver WebGL2), tex (a mesma arte escurecida para o shader), ratio (largura/altura)
+  function holoCard({ img, tex, ratio = 2 / 3, back, label = "carta" }) {
+    return `<div class="htc" data-htc="${esc(tex)}" data-htc-img="${esc(img)}"><div class="htc__card" role="button" tabindex="0" aria-pressed="false" aria-label="Virar a ${esc(label)}" style="aspect-ratio:${ratio}">
+      <div class="htc__face htc__front"><canvas class="htc__canvas" aria-hidden="true"></canvas></div>
+      <div class="htc__face htc__back">${back}</div></div></div>`;
+  }
+  function htcInit() {
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelectorAll(".htc[data-htc]:not([data-htc-on])").forEach((root) => {
+      root.dataset.htcOn = "1";
+      const card = root.querySelector(".htc__card"), canvas = root.querySelector("canvas");
+      let flipped = false, ax = 0, ay = 0, tgt = { ax: 0, ay: 0, active: false };
+      const virar = () => { flipped = !flipped; card.setAttribute("aria-pressed", flipped); if (!gl) aplicar(); };
+      card.addEventListener("click", (e) => { if (!e.target.closest("a")) virar(); });
+      card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); virar(); } });
+      const mover = (e) => { const r = card.getBoundingClientRect(), x = (e.clientX - r.left) / Math.max(r.width, 1), y = (e.clientY - r.top) / Math.max(r.height, 1), m = 14;
+        tgt = { ax: Math.max(-m, Math.min(m, (0.5 - y) * 2 * m)), ay: Math.max(-m, Math.min(m, (x - 0.5) * 2 * m)), active: true }; };
+      card.addEventListener("pointermove", mover);
+      ["pointerleave", "pointercancel"].forEach((ev) => card.addEventListener(ev, () => (tgt = { ax: 0, ay: 0, active: false })));
+      const aplicar = () => { card.style.transform = `rotateX(${ax.toFixed(1)}deg) rotateY(${(ay + (flipped ? 180 : 0)).toFixed(1)}deg)`; };
+      const gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
+      if (!gl) { canvas.replaceWith(Object.assign(new Image(), { src: root.dataset.htcImg, className: "htc__canvas", alt: "" })); aplicar(); return; }
+      const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); return x; };
+      const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, HTC_VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, HTC_FRAG)); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { canvas.replaceWith(Object.assign(new Image(), { src: root.dataset.htcImg, className: "htc__canvas", alt: "" })); return; }
+      const vao = gl.createVertexArray(), u = {}; ["uRes", "uView", "uTime", "uFoil", "uPattern", "uHasBg", "tBg"].forEach((k) => (u[k] = gl.getUniformLocation(prog, k)));
+      const texo = gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texo);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((p) => gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      let hasBg = 0; const im = new Image(); im.decoding = "async";
+      im.onload = () => { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texo); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im); hasBg = 1; };
+      im.src = root.dataset.htc;
+      const t0 = performance.now(); let visivel = true;
+      new IntersectionObserver(([e]) => { visivel = e.isIntersecting; if (visivel) requestAnimationFrame(frame); }, { rootMargin: "200px" }).observe(canvas);
+      function frame() {
+        if (!root.isConnected) { gl.getExtension("WEBGL_lose_context")?.loseContext(); return; }
+        if (!visivel) return;
+        const dpr = Math.min(devicePixelRatio || 1, 2), w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+        if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+        const now = (performance.now() - t0) / 1000;
+        const dx = !reduced && !tgt.active ? Math.sin(now * 0.41) * 14 * 0.34 : 0, dy = !reduced && !tgt.active ? Math.cos(now * 0.27) * 14 * 0.46 : 0;
+        const k = reduced ? 1 : 0.12; ax += ((tgt.active ? tgt.ax : 0) + dx - ax) * k; ay += ((tgt.active ? tgt.ay : 0) + dy - ay) * k;
+        const v = htcView(ax, ay);
+        gl.useProgram(prog); gl.bindVertexArray(vao);
+        gl.uniform2f(u.uRes, canvas.width, canvas.height); gl.uniform3f(u.uView, v[0], v[1], v[2]); gl.uniform1f(u.uTime, reduced ? 0 : now);
+        gl.uniform1f(u.uFoil, 1); gl.uniform1f(u.uPattern, 0.22); gl.uniform1f(u.uHasBg, hasBg); gl.uniform1i(u.tBg, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        aplicar();
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+  // Ficha no topo do Perfil: carta holográfica do estilo (ou da classe, até o estilo aparecer); o verso tem rank, meta e atributos
   function fichaPerfil() {
     if (!S.ficha) return `<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
-    const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual();
-    return `<a class="pf-ficha" href="#/ficha">
-      <div class="pf-top"><span class="fc-av metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt=""></span>
-        <div class="pf-id"><span class="pf-k">Ficha de herói</span><strong>${esc(n.classe)}${e.slug ? ` · ${esc(e.nome)}` : ""}</strong><small>Nível ${n.nivel}</small></div>
-        <div class="pf-rank"><b class="rk rk-${f.rank}">${f.rank}</b><small>meta <b class="rk-${F.meta}">${F.meta}</b></small></div></div>
-      ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
-      <span class="pf-ver">Ver ficha completa ›</span></a>`;
+    const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual(), g = sexoArte();
+    const arte = e.slug ? `assets/estilos/${e.slug}-${g}` : cartaClasse(n.slug, g).replace(/\.webp$/, "");
+    const barra = TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("");
+    const back = `<div class="pf-verso">
+        <span class="pf-k">Ficha de herói</span>
+        <strong class="pf-nome">${esc(e.slug ? e.nome : n.classe)}</strong>
+        <small class="pf-sub">${esc(n.classe)} · Nível ${n.nivel}</small>
+        <div class="pf-rank"><b class="rk rk-${f.rank}">${f.rank}</b><small>meta <b class="rk-${F.meta}">${F.meta}</b></small></div>
+        ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
+        ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? `${esc(e.desc)} · 28 dias` : `Estilo aparece em ${3 - e.treinos} ${3 - e.treinos === 1 ? "treino" : "treinos"}`}</small>` : ""}
+        <a class="pf-ver" href="#/ficha">Ver ficha completa ›</a></div>`;
+    return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: e.slug ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
   }
   function fichaMini() {
     if (!S.ficha) return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de atleta</strong><span class="t">${QUIZ.length} perguntas rápidas, +${XP.ficha} XP: rank, atributos e uma meta de 30 dias.</span></span></a>`;

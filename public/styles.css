@@ -1520,3 +1520,21 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .pf-attr strong { text-align: right; font-size: 14px; }
 .pf-attr .fc-bar { height: 8px; }
 .pf-ver { display: block; margin-top: 8px; text-align: right; color: #ffd76a; font-size: 13px; font-weight: 600; }
+
+/* Carta holográfica (frente WebGL, verso HTML) */
+.htc { perspective: 1100px; }
+.htc__card { position: relative; width: 100%; transform-style: preserve-3d; cursor: pointer; border-radius: 18px; outline: none; will-change: transform; transition: transform 0.08s linear; }
+.htc__card:focus-visible { box-shadow: 0 0 0 3px #ffd76a; }
+.htc__face { position: absolute; inset: 0; border-radius: 18px; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); }
+.htc__back { transform: rotateY(180deg); }
+.htc__canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pf-carta { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 14px; }
+.pf-carta .htc { width: min(78vw, 290px); }
+.pf-dica { color: #8d96b8; font-size: 12px; }
+.pf-verso { height: 100%; display: flex; flex-direction: column; gap: 4px; padding: 18px 16px; border: 2px solid #8a6d22; border-radius: 18px; background: linear-gradient(180deg, #16245e, #0a1130); color: #f4f6ff; box-sizing: border-box; }
+.pf-verso .pf-nome { font-size: 24px; line-height: 1.1; margin-top: 2px; }
+.pf-verso .pf-sub { color: #a9b4e0; font-size: 12.5px; }
+.pf-verso .pf-rank { flex-direction: row; gap: 10px; align-self: flex-start; margin: 8px 0 6px; }
+.pf-verso .pf-ver { margin-top: auto; }
+.pf-es { margin-top: 8px; }
+.pf-es-leg { color: #a9b4e0; font-size: 11.5px; }
