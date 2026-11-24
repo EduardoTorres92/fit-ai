@@ -2,7 +2,8 @@
 (() => {
   "use strict";
 
-  const A = (f) => `assets/${f}`;
+  // ?v= força o navegador a buscar de novo as artes trocadas (assets ficam 7 dias em cache)
+  const A = (f) => `assets/${f}${/^(cards\/|login|banner-)/.test(f) ? "?v=mestres1" : ""}`;
   const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
   const INICIAIS = ["S", "T", "Q", "Q", "S", "S", "D"];
   const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
