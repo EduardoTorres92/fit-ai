@@ -1538,3 +1538,20 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .pf-verso .pf-ver { margin-top: auto; }
 .pf-es { margin-top: 8px; }
 .pf-es-leg { color: #a9b4e0; font-size: 11.5px; }
+
+/* XP por série, planilha do exercício e posts automáticos */
+.xp-serie { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fff4d6; color: #a16a00; font-size: 12px; font-weight: 700; }
+.xp-toast .xp-det { display: block; color: #ffd76a; font-weight: 600; }
+.hx-plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 6px; }
+.hx-plan span { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--blue-08); }
+.hx-plan small { font-size: 11px; color: var(--muted); }
+.hx-plan b { font-size: 15px; }
+.hx-plan .sobe b { color: #12a150; }
+.mural-auto { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line, #e6e8f0); border-radius: 14px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.mural-auto small { display: block; color: var(--muted); font-size: 12px; }
+.mural-auto .tg { flex: 0 0 38px; height: 22px; border-radius: 22px; background: #c9ceda; position: relative; transition: background .2s; }
+.mural-auto .tg i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.mural-auto.on .tg { background: var(--blue); }
+.mural-auto.on .tg i { transform: translateX(16px); }
+.post-auto { align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a16a00; background: #fff4d6; padding: 4px 8px; border-radius: 8px; }
+.post-txt.auto { font-weight: 600; }

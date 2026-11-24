@@ -1019,6 +1019,13 @@
   const iaMinTotal = () => soma(IAK.flatMap((pk) => Object.values(S[pk].logs).map((l) => iaMin(pk, l))));
   const iaHist = (pk, id) => Object.keys(S[pk].logs).sort().filter((k) => (S[pk].logs[k].sets?.[id] || []).length).map((k) => ({ k, sets: S[pk].logs[k].sets[id] }));
   const iaAnterior = (pk, id) => iaHist(pk, id).filter((h) => h.k < hojeKey).pop() || null;
+  // Planilha do exercício: maior carga já usada e 1RM estimado (Epley, séries de até 12 reps)
+  function iaPlanilha(pk, id) {
+    const sets = iaHist(pk, id).flatMap((h) => h.sets).filter((s) => s.kg > 0 && s.r > 0);
+    if (!sets.length) return null;
+    const rm = Math.max(...sets.map((s) => s.kg * (1 + Math.min(12, s.r) / 30)));
+    return { rec: maxKg(sets), rm: Math.round(rm * 2) / 2 };
+  }
   const iaRecorde = (pk, id) => Math.max(0, ...iaHist(pk, id).flatMap((h) => h.sets.map((s) => s.r || 0)));
   // Meta do dia a partir da última vez: carga (dupla progressão), repetições ou tempo
   function iaMeta(pk, ex) {
@@ -1343,6 +1350,7 @@
     const sets = editavel ? (iaLogHoje(pk)?.sets?.[ex.id] || []) : [];
     const prev = iaAnterior(pk, ex.id), meta = iaMeta(pk, ex), ult = sets[sets.length - 1];
     const kgSug = ult ? ult.kg || "" : meta?.kg ?? (prev ? maxKg(prev.sets) || "" : "");
+    const plan = carga && un === "reps" ? iaPlanilha(pk, ex.id) : null;
     const [a, b] = faixa(ex.reps);
     const rSug = ult ? ult.r : un === "min" ? a || 10 : b || (ehMax(ex.reps) ? iaRecorde(pk, ex.id) || "" : 10);
     const q = encodeURIComponent(`${c.nome} execução correta`), feitoTudo = sets.length >= ex.series;
@@ -1353,6 +1361,7 @@
       ${c.musculos ? `<p class="ia-musc">💪 ${esc(c.musculos)}</p>` : ""}
       <div class="ex-tags"><span class="pill gray">${ex.series} × ${esc(ex.reps)}</span>${ex.descanso ? `<span class="pill gray">${icon("timer.svg")}${fmtDesc(ex.descanso)}</span>` : ""}
         ${prev ? `<span class="pill gray">Última: ${esc(prev.sets.map((s) => fmtSet(s, un)).join(" · "))}</span>` : ""}</div>
+      ${plan ? `<div class="hx-plan"><span><small>Recorde</small><b>${fmtKg(plan.rec)} kg</b></span><span><small>1RM estimado</small><b>${fmtKg(plan.rm)} kg</b></span>${meta?.kg ? `<span class="${meta.kg > maxKg(prev.sets) ? "sobe" : ""}"><small>Hoje</small><b>${fmtKg(meta.kg)} kg${meta.kg > maxKg(prev.sets) ? " ↑" : ""}</b></span>` : ""}</div>` : ""}
       ${meta && editavel ? `<p class="hx-meta">🎯 ${esc(meta.txt)}</p>` : ""}
       ${ex.obs ? `<p class="ex-obs">${esc(ex.obs)}</p>` : ""}
       ${animDe(pk, ex.id) ? `<button class="hx-anim" data-ia-anim="${animDe(pk, ex.id)}" aria-label="Ver a animação de ${esc(c.nome)}">
@@ -1362,7 +1371,7 @@
       ${c.exec ? `<details class="musc hx-como"><summary><span>📋 Como fazer</span></summary>
         <div class="hx-dica"><p><b>Execução:</b> ${esc(c.exec)}</p><p><b>Evite:</b> ${esc(c.erros)}</p></div></details>` : ""}
       ${editavel ? `
-      <div class="ia-contador${feitoTudo ? " ok" : ""}">${feitoTudo ? `✓ ${ex.series} ${plural} feit${nome === "Tiro" ? "os" : "as"}` : `${nome} <b>${sets.length + 1}</b> de ${ex.series}`}</div>
+      <div class="ia-contador${feitoTudo ? " ok" : ""}">${feitoTudo ? `✓ ${ex.series} ${plural} feit${nome === "Tiro" ? "os" : "as"}` : `${nome} <b>${sets.length + 1}</b> de ${ex.series}`}${iaXpProx(pk) ? `<span class="xp-serie">+${iaXpProx(pk)} XP</span>` : ""}</div>
       ${iaTimerHtml(pk, ex, un, editavel)}
       <div class="sets">
         ${sets.map((s, i) => `<button class="set" data-ia-del="${i}" title="Toque para remover" aria-label="${nome} ${i + 1}: ${esc(fmtSet(s, un))}. Toque para remover">${esc(fmtSet(s, un))}</button>`).join("")}
@@ -1401,10 +1410,24 @@
     if (!S[pk].logs[hojeKey]) { const h = iaHoje(pk) || { d: hojeDia, w: Math.max(0, iaSemana(pk)) }; S[pk].logs[hojeKey] = { d: h.d, w: h.w, sets: {}, done: false }; }
     return S[pk].logs[hojeKey];
   }
+  // Quanto a próxima série de hoje vale (a mesma conta do xpSessao)
+  function iaXpProx(pk) {
+    const l = iaLogHoje(pk), n = l ? nSets(l.sets) : 0;
+    return l?.done ? (n < XP.volumeMax ? 1 : 0) : (n + 1) * XP.parcialSerie <= XP.parcialMax ? XP.parcialSerie : 0;
+  }
   function iaSalvarSerie(pk, id, set) {
+    const exInfo = exDe(pk, id), exSess = (() => { const l0 = iaLogHoje(pk), t0 = l0 ? iaSessao(pk, l0.d, l0.w ?? 0) : null; return t0?.exercicios.find((e) => e.id === id) || { id, reps: "" }; })();
+    const un0 = unDe(pk, exSess), valor = (x) => (un0 === "reps" && x.kg ? x.kg : x.r);
+    const antes = iaHist(pk, id).filter((h) => h.k < hojeKey).flatMap((h) => h.sets);
+    const recAntes = antes.length ? Math.max(...antes.map(valor)) : 0;
     const l = iaGarantirLog(pk), t = iaSessao(pk, l.d, l.w ?? 0), ex = t?.exercicios.find((e) => e.id === id);
     (l.sets[id] = l.sets[id] || []).push(set);
     save();
+    conferirXp(false, `${exInfo?.nome || id} · ${fmtSet(set, un0)}`);
+    if (un0 !== "min" && recAntes > 0 && valor(set) > recAntes) {
+      const fmtV = (v) => (un0 === "s" ? `${v}s` : set.kg ? `${fmtKg(v)} kg` : `${v} reps`);
+      autoPost(`rec:${pk}:${id}:${hojeKey}`, `🏆 Novo recorde no ${exInfo?.nome || id}: ${fmtV(valor(set))} (antes ${fmtV(recAntes)})`);
+    }
     const tudo = t ? t.exercicios.every((e) => (l.sets[e.id] || []).length >= e.series) : false;
     // Descanso: entre séries (academia) ou até o próximo exercício / fim da volta (circuito)
     const ultimoDaVolta = t?.rodadas && t.exercicios[t.exercicios.length - 1].id === id;
@@ -2726,8 +2749,9 @@
     const e = TODOS_EX.find((x) => x.id === id);
     const tot = e.un === "tiro" ? l.sets[id].length : soma(l.sets[id]);
     if (tot >= e.meta && tot - n < e.meta) toast(`${e.nome}: meta batida! ✅`);
-    else if (recAntes > 0 && (menorMelhor(id) ? n < recAntes : n > recAntes)) toast(`Novo recorde em ${e.nome}: ${n}${UN[e.un]}! 🏆`);
+    else if (recAntes > 0 && (menorMelhor(id) ? n < recAntes : n > recAntes)) { toast(`Novo recorde em ${e.nome}: ${n}${UN[e.un]}! 🏆`); autoPost(`rec:cali:${id}:${hojeKey}`, `🏆 Novo recorde em ${e.nome}: ${n}${UN[e.un]} (antes ${recAntes}${UN[e.un]})`); }
     refazerCard(id);
+    conferirXp(false, `${e.nome} · ${n}${UN[e.un]}`);
   });
 
   /* Vídeos do Insanity: vêm de /api/videos para quem está logado (interativo = avisa se der erro) */
@@ -3499,7 +3523,7 @@
   }
   // Depois de salvar: XP ganho, subida de nível/classe e formatura
   let xpAntes = null;
-  function conferirXp(silencioso = false) {
+  function conferirXp(silencioso = false, det = "") {
     const at = etapaAtual();
     if (at.p && at.p().ok) {
       S.formaturas = { ...formaturas(), [at.k]: hojeKey };
@@ -3510,13 +3534,14 @@
     const n = meuNivel(), antes = xpAntes; xpAntes = n;
     if (silencioso || !antes) return;
     const ganho = n.xp - antes.xp;
-    if (ganho > 0) xpToast(ganho, n);
+    if (ganho > 0) xpToast(ganho, n, det);
     if (n.nivel > antes.nivel) setTimeout(() => modalNivel(n, n.ci > antes.ci), 1400);
+    if (n.ci > antes.ci) autoPost(`classe:${n.slug}`, `⬆️ Subi para o nível ${n.nivel} e virei ${n.classe}!`);
   }
-  function xpToast(ganho, n) {
+  function xpToast(ganho, n, det = "") {
     const t = document.createElement("div");
     t.className = "xp-toast"; t.setAttribute("role", "status");
-    t.innerHTML = `<img class="xp-av" src="${avatarClasse(n.slug)}" alt="" width="34" height="34"><div><strong>+${ganho} XP</strong><small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="xp-bar"><i style="width:${n.pct}%"></i></span></div>`;
+    t.innerHTML = `<img class="xp-av" src="${avatarClasse(n.slug)}" alt="" width="34" height="34"><div><strong>+${ganho} XP</strong>${det ? `<small class="xp-det">${esc(det)}</small>` : ""}<small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="xp-bar"><i style="width:${n.pct}%"></i></span></div>`;
     document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add("on"));
     setTimeout(() => { t.classList.remove("on"); setTimeout(() => t.remove(), 400); }, 2600);
@@ -4028,7 +4053,8 @@
       <header class="post-head">${avatar(G.perfis[p.usuario_id], 36)}<div><strong>${esc(G.perfis[p.usuario_id]?.nome || "Atleta")}</strong><small>${quando(p.criado_em)}</small></div>
         ${podeApagar ? `<button class="lnk-btn post-del" data-post-apagar="${p.id}" aria-label="Apagar post">Apagar</button>` : ""}</header>
       ${t?.titulo ? `<p class="post-treino">${t.concluido === false ? "⏳" : "✅"} ${esc(t.titulo)}${t.minutos ? ` · ${fmtMin(t.minutos)}` : ""}${t.programa ? ` · ${esc(progDe(t.programa)?.curto || IA[t.programa]?.nome || (t.programa === "calistenia" ? NOME_PROG : t.programa))}` : ""}</p>` : ""}
-      ${p.texto ? `<p class="post-txt">${esc(p.texto)}</p>` : ""}
+      ${t?.auto ? `<p class="post-auto">Conquista</p>` : ""}
+      ${p.texto ? `<p class="post-txt${t?.auto ? " auto" : ""}">${esc(p.texto)}</p>` : ""}
       ${p.foto ? (M.urls[p.foto] ? `<img class="post-foto" src="${esc(M.urls[p.foto])}" alt="Foto de ${nomeCurto(p.usuario_id)}" loading="lazy">` : `<div class="post-foto vazia">📷</div>`) : ""}
       <div class="post-reacoes">${REACOES.map((e) => { const n = rs.filter((r) => r.emoji === e).length, eu = rs.some((r) => r.emoji === e && r.usuario_id === uid);
         return `<button class="reacao${eu ? " on" : ""}" data-reagir="${e}" data-post-id="${p.id}" aria-pressed="${eu}" title="${rs.filter((r) => r.emoji === e).map((r) => (G.perfis[r.usuario_id]?.nome || "").split(" ")[0]).join(", ")}">${e}${n ? ` <b>${n}</b>` : ""}</button>`; }).join("")}</div>
@@ -4039,9 +4065,24 @@
       <form class="coment-form" data-comentar="${p.id}" autocomplete="off"><input name="t" maxlength="300" placeholder="Comente…" aria-label="Escreva um comentário"><button type="submit" class="btn btn-blue">Enviar</button></form>
     </article>`;
   }
+  // Conquistas viram post no mural de todos os grupos (recorde, chefe derrotado, nova classe). Uma vez por chave;
+  // dá para desligar no mural.
+  async function autoPost(chave, texto) {
+    if (!uid || !sb || S.autoPost === false || !(G.grupos || []).length) return;
+    S.autoPostados = S.autoPostados || {};
+    if (S.autoPostados[chave]) return;
+    S.autoPostados[chave] = hojeKey;
+    const ks = Object.keys(S.autoPostados); if (ks.length > 300) ks.slice(0, ks.length - 300).forEach((k) => delete S.autoPostados[k]);
+    save();
+    let ok = 0;
+    for (const g of G.grupos) { try { const { error } = await sb.from("posts").insert({ grupo_id: g.id, usuario_id: uid, texto, foto: null, treino: { auto: true } }); if (!error) ok++; } catch {} }
+    if (ok) { toast("📣 Conquista postada no mural do grupo", 2600); G.carregadoEm = 0; }
+    else { delete S.autoPostados[chave]; save(); }
+  }
   function muralHtml() {
     return `<div class="section mural">
       <div class="sec-head"><h2>📣 Mural do grupo</h2><button class="lnk-btn" data-mural-atualizar>Atualizar</button></div>
+      <button class="mural-auto${S.autoPost === false ? "" : " on"}" data-autopost aria-pressed="${S.autoPost !== false}"><span class="tg"><i></i></span><span><b>Postar minhas conquistas</b><small>Recorde, chefe derrotado e nova classe aparecem aqui sozinhos</small></span></button>
       <button class="mural-novo" data-post-novo>${avatar(G.perfis[uid] || { nome: nomeCompleto(), foto_url: S.user?.foto }, 32)}<span>Como foi o treino? Poste uma foto ou um comentário…</span><b>📸</b></button>
       ${M.posts.length ? M.posts.map(postHtml).join("") : `<p class="note">Ninguém postou ainda. Depois do treino, mostre para a galera! 💪</p>`}
     </div>`;
@@ -4129,10 +4170,11 @@
   }
 
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-post-novo],[data-post-fechar],[data-reagir],[data-post-coments],[data-post-apagar],[data-coment-apagar],[data-mural-atualizar]");
+    const t = e.target.closest("[data-post-novo],[data-post-fechar],[data-reagir],[data-post-coments],[data-post-apagar],[data-coment-apagar],[data-mural-atualizar],[data-autopost]");
     if (!t) return;
     const ds = t.dataset;
-    if (t.hasAttribute("data-post-novo")) abrirNovoPost();
+    if (t.hasAttribute("data-autopost")) { S.autoPost = S.autoPost === false; save(); render(); toast(S.autoPost ? "Suas conquistas vão para o mural." : "Posts automáticos desligados."); }
+    else if (t.hasAttribute("data-post-novo")) abrirNovoPost();
     else if (t.hasAttribute("data-post-fechar")) $("#post-dlg")?.close();
     else if (t.hasAttribute("data-mural-atualizar")) { G.carregadoEm = 0; carregarGrupos(true); toast("Atualizando…"); }
     else if (ds.reagir) {
@@ -6301,6 +6343,7 @@
     if (!novos.length) return;
     S.chefesVistos = mortos; save();
     const c = chefes().find((x) => x.k === novos[0]);
+    novos.forEach((k) => { const ch = chefes().find((x) => x.k === k); if (ch) autoPost(`chefe:${k}`, `⚔️ Derrotei o chefe ${ch.nome}: ${ch.desc}. Meu marco: ${marcaChefe(ch)}`); });
     dlgGami(`<div class="gami-crest ch-crest">${c.img ? `<img src="${c.img}" alt="">` : c.ic}</div><p class="gami-k">Chefe derrotado · +${XP.chefe} XP</p><h2>${esc(c.nome)}</h2>
       <p class="note">${esc(c.desc)}: o seu marco é <b>${marcaChefe(c)}</b>.${novos.length > 1 ? ` E mais ${novos.length - 1} chefe${novos.length > 2 ? "s" : ""} caiu junto!` : ""}</p>`);
   }
