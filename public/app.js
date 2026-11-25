@@ -4170,8 +4170,8 @@
   function membroTitulo(id) { const f = membroCfg(id).d7Feito; return f && D7[f.k] ? `<span class="pf-titulo">🎖️ ${esc(D7[f.k].titulo)}</span>` : ""; }
   function cartaMembroHtml(id, rows) {
     const c = membroCfg(id), n = nivelDe(Number(c.xp) || 0), est = estiloDe(rows), e = est.slug, E = e && ESTILOS[e], g = membroG(id);
-    const img = e && NIVEIS_ARTE.has(e) ? cartaDe(e, n.slug, g) : `assets/classes/cartas/${n.slug}-${g}.webp`;
-    return `<div class="mb-carta"><img src="${img}" alt="Carta ${esc(n.classe)}${E ? ` ${esc(E.nome)}` : ""}" loading="lazy">
+    const img = spriteDe(e, g, n.slug) || (e && NIVEIS_ARTE.has(e) ? cartaDe(e, n.slug, g) : `assets/classes/cartas/${n.slug}-${g}.webp`);
+    return `<div class="mb-carta${spriteDe(e, g, n.slug) ? " mb-sprite" : ""}"><img src="${img}" alt="Carta ${esc(n.classe)}${E ? ` ${esc(E.nome)}` : ""}" loading="lazy">
       <div class="mb-info"><span class="qz-kicker">Classe e estilo</span><b>${esc(n.classe)}${E ? ` · ${E.ic} ${esc(E.nome)}` : ""}</b>
         <small>Nível ${n.nivel} · ${n.xp.toLocaleString("pt-BR")} XP</small><span class="xp-bar mb-xp"><i style="width:${n.pct}%"></i></span>
         ${E ? `<small class="mb-mestre">${g === "f" ? "Mestra" : "Mestre"}: <b>${esc(E.mestre[g])}</b> · ${esc(E.lema)}</small>` : `<small class="mb-mestre">Estilo aparece no primeiro treino</small>`}</div></div>`;
@@ -7148,8 +7148,23 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     });
   }
   // Ficha no topo do Perfil: carta holográfica do estilo (ou da classe, até o estilo aparecer); o verso tem rank, meta e atributos
+  // Personagens animados (loop parado, gerados da própria carta com tools/animar-sprite.py): estilo-sexo-classe
+  const SPRITES = new Set(["ninja-m-recruta"]);
+  const spriteDe = (e, g, slug) => (e && SPRITES.has(`${e}-${g}-${slug}`) ? `assets/estilos/sprites/${e}-${g}-${slug}.webp` : null);
+  // Palco do personagem no Perfil: no lugar da carta, que continua a um toque (Personagem | Carta)
+  function palcoHtml(sprite, carta, nome) {
+    const v = S.pfVista === "carta" ? "carta" : "sprite";
+    return `<div class="pf-carta pf-dupla" data-vista="${v}">
+      <div class="pf-palco"><img class="pf-sprite" src="${sprite}" alt="${esc(nome)} animado"><span class="pf-chao"></span></div>
+      <div class="pf-cartawrap">${carta}</div>
+      <div class="pf-troca" role="group" aria-label="Ver personagem ou carta"><button type="button" data-pf-vista="sprite" aria-pressed="${v === "sprite"}">Personagem</button><button type="button" data-pf-vista="carta" aria-pressed="${v === "carta"}">Carta</button></div>
+    </div>`;
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-pf-vista]"); if (!b) return; S.pfVista = b.dataset.pfVista; save();
+    const box = b.closest(".pf-dupla"); if (box) { box.dataset.vista = S.pfVista; box.querySelectorAll("[data-pf-vista]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.pfVista === S.pfVista)); htcInit(); } });
   function fichaPerfil() {
-    if (!S.ficha) return `<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
+    const sprite = spriteDe(estiloComNiveis(), sexoArte(), meuNivel().slug);
+    if (!S.ficha) return `${sprite ? palcoHtml(sprite, `<img class="pf-cartaimg" src="${cartaClasse(meuNivel().slug)}" alt="">`, meuNivel().classe) : ""}<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
     const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual(), g = sexoArte();
     const comArte = !!e.slug;
     const niveis = !!estiloComNiveis(); // com carta por classe, a ficha mostra a carta da classe atual dentro do estilo
@@ -7163,7 +7178,9 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
         ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
         ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? esc(e.desc) : "Estilo aparece no primeiro treino"}</small>` : ""}
         <a class="pf-ver" href="#/ficha">Ver ficha completa ›</a></div>`;
-    return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: comArte || niveis ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
+    const carta = `${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: comArte || niveis ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small>`;
+    if (sprite) return palcoHtml(sprite, carta, e.slug ? `${e.nome} ${n.classe}` : n.classe);
+    return `<div class="pf-carta">${carta}</div>`;
   }
   function fichaMini() {
     if (!S.ficha) return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de atleta</strong><span class="t">${QUIZ.length} perguntas rápidas, +${XP.ficha} XP: rank, atributos e uma meta de 30 dias.</span></span></a>`;
