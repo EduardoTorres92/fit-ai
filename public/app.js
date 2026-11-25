@@ -219,6 +219,9 @@
     } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])), cf: { logs: {}, perfil: {} }, corrida: { logs: {} } }; }
   }
   let CACHE_CHEFES = null; // chefes calculados do histórico (zera a cada save)
+  // Ligas (insígnias por modalidade) e chefes ficam escondidos por enquanto. O XP já ganho com eles continua valendo
+  // (ninguém perde nível); para trazer de volta, é só ligar aqui.
+  const LIGAS_CHEFES = false;
   function save() { CACHE_CHEFES = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
   const semanasDesde = (d) => Math.floor(diffDays(parseKey(S.inicio), d) / 7);
@@ -627,7 +630,7 @@
     const hist = P.maxOut ? insMaxHist(p, id) : [], ant = hist.filter((h) => h.k < k).pop(), best = hist.length ? Math.max(...hist.map((h) => h.seg)) : 0;
     const link = insLink(id);
     const fit = v.fitTest && P.fitTest, fitAnt = fit ? fitHist(p).filter((h) => h.k < kk).pop() : null;
-    const boss = id === "cardio-challenge" || v.fitTest ? chefes().find((c) => c.k === (v.fitTest ? "shaunt-ft" : "shaunt-cc")) : null;
+    const boss = LIGAS_CHEFES && (id === "cardio-challenge" || v.fitTest) ? chefes().find((c) => c.k === (v.fitTest ? "shaunt-ft" : "shaunt-cc")) : null;
     return `${boss ? chefeBanner(boss, boss.derrotado ? "Chefe já derrotado · revanche" : "Dia de chefe!") : ""}<div class="ex ins${ok ? " done" : ""}" data-ins="${id}" data-kc="${k || ""}" data-ed="${editavel ? 1 : 0}">
       <div class="ex-top">
         <span class="ex-name"><span class="ex-check">${check}</span><span>${rotulo ? `<small class="ins-rot">${esc(rotulo)}</small>` : ""}${esc(v.nome)}</span></span>
@@ -4917,7 +4920,7 @@
     app.innerHTML = telas[rota](p1, p2);
     if (rota === "onboarding") startQuiz("onboarding");
     if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
-    if (rota === "home" || rota === "chefes") setTimeout(chefesNovos, 700);
+    if (LIGAS_CHEFES && (rota === "home" || rota === "chefes")) setTimeout(chefesNovos, 700);
     htcInit();
     const tab = document.querySelector(".wtab.on");
     if (tab) tab.scrollIntoView({ inline: "center", block: "nearest" });
@@ -5870,7 +5873,7 @@
     { const ms = medidas().slice(-8); if (ms.length) out.push(`Pesagens semanais (data: peso kg, medidas cm): ${ms.map((m) => `${m.d}: ${m.peso ?? "?"}${CORPO_MED.filter(([k]) => m[k]).map(([k, l]) => ` ${l.toLowerCase()} ${m[k]}`).join("")}`).join("; ")}. Comente a tendência quando fizer sentido.`); }
     out.push(`Nível informado: ${S.nivel || "não informado"}. Programa principal: ${progDe(principal())?.nome || NOME_PROG}.`);
     if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
-    { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
+    if (LIGAS_CHEFES) { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
       out.push(`Chefes (metas de recorde): ${cs.filter((c) => c.derrotado).length} de ${cs.length} derrotados.${vivos.length ? ` Mais perto: ${vivos.map((c) => `${c.nome} (${c.desc}; marco ${fmtMarca(c.met, c.melhor)}, HP ${c.hp}%)`).join("; ")}.` : ""} Missões de hoje: ${missoesDe(hojeKey).map((m) => `${m.t} ${m.ok ? "(feita)" : `(${m.fmt(m.valor, m.alvoV)})`}`).join("; ")}.`); }
     out.push(semanaContexto());
     { const e = estiloAtual(); out.push(`Estilo de treino (pelo que ele treina): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
@@ -6245,6 +6248,7 @@
   }
   // Seções das ligas no Perfil (as que fazem sentido para a pessoa) e no perfil de membro (as que têm alguma insígnia)
   function ligasPerfilHtml(rows, eu, o) {
+    if (!LIGAS_CHEFES) return "";
     return LIGAS.filter((L) => (eu ? L.vis() || L.ins(rows, o).some((x) => x.tier) : true)).map((L) => ligaHtml(L, rows, eu, o)).join("") +
       (eu ? `<p class="note small">Cada liga tem insígnias de bronze, prata e ouro, e um chefe que cai quando todas são conquistadas, em qualquer faixa. Tudo sai dos seus treinos registrados.</p>` : "");
   }
@@ -6276,7 +6280,7 @@
   function rankingSemanaHtml() {
     const lista = G.membros.map((id) => ({ id, xp: xpSemanaDe(id) })).sort((a, b) => b.xp - a.xp);
     const fim = addDays(mondayOf(hoje), 6), faltam = diffDays(hoje, fim);
-    const q = chefes().find((c) => c.k === "sr-q");
+    const q = LIGAS_CHEFES && chefes().find((c) => c.k === "sr-q");
     return `<div class="section tp-box">
       <div class="tp-head"><span class="tp-ic">⚡</span><div><span class="tp-k">Ranking da semana</span><b>XP de segunda até hoje</b><small>${faltam ? `zera em ${faltam} ${faltam === 1 ? "dia" : "dias"} (segunda)` : "último dia: zera amanhã"}</small></div></div>
       ${q ? `<a class="tp-srq" href="#/chefes"><img src="${q.img}" alt=""><span><b>Sr. Q · desafios do grupo</b><span class="ch-hp"><i style="width:${q.hp}%"></i></span></span><em>${q.melhor}/8</em></a>` : ""}
@@ -6292,7 +6296,7 @@
     const out = [];
     if (uid && G.membros?.length) { const l = G.membros.map((id) => ({ id, xp: xpSemanaDe(id) })).sort((a, b) => b.xp - a.xp), i = l.findIndex((x) => x.id === uid);
       if (i >= 0) out.push(`Ranking da semana do grupo (XP de segunda até hoje): ${i + 1}º de ${l.length} com ${l[i].xp} XP${i > 0 ? `, ${l[i - 1].xp - l[i].xp} XP atrás de quem está na frente` : ""}.`); }
-    const q = chefes().find((c) => c.k === "sr-q"), d = uid && desafioDaSemana();
+    const q = LIGAS_CHEFES && chefes().find((c) => c.k === "sr-q"), d = uid && desafioDaSemana();
     if (q) out.push(`Sr. Q (chefe dos desafios do grupo): ${q.melhor}/8 desafios cumpridos.${d ? ` Desafio desta semana: "${d.titulo}" (${(G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid) ? "já cumprido" : `ainda não cumprido, ${faltaDesafio(d)}`}).` : ""}`);
     out.push(d7Contexto());
     out.push("Quando fizer sentido, dê 1 ou 2 dicas concretas tiradas daqui (desafio pendente, o que falta no desafio de 7 dias). Sem inventar números que não estão aqui.");
@@ -6302,7 +6306,7 @@
   function semanaHome() {
     const liga = estiloAtual().liga;
     const bk = liga === "insanity" ? (VP.insanity && (principal() === "insanity" || !VP.insanity60) ? "shaunt-cc" : "shaunt-ft") : liga ? LIGAS.find((L) => L.k === liga)?.chefe : null;
-    const boss = bk && chefes().find((c) => c.k === bk);
+    const boss = LIGAS_CHEFES && bk && chefes().find((c) => c.k === bk);
     const bossHtml = boss ? `<a class="tp-srq tp-boss" href="#/chefes"><img src="${boss.img}" alt=""><span><b>${esc(boss.nome)}${boss.derrotado ? " · derrotado!" : ""}</b><span class="ch-hp"><i style="width:${boss.hp}%"></i></span></span><em>HP ${boss.hp}%</em></a>` : "";
     const d7 = d7Home();
     return d7 || bossHtml ? `<div class="tp-home-wrap">${d7}${bossHtml}</div>` : "";
@@ -6464,7 +6468,7 @@
   });
 
   /* ==========================================================
-     Estilo = como você treina ("Escudeiro · 🥷 Ninja"). Também diz qual chefe de modalidade aparece na home.
+     Estilo = como você treina ("Escudeiro · 🥷 Ninja"). Também diz qual chefe de modalidade aparece na home (quando LIGAS_CHEFES).
      Regra única: conta as sessões de todo o histórico por modalidade; entra toda modalidade com 2+ treinos e 25%+ do total.
      Também vira Ronin quem treina 3+ modalidades com 2+ treinos em cada (variedade), mesmo com uma delas dominando.
      Uma modalidade dá o estilo dela; duas ou mais, Ronin (Híbrido).
@@ -6625,7 +6629,7 @@
             : `<div class="alb-it off" title="Chegue a ${esc(nome)} como ${esc(E.nome)}"><img src="${cartaDe(e, slug, g)}" alt="" loading="lazy"><span class="carta-lock">🔒</span><small>${esc(nome)}</small></div>`).join("")}</div></div>`; }).join("")}
     </section>`;
   };
-  telas.chefes = () => {
+  if (LIGAS_CHEFES) telas.chefes = () => {
     setToolbar(null);
     const cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
     const ordem = [...cs].sort((a, b) => (b.rel - a.rel) || (a.derrotado - b.derrotado) || (b.tem - a.tem) || (a.hp - b.hp));
@@ -6797,7 +6801,7 @@
       <div class="ms-head"><span class="ms-k">Missões do dia</span><span class="ms-t" data-renova>renovam em ${renovaEm()}</span></div>
       ${ms.map((m) => `<div class="ms-row${m.ok ? " ok" : ""}"><span class="ms-ic">${m.ok ? "✓" : m.ic}</span><div class="ms-txt"><b>${esc(m.t)}</b><span class="ms-bar"><i style="width:${m.pct}%"></i></span></div><span class="ms-v">${m.ok ? `+${XP.missao} XP` : esc(m.fmt(m.valor, m.alvoV))}</span></div>`).join("")}
       <p class="ms-bonus">${feitas >= ms.length ? `🏆 Todas cumpridas: +${XP.missoesTodas} XP de bônus!` : `Cumpra as ${ms.length} e ganhe <b>+${XP.missoesTodas} XP</b> de bônus (${feitas}/${ms.length})`}</p>
-      <a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.img ? `<img class="ms-ch-img" src="${prox.img}" alt="">` : prox.ic || ""} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>
+      ${LIGAS_CHEFES ? `<a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.img ? `<img class="ms-ch-img" src="${prox.img}" alt="">` : prox.ic || ""} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>` : ""}
     </div>`;
   }
   setInterval(() => { const el = document.querySelector("[data-renova]"); if (el) el.textContent = `renovam em ${renovaEm()}`; }, 30000);
