@@ -9,6 +9,7 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { paramsCoach } from "../functions/coach.mjs";
@@ -317,7 +318,7 @@ export async function processar(u, permitido) {
     salvar();
     const conta = d.contas[v.email];
     if (ehDono(v.email)) await api("setMyCommands", { scope: { type: "chat", chat_id: chat }, commands: [
-      { command: "admin", description: "Painel do dono" }, { command: "hoje", description: "Treino de hoje" }, { command: "semana", description: "Próximos 7 dias" }, { command: "nivel", description: "Meu nível e XP" },
+      { command: "admin", description: "Painel do dono" }, { command: "cartas", description: "Artes das cartas" }, { command: "hoje", description: "Treino de hoje" }, { command: "semana", description: "Próximos 7 dias" }, { command: "nivel", description: "Meu nível e XP" },
       { command: "nutri", description: "Falar com a Nutri AI" }, { command: "coach", description: "Falar com o Coach AI" }, { command: "novo", description: "Conversa nova" }, { command: "parar", description: "Desligar os avisos" },
     ] }).catch(() => {});
     await enviar(chat, { text: `Pronto${conta.nome ? `, ${esc(conta.nome)}` : ""}! 💪 Conectei sua conta do FIT.AI.\n\nTodo dia às <b>${minStr(conta.hora)}</b> eu mando o seu treino${conta.noite != null ? ` e, se até as <b>${minStr(conta.noite)}</b> ele não estiver feito, dou um toque` : ""}. Os horários mudam no perfil do app.\n\nMe escreva ou mande foto quando quiser: quem responde é o Coach AI, com o seu programa e o seu histórico.\n\nComandos: /hoje /amanha /semana /nivel /nutri /novo /parar${ehDono(v.email) ? "\n\n🛠️ Você é o dono: /admin abre o painel." : ""}` });
@@ -328,6 +329,7 @@ export async function processar(u, permitido) {
   const hojeK = diaLocal(c.tz ?? -180);
   if (ehDono(email)) {
     if (cmd === "admin") { c.esperando = null; salvar(); await adminMenu(chat); return; }
+    if (cmd === "cartas") { const f = (texto.split(/\s+/)[1] || "").toLowerCase(); naFila(chat, () => enviarCartas(chat, f)); return; }
     if (cmd === "cancelar" && c.esperando) { c.esperando = null; c.rascunho = null; salvar(); await enviar(chat, { text: "Cancelado." }); return; }
     if (c.esperando === "aviso" && !cmd && texto) { await adminRascunho(c, chat, texto); return; }
   }
@@ -359,6 +361,39 @@ export async function processar(u, permitido) {
 
 /* ---------- Coach AI no Telegram ---------- */
 const filas = new Map(); // uma resposta por vez em cada chat
+// Dono: /cartas [estilo] manda as artes das cartas por classe (as mesmas do álbum do app):
+// um álbum de 10 fotos por estilo e gênero, na ordem Recruta → Imortal.
+const PASTA_CARTAS = fileURLToPath(new URL("../../public/assets/estilos/niveis/", import.meta.url));
+const CARTAS_ESTILOS = [["ninja", "Ninja"], ["monge", "Monge"], ["gladiador", "Gladiador"], ["batedor", "Batedor"], ["berserker", "Berserker"], ["ronin", "Ronin"]];
+const CARTAS_CLASSES = ["recruta", "escudeiro", "guerreiro", "cavaleiro", "paladino", "campeao", "mestre-de-armas", "tita", "lenda", "imortal"];
+const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+async function enviarCartas(chat, filtro) {
+  const lista = CARTAS_ESTILOS.filter(([k]) => !filtro || k === filtro);
+  if (!lista.length) { await enviar(chat, { text: "Estilos: ninja, monge, gladiador, batedor, berserker, ronin.\nEx.: <code>/cartas ninja</code> (sem nome, manda todas)." }); return; }
+  const t = await token();
+  await enviar(chat, { text: `🃏 Mandando ${lista.length * 20} cartas (${lista.map(([, n]) => n).join(", ")}). Masculino e feminino, de Recruta a Imortal.` });
+  for (const [k, nome] of lista) for (const [g, gn] of [["m", "masculino"], ["f", "feminino"]]) {
+    const arquivos = await Promise.all(CARTAS_CLASSES.map((cl) => readFile(join(PASTA_CARTAS, `${k}-${g}-${cl}.webp`))));
+    let ok = false;
+    for (const tipo of ["photo", "document"]) { // se o Telegram recusar como foto, vai como arquivo
+      for (let tentativa = 0; tentativa < 3 && !ok; tentativa++) {
+        const fd = new FormData();
+        fd.append("chat_id", String(chat));
+        fd.append("media", JSON.stringify(CARTAS_CLASSES.map((cl, i) => ({ type: tipo, media: `attach://f${i}`, ...(i === 0 ? { caption: `${nome} · ${gn}` } : {}) }))));
+        arquivos.forEach((buf, i) => fd.append(`f${i}`, new Blob([buf], { type: "image/webp" }), `${k}-${g}-${CARTAS_CLASSES[i]}.webp`));
+        const r = await fetch(`https://api.telegram.org/bot${t}/sendMediaGroup`, { method: "POST", body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (j.ok) { ok = true; break; }
+        if (j.parameters?.retry_after) { await esperar((j.parameters.retry_after + 1) * 1000); continue; }
+        console.error("telegram: cartas", tipo, j.description); break;
+      }
+      if (ok) break;
+    }
+    if (!ok) { await enviar(chat, { text: `Não consegui mandar as cartas de ${nome} (${gn}).` }).catch(() => {}); return; }
+    await esperar(1500);
+  }
+  await enviar(chat, { text: "Pronto ✅ Todas as cartas estão também no álbum do app." }).catch(() => {});
+}
 function naFila(chat, fn) {
   const p = (filas.get(chat) || Promise.resolve()).then(fn).catch((e) => console.error("telegram: coach", e?.status, e?.message));
   filas.set(chat, p);
