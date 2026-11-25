@@ -7150,14 +7150,17 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
   // Ficha no topo do Perfil: carta holográfica do estilo (ou da classe, até o estilo aparecer); o verso tem rank, meta e atributos
   // Personagens animados (loop parado, gerados da própria carta com tools/animar-sprite.py): estilo-sexo-classe
   const SPRITES = new Set([
-    "ninja-m-recruta", "ronin-m-recruta", "ronin-m-guerreiro", "ronin-m-cavaleiro", "ronin-m-paladino", "ronin-m-campeao", "ronin-m-mestre-de-armas", "ronin-m-tita", "ronin-m-lenda", "ronin-m-imortal", "ronin-f-recruta", "ronin-f-guerreiro", "ronin-f-cavaleiro", "ronin-f-paladino", "ronin-f-campeao", "ronin-f-mestre-de-armas", "ronin-f-tita", "ronin-f-lenda", "ronin-f-imortal",
-  ]); // Titãs do Ronin: de artes em fundo liso. Escudeiros ficam com a carta (a arte corta no joelho) até ter arte de corpo inteiro
+    "ninja-m-recruta", "ronin-m-recruta", "ronin-m-escudeiro", "ronin-m-guerreiro", "ronin-m-cavaleiro", "ronin-m-paladino", "ronin-m-campeao", "ronin-m-mestre-de-armas", "ronin-m-tita", "ronin-m-lenda", "ronin-m-imortal", "ronin-f-recruta", "ronin-f-escudeiro", "ronin-f-guerreiro", "ronin-f-cavaleiro", "ronin-f-paladino", "ronin-f-campeao", "ronin-f-mestre-de-armas", "ronin-f-tita", "ronin-f-lenda", "ronin-f-imortal",
+  ]); // Titãs do Ronin: de artes em fundo liso
+  // Arte cortada (ex.: no joelho): o personagem encosta na base do palco, sem sombra no chão
+  const SPRITES_CORTADOS = new Set(["ronin-m-escudeiro", "ronin-f-escudeiro"]);
   const spriteDe = (e, g, slug) => (e && SPRITES.has(`${e}-${g}-${slug}`) ? `assets/estilos/sprites/${e}-${g}-${slug}.webp?v=2` : null);
   // Palco do personagem no Perfil: no lugar da carta, que continua a um toque (Personagem | Carta)
   function palcoHtml(sprite, carta, nome) {
     const v = S.pfVista === "carta" ? "carta" : "sprite";
+    const cortado = [...SPRITES_CORTADOS].some((k) => sprite.includes(`/${k}.webp`));
     return `<div class="pf-carta pf-dupla" data-vista="${v}">
-      <div class="pf-palco"><img class="pf-sprite" src="${sprite}" alt="${esc(nome)} animado"><span class="pf-chao"></span></div>
+      <div class="pf-palco${cortado ? " cortado" : ""}"><img class="pf-sprite" src="${sprite}" alt="${esc(nome)} animado">${cortado ? "" : `<span class="pf-chao"></span>`}</div>
       <div class="pf-cartawrap">${carta}</div>
       <div class="pf-troca" role="group" aria-label="Ver personagem ou carta"><button type="button" data-pf-vista="sprite" aria-pressed="${v === "sprite"}">Personagem</button><button type="button" data-pf-vista="carta" aria-pressed="${v === "carta"}">Carta</button></div>
     </div>`;

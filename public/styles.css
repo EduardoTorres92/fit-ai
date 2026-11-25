@@ -1706,3 +1706,4 @@ button.alb-it:active { transform: scale(0.96); }
 .pf-troca button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; padding: 8px 16px; border-radius: 99px; min-height: 36px; cursor: pointer; }
 .pf-troca button[aria-pressed="true"] { background: var(--blue, #2b54ff); color: #fff; }
 .mb-carta.mb-sprite > img { object-fit: contain; image-rendering: pixelated; background: radial-gradient(120% 70% at 50% 100%, #2a3a8a, #0a1130); padding: 6px; }
+.pf-palco.cortado .pf-sprite { bottom: -1.7%; height: 90%; }
