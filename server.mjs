@@ -22,12 +22,13 @@ const { default: evolucao } = await import("./netlify/functions/evolucao.mjs");
 const { default: telegram } = await import("./netlify/functions/telegram.mjs");
 const { default: desafio } = await import("./netlify/functions/desafio.mjs");
 const { default: corrida } = await import("./netlify/functions/corrida.mjs");
+const { default: dupla } = await import("./netlify/functions/dupla.mjs");
 const { iniciarTelegram } = await import("./netlify/lib/telegram.mjs");
 const { iniciarAgendador } = await import("./netlify/lib/agua.mjs");
 
 const RAIZ = fileURLToPath(new URL("./public/", import.meta.url));
 const PORTA = Number(process.env.PORT) || 3000;
-const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua, "/api/wod": wod, "/api/evolucao": evolucao, "/api/telegram": telegram, "/api/desafio": desafio, "/api/corrida": corrida };
+const ROTAS = { "/api/auth": auth, "/api/coach": coach, "/api/videos": videos, "/api/hiper": hiper, "/api/agua": agua, "/api/wod": wod, "/api/evolucao": evolucao, "/api/telegram": telegram, "/api/desafio": desafio, "/api/corrida": corrida, "/api/dupla": dupla };
 const MAX_CORPO = 1600 * 1024; // o Coach manda programa + contexto; a foto do WOD vai em base64 (até ~1,4 MB)
 
 const TIPOS = {

@@ -1672,3 +1672,24 @@ button.alb-it:active { transform: scale(0.96); }
 .d7-fim span { font-size: 44px; }
 .d7-fim b { font-size: 20px; color: #ffd76a; }
 .d7-fim small { color: #a9b4e0; }
+
+/* Perfil de outra pessoa: carta, álbum */
+.mb-carta { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 18px; background: linear-gradient(120deg, #16245e, #0a1130); color: #f4f6ff; border: 1px solid #8a6d22; }
+.mb-carta > img { width: 112px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px; flex: none; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+.mb-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mb-info .qz-kicker { text-align: left; margin: 0; font-size: 10px; }
+.mb-info b { font-size: 17px; }
+.mb-info small { color: #a9b4e0; font-size: 12px; }
+.mb-xp { background: rgba(255, 255, 255, .16); margin: 2px 0; }
+.mb-mestre b { color: #ffd76a; font-size: 12px; }
+.mb-album { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.mb-album img { width: 84px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; flex: none; scroll-snap-align: start; }
+/* Dupla do desafio de 7 dias */
+.d7-convite { border-color: #ffd76a; box-shadow: 0 0 18px rgba(255, 215, 106, .18); }
+.d7-cv-top { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.d7-cv-top p { font-size: 14px; line-height: 1.4; }
+.d7-convite .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.d7-dupla .chips .chip { display: inline-flex; align-items: center; gap: 6px; }
+.d7-vs a { color: inherit; text-decoration: none; }
+.d7-espera .lnk-btn { margin-top: 4px; }
+.d7-conv { border-color: #ffd76a; }

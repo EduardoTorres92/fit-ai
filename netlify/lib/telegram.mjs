@@ -106,6 +106,19 @@ function limparAgenda(lista) {
   }));
 }
 
+// Liga a conta do Telegram ao id do app (para avisos entre amigos, como a dupla do desafio de 7 dias)
+export async function marcarUid(email, uid) {
+  const c = (await todos()).contas[email];
+  if (c && uid && c.uid !== uid) { c.uid = uid; salvar(); }
+}
+// Aviso para uma pessoa do app pelo id dela (só se ela conectou o Telegram). link: caminho dentro do app (#/...)
+export async function avisarUid(uid, texto, link) {
+  const c = Object.values((await todos()).contas).find((x) => x.uid === uid && x.chat);
+  if (!c) return false;
+  const botao = link ? { reply_markup: { inline_keyboard: [[{ text: "Abrir no FIT.AI", url: `${SITE}/app${link}` }]] } } : {};
+  await api("sendMessage", { chat_id: c.chat, text: texto, disable_web_page_preview: true, ...botao }).catch(() => {});
+  return true;
+}
 export async function estado(email) {
   const c = (await todos()).contas[email];
   return { ligado: !!c?.chat, hora: c ? minStr(c.hora) : "07:00", noite: c?.noite == null ? (c ? null : "20:00") : minStr(c.noite), marcar: c?.marcar || [],

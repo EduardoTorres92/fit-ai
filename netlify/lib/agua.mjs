@@ -39,7 +39,7 @@ const salvar = () => (gravando = gravando.then(() => gravarJson(ARQ, subs)).catc
 const idDe = (endpoint) => createHash("sha256").update(String(endpoint)).digest("hex").slice(0, 32);
 const hora = (t, pad) => { const m = String(t || "").match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : pad; };
 
-export async function assinar(a) {
+export async function assinar(a, uid = null) {
   const s = a?.assinatura;
   if (!s || typeof s.endpoint !== "string" || !/^https:\/\//.test(s.endpoint) || s.endpoint.length > 1000 || !s.keys?.p256dh || !s.keys?.auth) return { erro: "assinatura" };
   const lista = await todas(), id = idDe(s.endpoint);
@@ -48,7 +48,7 @@ export async function assinar(a) {
     sub: { endpoint: s.endpoint, keys: { p256dh: String(s.keys.p256dh).slice(0, 200), auth: String(s.keys.auth).slice(0, 100) } },
     intervalo: Math.min(240, Math.max(15, Math.round(Number(a.intervalo) || 60))), ml: Math.min(1000, Math.max(50, Math.round(Number(a.ml) || 300))),
     ini: hora(a.ini, 8 * 60), fim: hora(a.fim, 22 * 60), tz: Math.min(840, Math.max(-720, Math.round(Number(a.tz) || -180))),
-    ultimo: Date.now(), criado: lista[id]?.criado || Date.now(),
+    ultimo: Date.now(), criado: lista[id]?.criado || Date.now(), uid: uid || lista[id]?.uid || null,
   };
   salvar();
   return { ok: true };
@@ -98,4 +98,22 @@ export async function avisoTodos(titulo, corpo) {
     catch (e) { if (e?.statusCode === 404 || e?.statusCode === 410) { delete subs[id]; salvar(); } }
   }
   return { ok, total: Object.keys(lista).length };
+}
+
+// Liga um aparelho já assinado ao id do app (para avisos entre amigos)
+export async function marcarUid(endpoint, uid) {
+  const lista = await todas(), r = lista[idDe(endpoint)];
+  if (r && uid && r.uid !== uid) { r.uid = uid; salvar(); }
+  return { ok: !!r };
+}
+// Notificação para todos os aparelhos de uma pessoa (pelo id do app); link abre o app nessa tela
+export async function avisarUid(uid, titulo, corpo, link = "") {
+  await chavesVapid();
+  const lista = await todas(); let n = 0;
+  for (const [id, r] of Object.entries(lista)) {
+    if (r.uid !== uid) continue;
+    try { await webpush.sendNotification(r.sub, JSON.stringify({ tipo: "aviso", titulo, corpo, link }), { TTL: 3600, urgency: "normal" }); n++; }
+    catch (e) { if (e?.statusCode === 404 || e?.statusCode === 410) { delete lista[id]; salvar(); } }
+  }
+  return n;
 }

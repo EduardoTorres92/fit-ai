@@ -2361,7 +2361,8 @@
     if (perm !== "granted") { toast("Sem permissão de notificação. Libere nas configurações do navegador para este site.", 5000); return; }
     try {
       const sub = await aguaAssinatura(true);
-      const r = await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" },
+      const tk = await tokenSB().catch(() => null);
+      const r = await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json", ...(tk ? { authorization: `Bearer ${tk}` } : {}) },
         body: JSON.stringify({ acao: "assinar", assinatura: sub.toJSON(), intervalo: L.intervalo, ml: L.ml, ini: L.ini, fim: L.fim, tz: -new Date().getTimezoneOffset() }) });
       if (!r.ok) throw new Error(String(r.status));
       L.push = true; S.aguaLembrete = L; save(); render();
@@ -2392,6 +2393,7 @@
   }, 60000);
   // "Bebi" na notificação com o app aberto
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.tipo === "ir" && /^#\/[\w/-]*$/.test(e.data.link || "")) { location.hash = e.data.link; return; }
     if (e.data?.tipo !== "agua") return;
     if (e.data.bebi) aguaAdd(Number(e.data.ml) || 300); else location.hash = "#/nutricao";
     if (location.hash.startsWith("#/nutricao")) render();
@@ -3035,7 +3037,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, arte: S.arte || null, album: S.album || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3937,7 +3939,7 @@
       G.carregadoEm = Date.now(); G.erro = false;
     } catch (e) { console.error("grupos", e); G.erro = true; G.carregadoEm = Date.now(); if (!G.grupos) G.grupos = []; }
     G.carregando = false;
-    if (/^#\/(grupo|home)/.test(location.hash)) render();
+    if (/^#\/(grupo|home|recruta)/.test(location.hash)) render();
   }
   async function carregarGrupo(id) {
     const ms = await sb.from("membros").select("usuario_id").eq("grupo_id", id);
@@ -4141,16 +4143,49 @@
   function telaMembro(id) {
     const p = G.perfis[id];
     if (!p || !G.membros.includes(id)) return telaGrupo();
-    const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows);
+    const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows), eu = id === uid;
+    if (!eu && !G.conqDe?.[id] && sb) { G.conqDe = G.conqDe || {}; G.conqDe[id] = "carregando";
+      sb.from("conquistas").select("codigo, ganha_em").eq("usuario_id", id).then(({ data }) => { G.conqDe[id] = data || []; if (location.hash === `#/grupo/membro/${id}`) render(); }); }
+    const nome1 = esc((p.nome || "Atleta").split(" ")[0]);
     return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
       <div class="page-head"><a class="icon-btn" href="#/grupo" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a><h1>Perfil</h1><span class="spacer"></span></div>
-      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${id === uid ? " (você)" : ""} ${nivelSelo(cfgNivel(id))}</strong><span>${cfgNivel(id)?.nivel_xp ? `Nível ${cfgNivel(id).nivel_xp} · ${esc(CLASSES[Math.min(9, Math.floor((cfgNivel(id).nivel_xp - 1) / 5))][1])}${ESTILOS[cfgNivel(id).estilo] ? ` ${ESTILOS[cfgNivel(id).estilo].ic} ${esc(ESTILOS[cfgNivel(id).estilo].nome)}` : ""} · ` : ""}${esc(grupoSel()?.nome || "Grupo")}</span></div></div>
+      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${eu ? " (você)" : ""} ${nivelSelo(cfgNivel(id))}</strong><span>${esc(grupoSel()?.nome || "Grupo")}</span>${membroTitulo(id)}</div></div>
+      ${cartaMembroHtml(id, rows)}
+      ${!eu && uid ? (d7Ocupado() ? "" : `<button class="btn btn-blue" data-d7-convidar="${id}">⚔️ Desafiar ${nome1} no ${esc(D7.recruta.nome)}</button>`) : ""}
       <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
       <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
       <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
+      ${albumMembroHtml(id)}
+      ${conquistasMembroHtml(id)}
       ${id === uid ? ligasPerfilHtml(linhasLocais(), true, meuOpts()) : ligasPerfilHtml(rows, false, { g: G.perfis[id]?.config?.arte === "f" || (G.perfis[id]?.config?.arte !== "m" && G.perfis[id]?.config?.quiz?.sexo === "f") ? "f" : "m", peso: 0, form: G.perfis[id]?.config?.formaturas || {}, prs: [] })}
-      <div>${recordesHtml(rows, `${esc((p.nome || "Essa pessoa").split(" ")[0])} ainda não registrou Max Out nem Fit Test.`)}</div>
+      <div><div class="sec-head"><h2>Recordes</h2></div>${recordesHtml(rows, `${nome1} ainda não registrou Max Out nem Fit Test.`)}</div>
       </div></section>`;
+  }
+  // Perfil de outra pessoa: a carta e o álbum saem do que ela sincronizou (perfis.config) e dos treinos dela
+  const membroCfg = (id) => (id === uid ? { xp: meuNivel().xp, arte: sexoArte(), album: S.album, d7Feito: S.d7Feito } : G.perfis[id]?.config || {});
+  const membroG = (id) => { const c = membroCfg(id); return id === uid ? sexoArte() : c.arte === "f" || (c.arte !== "m" && c.quiz?.sexo === "f") ? "f" : "m"; };
+  function membroTitulo(id) { const f = membroCfg(id).d7Feito; return f && D7[f.k] ? `<span class="pf-titulo">🎖️ ${esc(D7[f.k].titulo)}</span>` : ""; }
+  function cartaMembroHtml(id, rows) {
+    const c = membroCfg(id), n = nivelDe(Number(c.xp) || 0), est = estiloDe(rows), e = est.slug, E = e && ESTILOS[e], g = membroG(id);
+    const img = e && NIVEIS_ARTE.has(e) ? cartaDe(e, n.slug, g) : `assets/classes/cartas/${n.slug}-${g}.webp`;
+    return `<div class="mb-carta"><img src="${img}" alt="Carta ${esc(n.classe)}${E ? ` ${esc(E.nome)}` : ""}" loading="lazy">
+      <div class="mb-info"><span class="qz-kicker">Classe e estilo</span><b>${esc(n.classe)}${E ? ` · ${E.ic} ${esc(E.nome)}` : ""}</b>
+        <small>Nível ${n.nivel} · ${n.xp.toLocaleString("pt-BR")} XP</small><span class="xp-bar mb-xp"><i style="width:${n.pct}%"></i></span>
+        ${E ? `<small class="mb-mestre">${g === "f" ? "Mestra" : "Mestre"}: <b>${esc(E.mestre[g])}</b> · ${esc(E.lema)}</small>` : `<small class="mb-mestre">Estilo aparece no primeiro treino</small>`}</div></div>`;
+  }
+  function albumMembroHtml(id) {
+    const al = membroCfg(id).album || {}, g = membroG(id);
+    const cartas = ESTILOS_ORDEM.flatMap((e) => CLASSES.slice(0, Math.min(CLASSES.length, (al[e] ?? -1) + 1)).map(([slug, nome]) => ({ e, slug, nome })));
+    return `<div><div class="sec-head"><h2>Álbum de cartas</h2><span>${cartas.length}/${albumTotal()}</span></div>
+      ${cartas.length ? `<div class="mb-album">${cartas.map((x) => `<img src="${cartaDe(x.e, x.slug, g)}" alt="${esc(ESTILOS[x.e].nome)} ${esc(x.nome)}" title="${esc(ESTILOS[x.e].nome)} ${esc(x.nome)}" loading="lazy">`).join("")}</div>` : `<p class="note small">Nenhuma carta ainda.</p>`}</div>`;
+  }
+  function conquistasMembroHtml(id) {
+    if (id === uid) return "";
+    const l = G.conqDe?.[id];
+    const ganhas = Array.isArray(l) ? l.filter((c) => CONQI[c.codigo]) : [];
+    return `<div><div class="sec-head"><h2>Conquistas</h2><span>${Array.isArray(l) ? `${ganhas.length} de ${CONQ.length}` : ""}</span></div>
+      ${l === "carregando" ? `<p class="note small">Carregando…</p>` : ganhas.length ? `<div class="badges">${ganhas.map((c) => { const [cid, ic, nome] = CONQI[c.codigo];
+        return `<div class="badge on" title="${esc(nome)}"><span class="b-ic">${conqIc(cid, ic)}</span><strong>${esc(nome)}</strong><small>${ddmm(String(c.ganha_em).slice(0, 10))}</small></div>`; }).join("")}</div>` : `<p class="note small">Nenhuma conquista ainda.</p>`}</div>`;
   }
   // Desafio da semana em destaque no Início (com a capa do vídeo, quando tem)
   function desafioHome() {
@@ -4976,6 +5011,9 @@
     if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; S.dono = false; S.graduadoMax30 = null; S.formaturas = {}; S.trilha = null; S.forca = null; S.desafiosN = 0; xpAntes = null; G.grupos = null; }
     S.contaId = u.id;
     uid = u.id;
+    // Aparelho com notificação ligada: liga ao id da conta, para receber avisos da dupla
+    if (S.aguaLembrete?.push && S.pushUid !== uid && pushOk()) setTimeout(async () => { try { const sub = await aguaAssinatura(false), tk = await tokenSB();
+      if (sub && tk) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ acao: "conta", endpoint: sub.endpoint }) }); S.pushUid = uid; save(); } } catch {} }, 3000);
     let perfil = null;
     try { perfil = (await sb.from("perfis").select("nome, foto_url, config").eq("id", uid).maybeSingle()).data; } catch {}
     // Sem peso no aparelho e nem na conta: usa o último peso das fotos de evolução
@@ -4996,6 +5034,8 @@
       if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
       if (perfil.config.arte && !S.arte) S.arte = perfil.config.arte;
+      if (perfil.config.d7 && (!S.d7 || (perfil.config.d7.ini || "") > (S.d7.ini || ""))) S.d7 = perfil.config.d7; // desafio de 7 dias (outro aparelho)
+      if (perfil.config.d7Feito && !S.d7Feito) S.d7Feito = perfil.config.d7Feito;
       if (perfil.config.album) { S.album = { ...(S.album || {}) }; for (const [k, v] of Object.entries(perfil.config.album)) S.album[k] = Math.max(S.album[k] ?? -1, Number(v)); }
       if (perfil.config.perfil) for (const [k, v] of Object.entries(perfil.config.perfil)) if (v && !S.perfil[k]) S.perfil[k] = v;
       if (Array.isArray(perfil.config.medidas)) { const por = Object.fromEntries((S.medidas || []).map((m) => [m.d, m])); perfil.config.medidas.forEach((m) => { if (m?.d && !por[m.d]) por[m.d] = m; }); S.medidas = Object.values(por).sort((a, b) => a.d.localeCompare(b.d)); }
@@ -6305,53 +6345,87 @@
     return { n, hojeOk, dia, fase: d7Fase(dia), reg: d.dias[dia - 1] || {}, fim: d.fim };
   }
   const d7Nome = (id) => esc((G.perfis[id]?.nome || "Atleta").split(" ")[0]);
+  const d7Cfg = (id) => G.perfis[id]?.config || {};
+  // Aviso para a dupla (Telegram e push, pelo servidor); falha em silêncio
+  async function d7Avisar(para, tipo, n) {
+    try { const tk = await tokenSB(); if (tk && para) fetch("/api/dupla", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ para, tipo, n }) }).catch(() => {}); } catch {}
+  }
+  // Convites que chegaram para mim: alguém do grupo me marcou e está esperando
+  function d7Convites() {
+    if (!uid || !G.membros) return [];
+    return G.membros.filter((id) => { const o = d7Cfg(id).d7; return id !== uid && o?.espera && o.dupla === uid && !o.fim && S.d7Recusa?.[id] !== o.convidou && !(S.d7?.dupla === id && !S.d7.espera && S.d7.ini >= o.convidou); });
+  }
+  const d7Ocupado = () => !!(S.d7 && !S.d7.fim && (d7Feitos(S.d7) > 0 || S.d7.espera));
+  // Quem convidou: quando a dupla aceita (ou recusa), a largada (ou o cancelamento) chega pelo perfil dela
+  function d7SyncDupla() {
+    const d = S.d7; if (!d?.espera || !d.dupla || !G.perfis?.[d.dupla]) return;
+    const c = d7Cfg(d.dupla), o = c.d7;
+    if (o && o.dupla === uid && !o.espera && o.ini && o.ini >= d.convidou) { d.ini = o.ini; delete d.espera; save(); setTimeout(() => toast(`🤝 ${(G.perfis[d.dupla]?.nome || "").split(" ")[0]} aceitou! O desafio de vocês começou.`), 300); }
+    else if (c.d7Recusa?.[uid] === d.convidou) { const nome = (G.perfis[d.dupla]?.nome || "").split(" ")[0]; S.d7 = null; save(); setTimeout(() => toast(`${nome} não pode agora. Chame outra pessoa ou comece sozinho.`, 4000), 300); }
+  }
   // Dupla: o progresso da outra pessoa vem do que ela sincronizou (perfis.config.d7)
   function d7Dupla() {
-    const d = S.d7, id = d?.dupla; if (!id) return null;
-    const o = G.perfis[id]?.config?.d7, dela = o && o.ini >= keyOf(addDays(parseKey(d.ini), -7)) ? o : null;
+    const d = S.d7, id = d?.dupla; if (!id || d.espera) return null;
+    const o = d7Cfg(id).d7, dela = o && o.dupla === uid && o.ini === d.ini ? o : null;
     const eu = d.fim, ela = dela?.fim;
     const venc = eu && ela ? (eu < ela ? "eu" : ela < eu ? "ela" : "empate") : eu ? "eu" : ela ? "ela" : null;
-    return { id, n: dela ? d7Feitos(dela) : 0, comecou: !!dela, venc };
+    return { id, n: dela ? d7Feitos(dela) : 0, junto: !!dela, venc };
   }
   function d7Home() {
-    const D = D7.recruta, e = d7Estado();
+    const D = D7.recruta; d7SyncDupla();
+    const cv = d7Convites()[0];
+    if (cv) return `<a class="tp-home d7-home d7-conv" href="#/recruta"><span class="d7-ic">⚔️</span><span><b>${d7Nome(cv)} te chamou</b><small>${esc(D.nome)} em dupla · toque para responder</small></span><strong class="d7-go">Ver ›</strong></a>`;
+    const e = d7Estado();
     if (e?.fim && S.d7.fim < keyOf(addDays(hoje, -7))) return "";
-    const txt = !e ? `${D.sub} · ${D.fases.length} fases e um chefe` : e.fim ? `Concluído! Título: ${D.titulo}` : e.hojeOk ? `Dia ${e.dia} feito ✓ · o dia ${e.dia + 1} abre amanhã` : `Dia ${e.dia} de 7 · ${e.fase.nome}`;
-    return `<a class="tp-home d7-home" href="#/recruta"><span class="d7-ic">${e?.fim ? "🎖️" : "🎯"}</span><span><b>${esc(D.nome)}</b><small>${esc(txt)}</small></span>${e ? `<strong>${e.n}<small>/7</small></strong>` : `<strong class="d7-go">Começar ›</strong>`}</a>`;
+    const du = d7Dupla();
+    const txt = !e ? `${D.sub} · sozinho ou em dupla` : S.d7.espera ? `Esperando ${d7Nome(S.d7.dupla)} aceitar` : e.fim ? `Concluído! Título: ${D.titulo}` : e.hojeOk ? `Dia ${e.dia} feito ✓ · o dia ${e.dia + 1} abre amanhã` : `Dia ${e.dia} de 7 · ${e.fase.nome}${du ? ` · ${d7Nome(du.id)} ${du.n}/7` : ""}`;
+    return `<a class="tp-home d7-home" href="#/recruta"><span class="d7-ic">${e?.fim ? "🎖️" : S.d7?.espera ? "⏳" : "🎯"}</span><span><b>${esc(D.nome)}</b><small>${esc(txt)}</small></span>${e && !S.d7.espera ? `<strong>${e.n}<small>/7</small></strong>` : `<strong class="d7-go">${e ? "Ver" : "Começar"} ›</strong>`}</a>`;
   }
   function d7Contexto() {
-    const e = d7Estado(), D = D7.recruta;
-    if (!e) return `${D.nome} (${D.sub}): ainda não começou. Dá para sugerir quando a pessoa quiser algo curto e sem equipamento.`;
+    const e = d7Estado(), D = D7.recruta, du = d7Dupla();
+    if (!e) return `${D.nome} (${D.sub}): ainda não começou. Dá para sugerir quando a pessoa quiser algo curto e sem equipamento, sozinha ou em dupla com alguém do grupo.`;
+    if (S.d7.espera) return `${D.nome}: esperando ${(G.perfis[S.d7.dupla]?.nome || "a dupla").split(" ")[0]} aceitar o convite.`;
     if (e.fim) return `${D.nome}: concluído em ${ddmm(S.d7.fim)}, título ${D.titulo}.`;
-    return `${D.nome}: dia ${e.dia} de 7 (${e.fase.nome})${e.hojeOk ? ", o de hoje já foi feito" : `; missões de hoje: ${e.fase.itens.map((x) => x[2]).join(", ")}`}.`;
+    return `${D.nome}: dia ${e.dia} de 7 (${e.fase.nome})${du ? `, em dupla com ${(G.perfis[du.id]?.nome || "").split(" ")[0]} (${du.n}/7)` : ""}${e.hojeOk ? ", o de hoje já foi feito" : `; missões de hoje: ${e.fase.itens.map((x) => x[2]).join(", ")}`}.`;
   }
+  const d7Chips = (attr) => `<div class="chips">${G.membros.filter((id) => id !== uid).map((id) => `<button class="chip" ${attr}="${id}">${avatar(G.perfis[id], 22)} ${d7Nome(id)}</button>`).join("")}</div>`;
   telas.recruta = () => {
     setToolbar(null);
-    const D = D7.recruta, e = d7Estado(), du = d7Dupla();
+    if (uid && (!G.grupos || Date.now() - G.carregadoEm > 30000)) carregarGrupos(true);
+    d7SyncDupla();
+    const D = D7.recruta, e = d7Estado(), du = d7Dupla(), temGrupo = uid && G.membros?.length > 1, convites = d7Convites();
     const capa = `<div class="d7-capa"><img src="${cartaClasse("recruta")}" alt=""><div><span class="qz-kicker">Missão especial</span><h1 class="fc-h1">${esc(D.nome)}</h1><p class="d7-sub">${esc(D.sub)}</p></div></div>`;
-    const trilhaFases = `<ol class="d7-fases">${D.fases.map((f) => `<li class="${e && f.dias.includes(e.dia) && !e.fim ? "on" : e && (e.fim || f.dias[f.dias.length - 1] < e.dia || (f.dias.includes(e.dia) && e.hojeOk && e.dia === f.dias[f.dias.length - 1])) ? "ok" : ""}"><b>Dias ${f.dias[0]}–${f.dias[f.dias.length - 1]}</b><span>${f.chefe ? D.chefe.ic : ""} ${esc(f.nome)}</span><small>+${f.xp} XP/dia</small></li>`).join("")}</ol>`;
-    if (!e) return `<section class="screen quiz d7-tela"><header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>${capa}${trilhaFases}
+    const ativo = e && !S.d7.espera;
+    const trilhaFases = `<ol class="d7-fases">${D.fases.map((f) => `<li class="${ativo && f.dias.includes(e.dia) && !e.fim ? "on" : ativo && (e.fim || f.dias[f.dias.length - 1] < e.dia || (f.dias.includes(e.dia) && e.hojeOk && e.dia === f.dias[f.dias.length - 1])) ? "ok" : ""}"><b>Dias ${f.dias[0]}–${f.dias[f.dias.length - 1]}</b><span>${f.chefe ? D.chefe.ic : ""} ${esc(f.nome)}</span><small>+${f.xp} XP/dia</small></li>`).join("")}</ol>`;
+    const conviteHtml = convites.map((id) => `<div class="d7-dupla d7-convite"><span class="qz-kicker">Convite para dupla</span>
+      <div class="d7-cv-top">${avatar(G.perfis[id], 44)}<p><b>${d7Nome(id)}</b> te chamou para o ${esc(D.nome)}. Vocês começam juntos hoje e quem completar os 7 dias primeiro vence.</p></div>
+      ${d7Ocupado() ? `<p class="note small">Termine o seu desafio atual para aceitar.</p>` : `<div class="row2"><button class="btn btn-blue" data-d7-aceitar="${id}">Aceitar ⚔️</button><button class="btn btn-outline" data-d7-recusar="${id}">Agora não</button></div>`}</div>`).join("");
+    const volta = `<header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>`;
+    if (!e) return `<section class="screen quiz d7-tela">${volta}${capa}${conviteHtml}${trilhaFases}
       <p class="d7-txt">Uma missão por dia, sem equipamento. Fechou as missões do dia, o próximo abre amanhã. Nos dias 6 e 7 você enfrenta o <b>${esc(D.chefe.nome)}</b>. Completou os 7 dias: <b>+${D.bonus} XP</b> e o título <b>${esc(D.titulo)}</b>.</p>
-      <button class="btn btn-blue fc-btn grande" data-d7-comecar>Aceitar a missão 🎯</button></section>`;
+      <button class="btn btn-blue fc-btn grande" data-d7-comecar>Começar sozinho 🎯</button>
+      ${temGrupo ? `<div class="d7-dupla"><span class="qz-kicker">Ou desafie alguém do grupo</span><p class="note small">A pessoa recebe o convite no app (e no Telegram ou notificação, se tiver ligado). Vocês largam juntos no dia em que ela aceitar.</p>${d7Chips("data-d7-convidar")}</div>` : uid ? "" : `<p class="note small">Entre com uma conta e participe de um grupo para desafiar um amigo.</p>`}</section>`;
+    if (S.d7.espera) return `<section class="screen quiz d7-tela">${volta}${capa}${trilhaFases}
+      <div class="d7-dupla d7-espera"><span class="qz-kicker">Convite enviado</span><div class="d7-cv-top">${avatar(G.perfis[S.d7.dupla], 44)}<p>Esperando <b>${d7Nome(S.d7.dupla)}</b> aceitar. Vocês começam juntos no dia do aceite.</p></div>
+        <button class="lnk-btn" data-d7-cancelar>Cancelar convite</button></div></section>`;
     const f = e.fase, reg = e.reg, hp = f.chefe ? (e.fim ? 0 : S.d7.dias[5]?.em ? 50 : 100) : null;
     const itens = f.itens.map(([k, ic, nome, num]) => { const ok = num ? reg.max > 0 : !!reg.ok?.[k], trava = e.hojeOk || e.fim;
       return num ? `<div class="d7-item${ok ? " on" : ""}"><span class="d7-ck">${ok ? "✓" : ic}</span><span class="d7-nm">${esc(nome)}</span>${trava ? `<b>${reg.max || 0}</b>` : `<input type="number" inputmode="numeric" min="1" max="300" class="d7-num" data-d7-max placeholder="reps" value="${reg.max || ""}"><button class="btn btn-outline d7-ok" data-d7-max-ok>OK</button>`}</div>`
         : `<button class="d7-item${ok ? " on" : ""}" data-d7-item="${k}" ${trava ? "disabled" : ""}><span class="d7-ck">${ok ? "✓" : ic}</span><span class="d7-nm">${esc(nome)}</span></button>`; }).join("");
     const recMax = Math.max(0, ...S.d7.dias.map((x) => x?.max || 0));
     const duplaHtml = du ? `<div class="d7-dupla"><span class="qz-kicker">Sua dupla</span>
-        <div class="d7-vs"><div><b>Você</b><span class="d7-bar"><i style="width:${Math.round((e.n / 7) * 100)}%"></i></span><small>${e.n}/7</small></div>
-          <div><b>${d7Nome(du.id)}</b><span class="d7-bar"><i style="width:${Math.round((du.n / 7) * 100)}%"></i></span><small>${du.comecou ? `${du.n}/7` : "ainda não começou"}</small></div></div>
-        ${du.venc ? `<p class="d7-venc">${du.venc === "eu" ? "🏆 Você completou primeiro!" : du.venc === "ela" ? `🏆 ${d7Nome(du.id)} completou primeiro` : "🤝 Empate: completaram no mesmo dia"}</p>` : `<p class="note small">Quem completar os 7 dias primeiro vence.</p>`}</div>`
-      : uid && G.membros?.length > 1 ? `<div class="d7-dupla"><span class="qz-kicker">Marque sua dupla</span><p class="note small">Chame alguém do grupo: quem completar os 7 dias primeiro vence.</p>
-        <div class="chips">${G.membros.filter((id) => id !== uid).map((id) => `<button class="chip" data-d7-dupla="${id}">${d7Nome(id)}</button>`).join("")}</div></div>` : "";
-    return `<section class="screen quiz d7-tela"><header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>${capa}${trilhaFases}
+        <div class="d7-vs"><div><b>Você</b><span class="d7-bar"><i style="width:${Math.round((e.n / 7) * 100)}%"></i></span><small>${e.n}/7${e.hojeOk && !e.fim ? " · hoje ✓" : ""}</small></div>
+          <a href="#/grupo/membro/${du.id}"><b>${d7Nome(du.id)}</b><span class="d7-bar"><i style="width:${Math.round((du.n / 7) * 100)}%"></i></span><small>${du.junto ? `${du.n}/7` : "atualiza quando abrir o app"}</small></a></div>
+        ${du.venc ? `<p class="d7-venc">${du.venc === "eu" ? "🏆 Você completou primeiro!" : du.venc === "ela" ? `🏆 ${d7Nome(du.id)} completou primeiro` : "🤝 Empate: completaram no mesmo dia"}</p>` : `<p class="note small">Quem completar os 7 dias primeiro vence. Cada dia que um fecha, o outro recebe um aviso.</p>`}</div>`
+      : temGrupo && !e.fim && e.n === 0 && !e.hojeOk ? `<div class="d7-dupla"><span class="qz-kicker">Chamar uma dupla</span><p class="note small">Ainda dá tempo: chame alguém e vocês largam juntos no dia do aceite.</p>${d7Chips("data-d7-convidar")}</div>` : "";
+    return `<section class="screen quiz d7-tela">${volta}${capa}${conviteHtml}${trilhaFases}
       ${e.fim ? `<div class="d7-fim"><span>🎖️</span><b>${esc(D.titulo)}</b><small>7 dias concluídos em ${ddmm(S.d7.fim)}${S.d7Feito && S.d7Feito.ini !== S.d7.ini ? " · refeito sem XP" : ` · +${d7XpDesde({ d7: S.d7, d7Feito: S.d7Feito })} XP`}</small></div>`
         : `<div class="d7-dia"><div class="sec-head"><h2>Dia ${e.dia} · ${esc(f.nome)}</h2><span>+${f.xp} XP</span></div>
         ${f.chefe ? `<div class="d7-chefe"><span class="d7-ch-ic">${D.chefe.ic}</span><div><b>${esc(D.chefe.nome)}</b><span class="ch-hp"><i style="width:${hp}%"></i></span><small>HP ${hp}% · cada dia de chefe tira metade${recMax ? ` · seu recorde: ${recMax} flexões` : ""}</small></div></div>` : ""}
         <div class="d7-itens">${itens}</div>
         ${e.hojeOk ? `<p class="d7-txt">Missão de hoje cumprida ✓ O dia ${e.dia + 1} abre amanhã.</p>` : `<p class="note small">Toque em cada missão quando terminar. Fechou todas, o dia conta.</p>`}</div>`}
       ${duplaHtml}
-      ${e.fim ? `<button class="lnk-btn" data-d7-comecar>Refazer o desafio${S.d7Feito ? " (sem XP)" : ""}</button>` : ""}
+      ${e.fim ? `<button class="btn btn-blue fc-btn" data-d7-novo>Fazer de novo${S.d7Feito ? " (sem XP)" : ""}</button>` : ""}
     </section>`;
   };
   function d7Fechar() {
@@ -6361,23 +6435,32 @@
     reg.em = hojeKey; d.dias[e.dia - 1] = reg;
     if (e.dia === 7) { d.fim = hojeKey; if (!S.d7Feito) S.d7Feito = { k: d.k, ini: d.ini, fim: hojeKey, xp: d7XpDesde({ d7: d }) }; }
     save(); conferirXp(false, `${D7.recruta.nome} · dia ${e.dia}`);
-    const D = D7.recruta;
+    const D = D7.recruta, du = d7Dupla();
+    if (du) d7Avisar(du.id, e.dia === 7 ? (du.venc === "eu" ? "venceu" : "dia") : e.dia === 6 ? "reta" : "dia", e.dia);
     if (e.dia === 7) {
-      autoPost(`d7fim:${d.ini}`, `🎖️ Completei o ${D.nome}: 7 dias sem academia! Agora sou ${D.titulo}.`);
-      setTimeout(() => dlgGami(`<div class="gami-crest ch-crest">🎖️</div><p class="gami-k">${esc(D.chefe.nome)} derrotado</p><h2>${esc(D.titulo)}</h2><p class="note">Você completou os 7 dias do ${esc(D.nome)}.</p>`), 1500);
+      autoPost(`d7fim:${d.ini}`, du?.venc === "eu" ? `🏆 Completei o ${D.nome} antes da minha dupla, ${(G.perfis[du.id]?.nome || "").split(" ")[0]}! Agora sou ${D.titulo}.` : `🎖️ Completei o ${D.nome}: 7 dias sem academia! Agora sou ${D.titulo}.`);
+      setTimeout(() => dlgGami(`<div class="gami-crest ch-crest">🎖️</div><p class="gami-k">${esc(D.chefe.nome)} derrotado</p><h2>${esc(D.titulo)}</h2><p class="note">Você completou os 7 dias do ${esc(D.nome)}.${du?.venc === "eu" ? ` E chegou antes de ${d7Nome(du.id)}! 🏆` : ""}</p>`), 1500);
     } else if (e.dia === 6) setTimeout(() => toast(`${D.chefe.ic} ${D.chefe.nome} perdeu metade da vida! Amanhã é o golpe final.`), 1600);
   }
+  const d7Novo = (extra = {}) => ({ k: "recruta", ini: hojeKey, dias: [], dupla: null, fim: null, ...extra });
   document.addEventListener("click", (ev) => {
-    const t = ev.target;
-    if (t.closest("[data-d7-comecar]")) { S.d7 = { k: "recruta", ini: hojeKey, dias: [], dupla: S.d7?.fim ? null : S.d7?.dupla || null, fim: null }; save(); render(); scrollTo(0, 0); return; }
-    const it = t.closest("[data-d7-item]");
-    if (it && S.d7) { const e = d7Estado(); if (e.hojeOk || e.fim) return; const reg = S.d7.dias[e.dia - 1] || (S.d7.dias[e.dia - 1] = {}); reg.ok = { ...(reg.ok || {}), [it.dataset.d7Item]: !reg.ok?.[it.dataset.d7Item] }; save(); d7Fechar(); render(); return; }
-    if (t.closest("[data-d7-max-ok]") && S.d7) { const v = Math.round(Number($("[data-d7-max]")?.value) || 0); if (v < 1) return toast("Quantas flexões seguidas?");
-      const e = d7Estado(); const reg = S.d7.dias[e.dia - 1] || (S.d7.dias[e.dia - 1] = {}); reg.max = Math.min(300, v); save(); d7Fechar(); render(); return; }
-    const du = t.closest("[data-d7-dupla]");
-    if (du && S.d7) { S.d7.dupla = du.dataset.d7Dupla; save(); render();
-      autoPost(`d7dupla:${S.d7.ini}:${S.d7.dupla}`, `⚔️ Chamei ${(G.perfis[S.d7.dupla]?.nome || "").split(" ")[0]} para o ${D7.recruta.nome}: quem completar os 7 dias primeiro vence!`);
-      toast("Dupla marcada! Avisei no mural do grupo."); }
+    const t = ev.target, b = (sel) => t.closest(sel);
+    const nome = (id) => (G.perfis[id]?.nome || "").split(" ")[0];
+    if (b("[data-d7-comecar]") || b("[data-d7-novo]")) { S.d7 = d7Novo(); save(); render(); scrollTo(0, 0); return; }
+    const cv = b("[data-d7-convidar]");
+    if (cv) { const id = cv.dataset.d7Convidar; S.d7 = d7Novo({ ini: null, dupla: id, espera: true, convidou: hojeKey }); save(); if (location.hash !== "#/recruta") location.hash = "#/recruta"; else render(); scrollTo(0, 0);
+      d7Avisar(id, "convite"); autoPost(`d7conv:${hojeKey}:${id}`, `⚔️ Desafiei ${nome(id)} para o ${D7.recruta.nome}: quem completar os 7 dias primeiro vence!`);
+      toast(`Convite enviado para ${nome(id)}!`); return; }
+    if (b("[data-d7-cancelar]") && S.d7?.espera) { S.d7 = null; save(); render(); return; }
+    const ac = b("[data-d7-aceitar]");
+    if (ac && !d7Ocupado()) { const id = ac.dataset.d7Aceitar; S.d7 = d7Novo({ dupla: id }); save(); render(); scrollTo(0, 0);
+      d7Avisar(id, "aceitou"); autoPost(`d7dupla:${hojeKey}:${id}`, `🤝 Aceitei o desafio de ${nome(id)}: ${D7.recruta.nome} em dupla, começando hoje!`); toast("Dupla formada! Começa hoje."); return; }
+    const rc = b("[data-d7-recusar]");
+    if (rc) { const id = rc.dataset.d7Recusar; S.d7Recusa = { ...(S.d7Recusa || {}), [id]: d7Cfg(id).d7?.convidou || hojeKey }; save(); render(); d7Avisar(id, "recusou"); return; }
+    const it = b("[data-d7-item]");
+    if (it && S.d7 && !S.d7.espera) { const e = d7Estado(); if (e.hojeOk || e.fim) return; const reg = S.d7.dias[e.dia - 1] || (S.d7.dias[e.dia - 1] = {}); reg.ok = { ...(reg.ok || {}), [it.dataset.d7Item]: !reg.ok?.[it.dataset.d7Item] }; save(); d7Fechar(); render(); return; }
+    if (b("[data-d7-max-ok]") && S.d7 && !S.d7.espera) { const v = Math.round(Number($("[data-d7-max]")?.value) || 0); if (v < 1) return toast("Quantas flexões seguidas?");
+      const e = d7Estado(); const reg = S.d7.dias[e.dia - 1] || (S.d7.dias[e.dia - 1] = {}); reg.max = Math.min(300, v); save(); d7Fechar(); render(); }
   });
 
   /* ==========================================================

@@ -7,7 +7,7 @@ self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch {}
   if (d.tipo === "aviso") { // aviso do FIT.AI para todos
-    e.waitUntil(self.registration.showNotification(d.titulo || "FIT.AI", { body: d.corpo || "", icon: "assets/agua-192.png", badge: "assets/agua-96.png", tag: "fitai-aviso", data: { aviso: true } }));
+    e.waitUntil(self.registration.showNotification(d.titulo || "FIT.AI", { body: d.corpo || "", icon: "assets/agua-192.png", badge: "assets/agua-96.png", tag: d.link ? `fitai-${d.link}` : "fitai-aviso", data: { aviso: true, link: d.link || "" } }));
     return;
   }
   const ml = d.ml || 300;
@@ -23,7 +23,12 @@ self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   if (e.action === "depois") return;
   if (e.notification.data?.aviso) {
-    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => (abas[0] && "focus" in abas[0] ? abas[0].focus() : self.clients.openWindow("./app"))));
+    const link = /^#\/[\w/-]*$/.test(e.notification.data.link || "") ? e.notification.data.link : "";
+    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((abas) => {
+      const a = abas.find((x) => "focus" in x);
+      if (a) { if (link) a.postMessage({ tipo: "ir", link }); return a.focus(); }
+      return self.clients.openWindow(`./app${link}`);
+    }));
     return;
   }
   const ml = e.notification.data?.ml || 300, bebi = e.action === "bebi";

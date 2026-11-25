@@ -2,7 +2,7 @@
 // - Webhook do Telegram: POST com o cabeçalho X-Telegram-Bot-Api-Secret-Token.
 // - App (com o token de login): POST { acao: "estado" | "vincular" | "config" | "agenda" | "ok" | "testar" | "desligar" | "token" }.
 // Qualquer pessoa com conta pode conectar o próprio Telegram; o token do bot e o painel (/admin) são só do dono.
-import { emailDoToken } from "../lib/dono.mjs";
+import { usuarioDoToken } from "../lib/dono.mjs";
 import { ehEmailDono } from "../lib/sessao.mjs";
 import * as tg from "../lib/telegram.mjs";
 import { registrarChave } from "../lib/admin.mjs";
@@ -22,8 +22,9 @@ export default async (req) => {
     }
 
     const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const email = await emailDoToken(token).catch(() => null);
+    const quem = await usuarioDoToken(token).catch(() => null), email = quem?.email;
     if (!email) return json(401, { erro: "login" });
+    if (quem.id) tg.marcarUid(email, quem.id).catch(() => {});
     const dono = ehEmailDono(email);
     if (dono) registrarChave(token).catch((e) => console.error("admin: registro", e?.message)); // libera o painel no Telegram
     const c = await req.json().catch(() => ({}));
