@@ -3734,7 +3734,7 @@
       <details class="xp-regras"><summary>O que é cada coisa</summary><ul class="note small">
         <li><b>Nível</b>: quanto você treina. Sobe com o XP, do 1 ao ${NIVEL_MAX}.</li>
         <li><b>Classe</b>: o título do seu nível, com carta nova a cada 5 níveis (Recruta, Escudeiro…).</li>
-        <li><b>Estilo</b>: como você treina, e também a sua liga na temporada: ${Object.values(ESTILOS).map((e) => `${e.ic} ${e.nome} (${LIGA_T[e.liga].nome})`).join(", ")}. Duas modalidades com 25% ou mais dos treinos fazem de você Ronin.</li>
+        <li><b>Estilo</b>: como você treina, e também a sua liga na temporada: ${Object.values(ESTILOS).map((e) => `${e.ic} ${e.nome} (${LIGA_T[e.liga].nome})`).join(", ")}. Você vira Ronin com duas modalidades com 25% ou mais dos treinos, ou com 3 modalidades com 2 treinos ou mais em cada.</li>
         <li><b>Trilha</b>: o plano que o app te passa (etapas e formaturas).</li>
         <li><b>Grupo</b>: os amigos com quem você compete no ranking e nos desafios.</li></ul></details>`;
   }
@@ -6233,7 +6233,6 @@
     hibrido: { nome: "Híbrido", rot: "Jacaré", img: "assets/chefes/jacare-rosto.webp" },
   };
   const noIntervalo = (rows, a, b) => rows.filter((r) => r.data >= a && r.data <= b);
-  // Liga da pessoa na temporada: modalidade com 2+ treinos e 25%+ do total conta; duas ou mais = Híbrido
   // Liga da pessoa na temporada = o estilo dela (mesma regra, ver estiloDe)
   const ligaTemporada = (rows, t = temporada()) => estiloDe(rows, t).liga;
   const PTS_TIER = [0, 10, 20, 30];
@@ -6290,7 +6289,7 @@
         : `<p class="note small">Ninguém nesta liga ainda.</p>`}
       <details class="xp-regras"><summary>Como funciona</summary><ul class="note small">
         <li>${esc(t.nome)} vai de ${ddmm(t.ini)} a ${ddmm(t.fim)}${t.sub === "Aquecimento" ? ": é o aquecimento, sem prêmio por posição" : ""}.</li>
-        <li>Sua liga é a modalidade que você treina. Duas ou mais modalidades (cada uma com 2+ treinos e 25%+ do total) = Híbrido.</li>
+        <li>Sua liga é a modalidade que você treina. Duas modalidades com 25%+ do total cada, ou 3 modalidades com 2+ treinos cada = Híbrido.</li>
         <li>Pontos: +10 por treino (no Insanity, por vídeo), +10/20/30 por insígnia nova ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado.</li>
         ${t.herda ? `<li>Quem já treinava parte de onde parou: treinos e insígnias de antes de ${ddmm(t.ini)} também contam, e quem começou antes ganhou +${XP.veterano} XP de veterano.</li>` : ""}
         ${t.beta ? `<li>${esc(t.nome)} é o beta: todo mundo que entrar tem todos os recursos liberados.</li>` : ""}
@@ -6354,6 +6353,7 @@
   /* ==========================================================
      Estilo = como você treina. É a mesma coisa que a liga da temporada ("Escudeiro · 🥷 Ninja" compete na Liga Insanity).
      Regra única: conta as sessões da temporada por modalidade; entra toda modalidade com 2+ treinos e 25%+ do total.
+     Também vira Ronin quem treina 3+ modalidades com 2+ treinos em cada (variedade), mesmo com uma delas dominando.
      Uma modalidade dá o estilo dela; duas ou mais, Ronin (Híbrido).
      ========================================================== */
   const ESTILOS = {
@@ -6366,14 +6366,17 @@
   };
   const ESTILO_DA_LIGA = Object.fromEntries(Object.entries(ESTILOS).map(([k, e]) => [e.liga, k]));
   const TIPOS_TREINO = [["insanity", "Insanity", "#ff6b8b"], ["calistenia", "Calistenia", "#4fd2ff"], ["hipertrofia", "Academia", "#ffb45e"], ["corrida", "Corrida", "#4ee39b"], ["cross", "Cross", "#c78bff"]];
+  const RONIN_VARIEDADE = 3;
   function estiloDe(rows, t = temporada()) {
     const fe = feitas(noIntervalo(rows, t.herda ? "0000" : t.ini, t.fim)), n = {}; // Temporada 1: o que já foi feito antes também conta
     for (const r of fe) { const m = MOD_DE(r.programa); if (m) n[m] = (n[m] || 0) + 1; }
     const total = soma(Object.values(n)), pct = Object.fromEntries(TIPOS_TREINO.map(([k]) => [k, total ? Math.round(((n[k] || 0) / total) * 100) : 0]));
     if (!total) return { slug: null, liga: null, pct, treinos: 0 };
-    const contam = Object.entries(n).filter(([, v]) => v >= 2 && v / total >= 0.25), top = Object.entries(n).sort((x, y) => y[1] - x[1])[0][0];
-    const liga = contam.length >= 2 ? "hibrido" : top, slug = ESTILO_DA_LIGA[liga];
-    return { slug, ...ESTILOS[slug], pct, treinos: total, top, contam: contam.map(([k]) => k) };
+    // Ronin: duas modalidades com 25%+ cada OU variedade (3+ modalidades com 2+ treinos cada)
+    const fortes = Object.entries(n).filter(([, v]) => v >= 2 && v / total >= 0.25), varias = Object.entries(n).filter(([, v]) => v >= 2), top = Object.entries(n).sort((x, y) => y[1] - x[1])[0][0];
+    const porVariedade = fortes.length < 2 && varias.length >= RONIN_VARIEDADE, contam = porVariedade ? varias : fortes;
+    const liga = fortes.length >= 2 || porVariedade ? "hibrido" : top, slug = ESTILO_DA_LIGA[liga];
+    return { slug, ...ESTILOS[slug], pct, treinos: total, top, contam: contam.map(([k]) => k), porVariedade, varias: varias.map(([k]) => k) };
   }
   const estiloAtual = () => estiloDe(linhasLocais());
   // Barra empilhada com a divisão do treino e o que falta para mudar de estilo
@@ -6383,7 +6386,10 @@
       <span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span>`;
     if (!e.slug) return `<div class="es-box"><div class="es-top"><span class="es-ic">❔</span><div><b>Estilo: a descobrir</b><small>Faça o primeiro treino e ele aparece, pelo que você realmente treina. O estilo também é a sua liga na temporada.</small></div></div></div>`;
     const nome = (k) => TIPOS_TREINO.find(([x]) => x === k)[1];
-    const nota = e.slug === "ronin" ? `${e.contam.map(nome).join(" e ")} passam de 25% do seu treino: você é híbrido e compete na Liga Híbrido.` : `Você compete na Liga ${esc(LIGA_T[e.liga].nome)}. Se outra modalidade chegar a 25% (com 2 treinos ou mais), você vira Ronin.`;
+    const lista = (ks) => ks.map(nome).join(", ").replace(/, ([^,]*)$/, " e $1");
+    const falta = RONIN_VARIEDADE - e.varias.length;
+    const nota = e.slug === "ronin" ? (e.porVariedade ? `Você treina ${lista(e.contam)} (2 treinos ou mais em cada): você é híbrido e compete na Liga Híbrido.` : `${lista(e.contam)} passam de 25% do seu treino: você é híbrido e compete na Liga Híbrido.`)
+      : `Você compete na Liga ${esc(LIGA_T[e.liga].nome)}. Você vira Ronin se outra modalidade chegar a 25% ou se treinar ${falta > 1 ? `mais ${falta} modalidades` : "mais 1 modalidade"} (2 treinos ou mais em cada).`;
     return `<div class="es-box"><div class="es-top"><span class="es-ic">${e.ic}</span><div><b>Estilo: ${esc(e.nome)}</b><small>Você ${esc(e.desc)} · nesta temporada</small></div></div>${barra}<p class="es-nota">${nota}</p></div>`;
   }
   const estiloTxt = () => { const e = estiloAtual(); return e.slug ? `${e.ic} ${e.nome}` : ""; };
