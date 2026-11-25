@@ -1267,6 +1267,13 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 .fc-head { padding: 4px 0; }
 .fc-wrap { padding-top: 8px; }
 .fc-h1 { font-family: var(--font); font-weight: 800; font-size: 28px; line-height: 1.08; text-align: center; text-transform: uppercase; }
+.fc-mestre { margin: 18px auto 6px; text-align: center; }
+.fc-mestre .qz-kicker { text-align: center; }
+.fc-mestre-carta { display: block; width: min(64%, 240px); aspect-ratio: 2 / 3; object-fit: cover; margin: 8px auto 0; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); animation: fcMestre .6s cubic-bezier(.2, .9, .3, 1.2) both; }
+.fc-mestre-txt { margin-top: 10px; font-size: 15px; }
+.fc-mestre-lema { margin-top: 4px; font-size: 13px; font-style: italic; opacity: .75; }
+@keyframes fcMestre { from { opacity: 0; transform: translateY(14px) scale(.92) rotate(-3deg); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .fc-mestre-carta { animation: none; } }
 .fc-ganho { margin-top: 8px; text-align: center; color: #ffd76a; font-size: 14px; font-weight: 600; }
 .fc-card { margin-top: 18px; padding: 18px 16px 14px; border: 1px solid #8a6d22; border-radius: 22px; background: linear-gradient(180deg, rgba(27, 42, 107, 0.65), rgba(8, 14, 40, 0.85)); }
 .fc-top { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }

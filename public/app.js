@@ -3469,7 +3469,9 @@
   // Estilos que já têm uma carta para cada classe (Ninja Recruta … Ninja Imortal): o personagem evolui dentro do próprio estilo.
   // Os outros estilos continuam com as cartas genéricas das classes até ganharem as suas.
   const NIVEIS_ARTE = new Set(["ninja", "ronin", "monge", "batedor", "berserker", "gladiador"]);
-  const estiloComNiveis = () => { try { const e = estiloAtual().slug; return NIVEIS_ARTE.has(e) ? e : null; } catch { return null; } };
+  // Antes do primeiro treino, o estilo vem da trilha escolhida (Insanos → Ninja…), para a arte já ser a do mestre dela
+  const ESTILO_DA_TRILHA = { insanos: "ninja", academia: "gladiador", calistenia: "monge", cross: "berserker", corrida: "batedor", hibrido: "ronin" };
+  const estiloComNiveis = () => { try { const e = estiloAtual().slug || ESTILO_DA_TRILHA[trilha()]; return NIVEIS_ARTE.has(e) ? e : null; } catch { return null; } };
   const avatarClasse = (slug) => { const e = estiloComNiveis(), g = sexoArte(); return e ? `assets/estilos/niveis/avatar/${e}-${g}-${slug}.webp` : `assets/classes/avatar/${slug}-${g}.webp`; };
   const cartaClasse = (slug, g = sexoArte()) => { const e = estiloComNiveis(); return e ? `assets/estilos/niveis/${e}-${g}-${slug}.webp` : `assets/classes/cartas/${slug}-${g}.webp`; };
   /* ==========================================================
@@ -6355,12 +6357,12 @@
      Uma modalidade dá o estilo dela; duas ou mais, Ronin (Híbrido).
      ========================================================== */
   const ESTILOS = {
-    ninja: { nome: "Ninja", ic: "🥷", liga: "insanity", desc: "vive dos vídeos do Insanity" },
-    monge: { nome: "Monge", ic: "🥋", liga: "calistenia", desc: "treina calistenia com o peso do corpo" },
-    gladiador: { nome: "Gladiador", ic: "🛡️", liga: "hipertrofia", desc: "treina com carga na academia" },
-    batedor: { nome: "Batedor", ic: "🏹", liga: "corrida", desc: "corre" },
-    berserker: { nome: "Berserker", ic: "🪓", liga: "cross", desc: "vive de WODs" },
-    ronin: { nome: "Ronin", ic: "⚔️", liga: "hibrido", desc: "mistura duas ou mais modalidades" },
+    ninja: { nome: "Ninja", ic: "🥷", liga: "insanity", desc: "vive dos vídeos do Insanity", mestre: { m: "Kenji", f: "Yuna" }, lema: "Rápidos e explosivos, vivem dos vídeos." },
+    monge: { nome: "Monge", ic: "🥋", liga: "calistenia", desc: "treina calistenia com o peso do corpo", mestre: { m: "Tenzin", f: "Mei" }, lema: "Calma, controle, cada repetição perfeita." },
+    gladiador: { nome: "Gladiador", ic: "🛡️", liga: "hipertrofia", desc: "treina com carga na academia", mestre: { m: "Tito", f: "Lívia" }, lema: "Arena, carga e glória." },
+    batedor: { nome: "Batedor", ic: "🏹", liga: "corrida", desc: "corre", mestre: { m: "Zion", f: "Kaya" }, lema: "Os primeiros a chegar, os últimos a cansar." },
+    berserker: { nome: "Berserker", ic: "🪓", liga: "cross", desc: "vive de WODs", mestre: { m: "Bjorn", f: "Freya" }, lema: "Fúria nórdica em cada WOD." },
+    ronin: { nome: "Ronin", ic: "⚔️", liga: "hibrido", desc: "mistura duas ou mais modalidades", mestre: { m: "Takeshi", f: "Ayame" }, lema: "Sem mestre, sem caminho único." },
   };
   const ESTILO_DA_LIGA = Object.fromEntries(Object.entries(ESTILOS).map(([k, e]) => [e.liga, k]));
   const TIPOS_TREINO = [["insanity", "Insanity", "#ff6b8b"], ["calistenia", "Calistenia", "#4fd2ff"], ["hipertrofia", "Academia", "#ffb45e"], ["corrida", "Corrida", "#4ee39b"], ["cross", "Cross", "#c78bff"]];
@@ -6878,6 +6880,16 @@
     if (VP[k]) { const w = insSemanaDe(k, hoje); return w < 0 ? `A semana 1 do <b>${esc(x.nome)}</b> começa na segunda, ${ddmm(S[k].inicio)}. Até lá, dá para conhecer os vídeos.` : `Você está na <b>semana 1</b> do ${esc(x.nome)}. Abra o treino de hoje, toque em Assistir e marque cada vídeo como feito.`; }
     return "";
   }
+  // Mestre que conduz a pessoa: o estilo dos treinos dela ou, antes do primeiro treino, o estilo da trilha escolhida
+  function mestreHtml() {
+    const e = estiloAtual().slug || ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], T = TRILHAS[trilha()], g = sexoArte(), nome = E.mestre[g];
+    return `<div class="fc-mestre">
+      <p class="qz-kicker">${g === "f" ? "Sua mestra" : "Seu mestre"}</p>
+      <img class="fc-mestre-carta" src="assets/estilos/${e}-${g}.webp" alt="Carta de ${esc(nome)}, ${g === "f" ? "mestra" : "mestre"} ${esc(E.nome)}">
+      <p class="fc-mestre-txt"><b>${esc(nome)}</b>, ${g === "f" ? "mestra" : "mestre"} ${E.ic} ${esc(E.nome)}, vai te conduzir na trilha <b>${T.ic} ${esc(T.nome)}</b>.</p>
+      <p class="fc-mestre-lema">“${esc(E.lema)}”</p>
+    </div>`;
+  }
   function fichaHtml(modo) {
     const q = S.quiz || {}, F = S.ficha, f = fichaAtual(), n = meuNivel(), nova = modo !== "pagina";
     const dias = Math.max(0, Math.min(30, diffDays(parseKey(F.metaIni), hoje))), fim = keyOf(addDays(parseKey(F.metaIni), 30));
@@ -6891,6 +6903,7 @@
         <p class="qz-kicker gold">${nova ? "[ Coach ] · análise concluída" : "Ficha de atleta"}</p>
         ${nova ? `<h1 class="fc-h1">${esc(primeiroNome())}, sua ficha de atleta está pronta</h1>` : ""}
         ${nova ? `<p class="fc-ganho">⚡ +${XP.ficha} XP pela ficha</p>` : ""}
+        ${nova ? mestreHtml() : ""}
         <div class="fc-card">
           <div class="fc-top">
             <span class="fc-av metal-${n.metal}"><img src="${avatarClasse(n.slug)}" alt=""></span>
