@@ -3468,7 +3468,7 @@
   const sexoArte = () => (S.arte === "f" || S.arte === "m" ? S.arte : /^fem/.test(norm(S.quiz?.sexo === "f" ? "feminino" : S.quiz?.sexo === "m" ? "masculino" : nutriSexo())) ? "f" : "m");
   // Estilos que já têm uma carta para cada classe (Ninja Recruta … Ninja Imortal): o personagem evolui dentro do próprio estilo.
   // Os outros estilos continuam com as cartas genéricas das classes até ganharem as suas.
-  const NIVEIS_ARTE = new Set(["ninja"]);
+  const NIVEIS_ARTE = new Set(["ninja", "ronin"]);
   const estiloComNiveis = () => { try { const e = estiloAtual().slug; return NIVEIS_ARTE.has(e) ? e : null; } catch { return null; } };
   const avatarClasse = (slug) => { const e = estiloComNiveis(), g = sexoArte(); return e ? `assets/estilos/niveis/avatar/${e}-${g}-${slug}.webp` : `assets/classes/avatar/${slug}-${g}.webp`; };
   const cartaClasse = (slug, g = sexoArte()) => { const e = estiloComNiveis(); return e ? `assets/estilos/niveis/${e}-${g}-${slug}.webp` : `assets/classes/cartas/${slug}-${g}.webp`; };
