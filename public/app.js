@@ -3036,7 +3036,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null, album: S.album || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3472,8 +3472,29 @@
   const estiloComNiveis = () => { try { const e = estiloAtual().slug; return NIVEIS_ARTE.has(e) ? e : null; } catch { return null; } };
   const avatarClasse = (slug) => { const e = estiloComNiveis(), g = sexoArte(); return e ? `assets/estilos/niveis/avatar/${e}-${g}-${slug}.webp` : `assets/classes/avatar/${slug}-${g}.webp`; };
   const cartaClasse = (slug, g = sexoArte()) => { const e = estiloComNiveis(); return e ? `assets/estilos/niveis/${e}-${g}-${slug}.webp` : `assets/classes/cartas/${slug}-${g}.webp`; };
+  /* ==========================================================
+     Álbum de cartas. S.album = { estilo: índice da classe mais alta já alcançada nesse estilo }.
+     Chegar a uma classe num estilo libera todas as cartas até ela nesse estilo; treinar outra modalidade
+     muda o estilo e abre outra coleção. Masculino e feminino são a mesma carta (segue a escolha do Perfil).
+     ========================================================== */
+  const ESTILOS_ORDEM = ["ninja", "monge", "gladiador", "batedor", "berserker", "ronin"];
+  const albumTotal = () => ESTILOS_ORDEM.length * CLASSES.length;
+  const albumTem = (e, ci) => (S.album?.[e] ?? -1) >= ci;
+  const albumQtdEstilo = (e) => Math.min(CLASSES.length, (S.album?.[e] ?? -1) + 1);
+  const albumQtd = () => soma(ESTILOS_ORDEM.map(albumQtdEstilo));
+  const cartaDe = (e, slug, g = sexoArte()) => `assets/estilos/niveis/${e}-${g}-${slug}.webp`;
+  // Guarda o estilo e a classe de agora no álbum; devolve as cartas novas ([[estilo, índice], ...])
+  function albumAtualizar() {
+    const e = estiloComNiveis(); if (!e) return [];
+    const n = meuNivel(), antes = S.album?.[e] ?? -1;
+    if (n.ci <= antes) return [];
+    S.album = { ...(S.album || {}), [e]: n.ci };
+    save();
+    return CLASSES.slice(antes + 1, n.ci + 1).map((_, i) => [e, antes + 1 + i]);
+  }
   function galeriaCartas(n) {
     return `<div class="carta-gal">${CLASSES.map(([slug, nome], i) => `<div class="carta-it${i === n.ci ? " on" : i > n.ci ? " off" : ""}"><img src="${cartaClasse(slug)}" alt="${esc(nome)}${i > n.ci ? " (bloqueada)" : ""}" loading="lazy">${i > n.ci ? `<span class="carta-lock">🔒</span>` : ""}</div>`).join("")}</div>
+      <a class="alb-link" href="#/album">🃏 Ver álbum de cartas · ${albumQtd()}/${albumTotal()} ›</a>
       <p class="arte-lbl">Gênero do personagem</p><div class="seg arte-seg"><button class="${sexoArte() === "m" ? "on" : ""}" data-arte="m">♂ Masculino</button><button class="${sexoArte() === "f" ? "on" : ""}" data-arte="f">♀ Feminino</button></div>`;
   }
 
@@ -3577,10 +3598,16 @@
       if (!silencioso) setTimeout(() => modalFormatura(at, prox), 600);
     }
     const n = meuNivel(), antes = xpAntes; xpAntes = n;
+    const novas = albumAtualizar(); // na abertura do app (silencioso) só registra o que a pessoa já alcançou
     if (silencioso || !antes) return;
     const ganho = n.xp - antes.xp;
     if (ganho > 0) xpToast(ganho, n, det);
-    if (n.nivel > antes.nivel) setTimeout(() => modalNivel(n, n.ci > antes.ci), 1400);
+    if (n.nivel > antes.nivel) setTimeout(() => modalNivel(n, n.ci > antes.ci, novas.length > 0), 1400);
+    else if (novas.length) { // trocou de estilo: abriu outra coleção
+      setTimeout(() => modalCartasNovas(novas), 1400);
+      const E = ESTILOS[novas[0][0]];
+      autoPost(`colecao:${novas[0][0]}`, `🃏 Virei ${E.nome} ${E.ic} e ganhei ${novas.length === 1 ? "uma carta nova" : `${novas.length} cartas novas`} no álbum!`);
+    }
     if (n.ci > antes.ci) autoPost(`classe:${n.slug}`, `⬆️ Subi para o nível ${n.nivel} e virei ${n.classe}!`);
   }
   function xpToast(ganho, n, det = "") {
@@ -3591,17 +3618,78 @@
     requestAnimationFrame(() => t.classList.add("on"));
     setTimeout(() => { t.classList.remove("on"); setTimeout(() => t.remove(), 400); }, 2600);
   }
-  function dlgGami(html) {
+  function dlgGami(html, ok = "Bora!") {
     let d = document.getElementById("gami-dlg");
     if (!d) { d = document.createElement("dialog"); d.id = "gami-dlg"; document.body.appendChild(d); d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-gami-ok]")) d.close(); }); }
-    d.innerHTML = `<div class="gami-box">${html}<button class="btn btn-blue" data-gami-ok>Bora!</button></div>`;
+    d.innerHTML = `<div class="gami-box">${html}<button class="btn btn-blue" data-gami-ok>${esc(ok)}</button></div>`;
     if (!d.open) d.showModal();
   }
-  function modalNivel(n, novaClasse) {
+  function modalNivel(n, novaClasse, cartaNova = false) {
     dlgGami(`<div class="gami-carta"><img src="${cartaClasse(n.slug)}" alt="Carta da classe ${esc(n.classe)}"></div>
       <p class="gami-k">${novaClasse ? "Nova classe!" : "Subiu de nível!"}</p><h2>${novaClasse ? esc(n.classe) : `Nível ${n.nivel}`}</h2>
-      <p class="note">${novaClasse ? `Você agora é <b>${esc(n.classe)}</b> (nível ${n.nivel}).` : `${esc(n.classe)} · faltam ${n.fim - n.xp} XP para o nível ${n.nivel + 1}.`}</p>`);
+      <p class="note">${novaClasse ? `Você agora é <b>${esc(n.classe)}</b> (nível ${n.nivel}).` : `${esc(n.classe)} · faltam ${n.fim - n.xp} XP para o nível ${n.nivel + 1}.`}</p>
+      ${cartaNova ? `<a class="gami-tag" href="#/album" data-gami-ok>🃏 Nova carta no álbum ›</a>` : ""}`);
   }
+  function modalCartasNovas(novas) {
+    const [e, ci] = novas[novas.length - 1], E = ESTILOS[e];
+    dlgGami(`<div class="gami-carta"><img src="${cartaDe(e, CLASSES[ci][0])}" alt="Carta ${esc(E.nome)} ${esc(CLASSES[ci][1])}"></div>
+      <p class="gami-k">Nova coleção!</p><h2>${E.ic} ${esc(E.nome)}</h2>
+      <p class="note">Seu treino mudou e você virou <b>${esc(E.nome)}</b>: ${novas.length === 1 ? "ganhou uma carta nova" : `ganhou ${novas.length} cartas novas`} no álbum.</p>
+      <a class="gami-tag" href="#/album" data-gami-ok>🃏 Ver álbum ›</a>`);
+  }
+  // Carta aberta no álbum: grande, com baixar e compartilhar
+  function abrirCarta(e, ci) {
+    const [slug, nome, metal] = CLASSES[ci], E = ESTILOS[e];
+    dlgGami(`<div class="gami-carta alb-grande"><img src="${cartaDe(e, slug)}" alt="Carta ${esc(E.nome)} ${esc(nome)}"></div>
+      <p class="gami-k">${E.ic} ${esc(E.nome)} · ${esc(metal)}</p><h2>${esc(nome)}</h2>
+      <div class="alb-acoes"><button class="btn btn-outline" data-carta-baixar="${e}|${ci}|carta">⬇️ Baixar carta</button><button class="btn btn-outline" data-carta-baixar="${e}|${ci}|story">📲 Compartilhar</button></div>`, "Fechar");
+  }
+  const carregarImg = (src) => new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = falha; i.src = src; });
+  // Gera a imagem: "carta" (só a carta) ou "story" (1080x1920 com nome, nível e números reais, para Instagram/WhatsApp)
+  async function cartaExportar(e, ci, modo) {
+    const [slug, nome] = CLASSES[ci], E = ESTILOS[e], arq = `fitai-${e}-${slug}`;
+    try {
+      const img = await carregarImg(cartaDe(e, slug));
+      const c = document.createElement("canvas"), x = c.getContext("2d");
+      if (modo === "carta") { c.width = img.naturalWidth; c.height = img.naturalHeight; x.drawImage(img, 0, 0); }
+      else {
+        try { await document.fonts.ready; } catch {}
+        const fonte = getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "system-ui, sans-serif";
+        const W = 1080, H = 1920; c.width = W; c.height = H;
+        const fundo = x.createLinearGradient(0, 0, 0, H); fundo.addColorStop(0, "#111a4a"); fundo.addColorStop(1, "#05060f");
+        x.fillStyle = fundo; x.fillRect(0, 0, W, H);
+        const brilho = x.createRadialGradient(W / 2, 900, 80, W / 2, 900, 760); brilho.addColorStop(0, "rgba(255,200,90,0.30)"); brilho.addColorStop(1, "rgba(255,200,90,0)");
+        x.fillStyle = brilho; x.fillRect(0, 0, W, H);
+        x.textAlign = "center";
+        x.fillStyle = "#ffd76a"; x.font = `700 34px ${fonte}`; x.fillText(`${E.ic}  ${E.nome.toUpperCase()} · ${nome.toUpperCase()}`, W / 2, 250);
+        const cw = 740, ch = cw * 1.5, cx = (W - cw) / 2, cy = 310;
+        x.save(); x.shadowColor = "rgba(0,0,0,0.65)"; x.shadowBlur = 70; x.shadowOffsetY = 24;
+        x.beginPath(); if (x.roundRect) x.roundRect(cx, cy, cw, ch, 28); else x.rect(cx, cy, cw, ch); x.fillStyle = "#000"; x.fill(); x.restore();
+        x.save(); x.beginPath(); if (x.roundRect) x.roundRect(cx, cy, cw, ch, 28); else x.rect(cx, cy, cw, ch); x.clip(); x.drawImage(img, cx, cy, cw, ch); x.restore();
+        const n = meuNivel(), k = kpis(linhasLocais());
+        x.fillStyle = "#ffffff"; x.font = `800 60px ${fonte}`; x.fillText(nomeCompleto().split(" ")[0], W / 2, cy + ch + 110);
+        x.fillStyle = "#b9c3ff"; x.font = `600 36px ${fonte}`;
+        x.fillText(k.treinos ? `Nível ${n.nivel} · ${k.treinos} ${k.treinos === 1 ? "treino" : "treinos"} · ${k.dias} ${k.dias === 1 ? "dia" : "dias"} de treino` : `Nível ${n.nivel}`, W / 2, cy + ch + 170);
+        x.fillStyle = "#ffd76a"; x.font = `700 32px ${fonte}`; x.fillText("FIT.AI · fitai.eduardotorres-dev.com.br", W / 2, H - 90);
+      }
+      const tipo = modo === "carta" ? "image/png" : "image/jpeg";
+      const blob = await new Promise((ok) => c.toBlob(ok, tipo, 0.92));
+      if (!blob) throw new Error("imagem");
+      const file = new File([blob], `${arq}.${modo === "carta" ? "png" : "jpg"}`, { type: tipo });
+      if (modo === "story" && navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: "FIT.AI", text: `Minha carta ${E.nome} ${nome} no FIT.AI 🃏` }); return; } catch (err) { if (err?.name === "AbortError") return; }
+      }
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(file), download: file.name });
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast(modo === "carta" ? "Carta baixada ✓" : "Imagem baixada ✓");
+    } catch { toast("Não consegui gerar a imagem da carta."); }
+  }
+  document.addEventListener("click", (ev) => {
+    const ab = ev.target.closest?.("[data-carta]");
+    if (ab) { const [e, ci] = ab.dataset.carta.split("|"); abrirCarta(e, Number(ci)); return; }
+    const bx = ev.target.closest?.("[data-carta-baixar]");
+    if (bx) { const [e, ci, modo] = bx.dataset.cartaBaixar.split("|"); cartaExportar(e, Number(ci), modo); }
+  });
   function modalFormatura(et, prox) {
     dlgGami(`<div class="gami-crest metal-ouro"><img class="gm-cls" src="assets/emblemas/graduado-max30.svg" alt=""></div>
       <p class="gami-k">Formatura · +${XP.formatura} XP</p><h2>${esc(et.nome)} concluído!</h2>
@@ -4908,6 +4996,7 @@
       if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
       if (perfil.config.arte && !S.arte) S.arte = perfil.config.arte;
+      if (perfil.config.album) { S.album = { ...(S.album || {}) }; for (const [k, v] of Object.entries(perfil.config.album)) S.album[k] = Math.max(S.album[k] ?? -1, Number(v)); }
       if (perfil.config.perfil) for (const [k, v] of Object.entries(perfil.config.perfil)) if (v && !S.perfil[k]) S.perfil[k] = v;
       if (Array.isArray(perfil.config.medidas)) { const por = Object.fromEntries((S.medidas || []).map((m) => [m.d, m])); perfil.config.medidas.forEach((m) => { if (m?.d && !por[m.d]) por[m.d] = m; }); S.medidas = Object.values(por).sort((a, b) => a.d.localeCompare(b.d)); }
       if (perfil.config.pesagemPulada && !S.pesagemPulada) S.pesagemPulada = perfil.config.pesagemPulada;
@@ -6397,6 +6486,24 @@
         <span class="ch-hp"><i style="width:${c.hp}%"></i></span>
         <div class="ch-l3"><span>HP ${c.hp}%</span><span>${c.tem ? `Seu marco: ${marcaChefe(c)}` : "Ainda sem registro"}</span></div></div></div>`;
   }
+  telas.album = () => {
+    setToolbar(null);
+    albumAtualizar();
+    const g = sexoArte(), eAt = estiloComNiveis();
+    return `<section class="screen quiz alb-tela">
+      <header class="fc-head"><a href="#/perfil" class="qz-voltar">← voltar</a></header>
+      <p class="qz-kicker gold">Álbum de cartas</p>
+      <h1 class="fc-h1">${albumQtd()} de ${albumTotal()} cartas</h1>
+      <p class="alb-resumo">Cada classe que você alcança libera a carta do seu estilo. Treinou outra modalidade? Você muda de estilo e começa outra coleção.</p>
+      <div class="seg arte-seg alb-genero"><button class="${g === "m" ? "on" : ""}" data-arte="m">♂ Masculino</button><button class="${g === "f" ? "on" : ""}" data-arte="f">♀ Feminino</button></div>
+      ${ESTILOS_ORDEM.map((e) => { const E = ESTILOS[e];
+        return `<div class="alb-sec${e === eAt ? " atual" : ""}"><div class="alb-h"><span>${E.ic} ${esc(E.nome)}</span><small>${albumQtdEstilo(e)}/${CLASSES.length}${e === eAt ? " · seu estilo" : ""}</small></div>
+          <p class="alb-d">Quem ${esc(E.desc)}</p>
+          <div class="alb-grade">${CLASSES.map(([slug, nome], ci) => albumTem(e, ci)
+            ? `<button class="alb-it" data-carta="${e}|${ci}" aria-label="Abrir a carta ${esc(E.nome)} ${esc(nome)}"><img src="${cartaDe(e, slug, g)}" alt="" loading="lazy"></button>`
+            : `<div class="alb-it off" title="Chegue a ${esc(nome)} como ${esc(E.nome)}"><img src="${cartaDe(e, slug, g)}" alt="" loading="lazy"><span class="carta-lock">🔒</span><small>${esc(nome)}</small></div>`).join("")}</div></div>`; }).join("")}
+    </section>`;
+  };
   telas.chefes = () => {
     setToolbar(null);
     const cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
@@ -6854,6 +6961,8 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
       <div class="htc__face htc__front"><canvas class="htc__canvas" aria-hidden="true"></canvas></div>
       <div class="htc__face htc__back">${back}</div></div></div>`;
   }
+  // Efeito holográfico desligado por enquanto: vai voltar como recompensa rara (missões), para valer mais.
+  const HOLO_ATIVO = false;
   function htcInit() {
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.querySelectorAll(".htc[data-htc]:not([data-htc-on])").forEach((root) => {
@@ -6868,7 +6977,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
       card.addEventListener("pointermove", mover);
       ["pointerleave", "pointercancel"].forEach((ev) => card.addEventListener(ev, () => (tgt = { ax: 0, ay: 0, active: false })));
       const aplicar = () => { card.style.transform = `rotateX(${ax.toFixed(1)}deg) rotateY(${(ay + (flipped ? 180 : 0)).toFixed(1)}deg)`; };
-      const gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
+      const gl = HOLO_ATIVO ? canvas.getContext("webgl2", { alpha: false, antialias: false }) : null;
       if (!gl) { canvas.replaceWith(Object.assign(new Image(), { src: root.dataset.htcImg, className: "htc__canvas", alt: "" })); aplicar(); return; }
       const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); return x; };
       const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, HTC_VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, HTC_FRAG)); gl.linkProgram(prog);
