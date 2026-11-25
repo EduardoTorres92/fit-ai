@@ -713,7 +713,7 @@
           ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
           ${t && principal() === "plano" ? workoutCard(w, d) : ""}
           ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
-          ${temporadaHome()}
+          ${semanaHome()}
           ${missoesHome()}
           ${pesagemHome()}
           ${ativHome()}
@@ -828,10 +828,9 @@
           <div class="profile">
             <button class="foto-btn" id="trocar-foto" aria-label="Trocar foto de perfil"><img src="${esc(fotoPerfil())}" alt="Foto de ${esc(nomeCompleto())}" referrerpolicy="no-referrer"><span class="foto-cam" aria-hidden="true">📷</span><img class="foto-classe" src="${classeImg(meuNivel().slug)}" alt="" aria-hidden="true"></button>
             <input type="file" id="foto-arquivo" accept="image/*" hidden>
-            <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span></div></div>
+            <div><button class="nome-btn" id="trocar-nome" ${S.user ? "" : "disabled"}><strong>${esc(nomeCompleto())}</strong></button><span>${uid && S.user?.email ? esc(S.user.email) : `${esc(NOME_PROG)} · Semana ${Math.max(w, 0) + 1}`}</span>${S.d7Feito ? `<span class="pf-titulo">🎖️ ${esc(D7[S.d7Feito.k]?.titulo || "")}</span>` : ""}</div></div>
           ${fichaPerfil()}
           ${nivelCard()}
-          ${temporadaPerfilHtml()}
           ${ligasPerfilHtml(linhasLocais(), true, meuOpts())}
           ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
@@ -3036,7 +3035,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, arte: S.arte || null, album: S.album || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, arte: S.arte || null, album: S.album || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3460,7 +3459,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -3734,7 +3733,7 @@
       <details class="xp-regras"><summary>O que é cada coisa</summary><ul class="note small">
         <li><b>Nível</b>: quanto você treina. Sobe com o XP, do 1 ao ${NIVEL_MAX}.</li>
         <li><b>Classe</b>: o título do seu nível, com carta nova a cada 5 níveis (Recruta, Escudeiro…).</li>
-        <li><b>Estilo</b>: como você treina, e também a sua liga na temporada: ${Object.values(ESTILOS).map((e) => `${e.ic} ${e.nome} (${LIGA_T[e.liga].nome})`).join(", ")}. Você vira Ronin com duas modalidades com 25% ou mais dos treinos, ou com 3 modalidades com 2 treinos ou mais em cada.</li>
+        <li><b>Estilo</b>: como você treina: ${Object.values(ESTILOS).map((e) => `${e.ic} ${e.nome} (${LIGA_T[e.liga].nome})`).join(", ")}. Você vira Ronin com duas modalidades com 25% ou mais dos treinos, ou com 3 modalidades com 2 treinos ou mais em cada.</li>
         <li><b>Trilha</b>: o plano que o app te passa (etapas e formaturas).</li>
         <li><b>Grupo</b>: os amigos com quem você compete no ranking e nos desafios.</li></ul></details>`;
   }
@@ -4101,7 +4100,7 @@
     const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
     return `<section class="screen has-toolbar">${head}
       <div class="chips g-chips">${G.grupos.map((x) => `<button class="chip${x.id === G.sel ? " primary" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="chip" id="g-criar">+ Criar</button><button class="chip" id="g-codigo">Código</button></div>
-      ${temporadaGrupoHtml()}
+      ${rankingSemanaHtml()}
       <div class="section">
         <div class="g-head"><div><h2>${esc(g.nome)}</h2><small>${G.membros.length} ${G.membros.length === 1 ? "pessoa" : "pessoas"} · código <b>${esc(g.codigo)}</b></small></div>
           <button class="btn btn-blue" id="g-convidar">Convidar</button></div>
@@ -4884,7 +4883,6 @@
     if (rota === "onboarding") startQuiz("onboarding");
     if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
     if (rota === "home" || rota === "chefes") setTimeout(chefesNovos, 700);
-    if (rota === "home") setTimeout(popTemporada, 1400);
     htcInit();
     const tab = document.querySelector(".wtab.on");
     if (tab) tab.scrollIntoView({ inline: "center", block: "nearest" });
@@ -5834,8 +5832,8 @@
     if (S.quiz) { const q = S.quiz; out.push(`Quiz de entrada: objetivo ${qzTxt("objetivo", q.objetivo)}; treina ${qzTxt("local", q.local).toLowerCase()}; ${q.dias || "?"} dias por semana; ${q.tempo || "?"} min por treino; o que atrapalha: ${(q.obst || []).map((o) => qzTxt("obst", o)).join(", ") || "—"}; o que motiva: ${qzTxt("estilo", q.estilo)}.`); }
     { const cs = chefes(), vivos = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp).slice(0, 3);
       out.push(`Chefes (metas de recorde): ${cs.filter((c) => c.derrotado).length} de ${cs.length} derrotados.${vivos.length ? ` Mais perto: ${vivos.map((c) => `${c.nome} (${c.desc}; marco ${fmtMarca(c.met, c.melhor)}, HP ${c.hp}%)`).join("; ")}.` : ""} Missões de hoje: ${missoesDe(hojeKey).map((m) => `${m.t} ${m.ok ? "(feita)" : `(${m.fmt(m.valor, m.alvoV)})`}`).join("; ")}.`); }
-    out.push(temporadaContexto());
-    { const e = estiloAtual(); out.push(`Estilo de treino na temporada (é também a liga dele): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
+    out.push(semanaContexto());
+    { const e = estiloAtual(); out.push(`Estilo de treino (pelo que ele treina): ${e.slug ? `${e.nome} (${e.desc})` : "ainda sem estilo"}; divisão: ${TIPOS_TREINO.map(([k, nome]) => `${nome} ${e.pct[k]}%`).join(", ")}.`); }
     if (S.ficha) { const f = fichaAtual(); out.push(`Ficha de atleta: rank ${f.rank} (meta ${S.ficha.meta} até ${ddmm(keyOf(addDays(parseKey(S.ficha.metaIni), 30)))}), ${ATRIB.map(([k, r]) => `${r} ${f.attrs[k]}`).join(", ")} (0 a 100). Use os atributos mais baixos para sugerir o que treinar.`); }
     { const n = meuNivel(), at = etapaAtual(), g = at.p ? at.p() : null, T = TRILHAS[trilha()];
       const libs = CATALOGO.filter((x) => liberado(x.k)).map((x) => x.nome).join(", ");
@@ -6212,17 +6210,10 @@
   }
 
   /* ==========================================================
-     Temporadas: 8 semanas, uma liga por pessoa (quem treina duas ou mais modalidades de verdade entra no Híbrido).
-     Pontos dentro da temporada: +10 por treino concluído da liga (Insanity: por vídeo), +10/20/30 por insígnia nova
-     ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado. Tudo calculado das linhas de treino.
+     Ranking da semana no grupo: XP ganho de segunda até hoje (zera toda segunda, justo para quem entra depois).
+     Conta treinos, recordes, meta da semana, água, desafio do grupo e o desafio de 7 dias. O dos outros sai
+     das linhas de treino e do que cada um sincronizou (perfis.config).
      ========================================================== */
-  const TEMPORADAS = [{ n: 1, nome: "Temporada 1", sub: "Aquecimento", ini: "2026-11-23", fim: "2027-01-17", herda: true, beta: true }];
-  function temporada() {
-    const t = TEMPORADAS.find((x) => hojeKey >= x.ini && hojeKey <= x.fim) || TEMPORADAS.find((x) => hojeKey < x.ini) || TEMPORADAS[TEMPORADAS.length - 1];
-    const fase = hojeKey < t.ini ? "antes" : hojeKey > t.fim ? "fim" : "agora";
-    const semana = fase === "agora" ? Math.floor(diffDays(parseKey(t.ini), hoje) / 7) + 1 : fase === "fim" ? 8 : 0;
-    return { ...t, fase, semana, faltam: fase === "antes" ? diffDays(hoje, parseKey(t.ini)) : diffDays(hoje, parseKey(t.fim)) };
-  }
   const MOD_DE = (pr) => (pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
   const LIGA_T = {
     insanity: { nome: "Insanity", rot: "Canguru", img: "assets/chefes/canguru-rosto.webp" },
@@ -6233,126 +6224,165 @@
     hibrido: { nome: "Híbrido", rot: "Jacaré", img: "assets/chefes/jacare-rosto.webp" },
   };
   const noIntervalo = (rows, a, b) => rows.filter((r) => r.data >= a && r.data <= b);
-  // Liga da pessoa na temporada = o estilo dela (mesma regra, ver estiloDe)
-  const ligaTemporada = (rows, t = temporada()) => estiloDe(rows, t).liga;
-  const PTS_TIER = [0, 10, 20, 30];
-  function pontosTemporada(rows, liga, o, t = temporada()) {
-    const ate = t.fase === "fim" ? t.fim : hojeKey, desde = t.herda ? "0000" : t.ini; // herda: quem já treinava parte de onde parou
-    const dentro = feitas(noIntervalo(rows, desde, ate)), antes = rows.filter((r) => r.data < desde), todas = rows.filter((r) => r.data <= ate);
-    const mods = liga === "hibrido" ? null : [liga], conta = (r) => !mods || mods.includes(MOD_DE(r.programa));
-    let treinos = 0;
-    for (const r of dentro.filter(conta)) treinos += MOD_DE(r.programa) === "insanity" ? Math.max(1, (r.detalhes?.feitos || []).length) : MOD_DE(r.programa) ? 1 : 0;
-    let ins = 0, chefes = 0, max = 0;
-    for (const L of LIGAS.filter((L) => liga === "hibrido" || L.k === liga)) {
-      const a = L.ins(antes, o), d = L.ins(todas, o), ta = Object.fromEntries(a.map((x) => [x.k, x.tier]));
-      for (const x of d) if (x.tier > (ta[x.k] || 0)) ins += PTS_TIER[x.tier] - PTS_TIER[ta[x.k] || 0];
-      if (d.every((x) => x.tier) && !a.every((x) => x.tier)) chefes++;
-    }
-    if (liga === "insanity" || liga === "hibrido") { // Max Out que passou do melhor anterior naquele vídeo
-      const best = {};
-      for (const m of maxOuts(todas).sort((a, b) => a.k.localeCompare(b.k))) { if (m.k >= desde && best[m.v] && m.s > best[m.v]) max++; best[m.v] = Math.max(best[m.v] || 0, m.s); }
-    }
-    return { treinos, ins, chefes, max, total: treinos * 10 + ins + chefes * 50 + max * 10 };
+  // Data em que o app abriu para todos: quem treinou antes ganhou o bônus de veterano
+  const INICIO_ABERTO = "2026-11-23";
+  function xpSemanaDe(id) {
+    const seg = semanaAtual(), eu = id === uid, cfg = eu ? { meta: metaSemana(), d7: S.d7, d7Feito: S.d7Feito } : G.perfis[id]?.config || {};
+    const meta = Number(cfg.meta) || 6, rows = linhasDe(id);
+    const agua = aguaDe(id).filter((a) => a.data >= seg && a.ml && a.meta);
+    const desafios = (G.feitos || []).filter((f) => f.usuario_id === id && f.feito_em && keyOf(new Date(f.feito_em)) >= seg).length;
+    return Math.max(0, xpDe(rows, agua, desafios, meta) - xpDe(rows.filter((r) => r.data < seg), [], 0, meta) + d7XpDesde(cfg, seg));
   }
-  function tabelaTemporada(t = temporada()) {
-    const opts = (id) => (id === uid ? meuOpts() : { g: G.perfis[id]?.config?.arte === "f" ? "f" : "m", peso: 0, form: G.perfis[id]?.config?.formaturas || {}, prs: [] });
-    return G.membros.map((id) => { const rows = linhasDe(id), liga = ligaTemporada(rows, t); return liga ? { id, liga, ...pontosTemporada(rows, liga, opts(id), t) } : null; }).filter(Boolean);
-  }
-  // Insígnias da temporada (Perfil): Pioneiro (treinou na temporada) e Finalista (Cardio Challenge final do MAX:30 dentro do prazo)
-  function finalistaMax30(t = temporada()) {
-    const P = VP.insanity; if (!P) return null;
-    let ult = null; P.semanas.forEach((s, w) => s.dias.forEach((x, d) => x.ids.length && (ult = [w, d])));
-    return Object.keys(S.insanity?.logs || {}).filter((k) => k >= t.ini && k <= t.fim && insFeito("insanity", k) && S.insanity.logs[k].w === ult[0] && S.insanity.logs[k].d === ult[1]).sort()[0] || null;
-  }
-  function temporadaPerfilHtml() {
-    const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t), treinou = feitas(noIntervalo(rows, t.ini, t.fim)).length > 0, fin = finalistaMax30(t);
-    if (t.fase === "antes") return "";
-    return `<div class="ins-box"><div class="sec-head"><h2>${esc(t.nome)} · ${esc(t.sub)}</h2><span>${liga ? `Liga ${esc(LIGA_T[liga].nome)}` : ""}</span></div>
-      <div class="ins-grid">
-        <div class="ins-it ${treinou && t.fase === "fim" ? "ins-ouro" : treinou ? "ins-prata" : "ins-off"}"><span class="ins-med">🚩</span><b>Pioneiro</b><small>${treinou ? (t.fase === "fim" ? `conquistada · ${esc(t.nome)}` : "garantida no fim da temporada") : "treine na temporada"}</small></div>
-        ${VP.insanity ? `<div class="ins-it ${fin ? "ins-ouro" : "ins-off"}"><span class="ins-med">🏁</span><b>Finalista</b><small>${fin ? `MAX:30 completo · ${ddmm(fin)}` : `Cardio Challenge final do MAX:30 até ${ddmm(t.fim)}`}</small></div>` : ""}
-      </div></div>`;
-  }
-  // Grupo: ranking da liga escolhida
-  function temporadaGrupoHtml() {
-    const t = temporada(), tab = tabelaTemporada(t), minha = tab.find((x) => x.id === uid)?.liga;
-    const ligas = Object.keys(LIGA_T).filter((k) => tab.some((x) => x.liga === k));
-    if (!G.ligaSel || !LIGA_T[G.ligaSel]) G.ligaSel = minha || ligas[0] || "hibrido";
-    const sel = G.ligaSel, lista = tab.filter((x) => x.liga === sel).sort((a, b) => b.total - a.total), L = LIGA_T[sel];
-    const quando = t.fase === "antes" ? `começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`} (${ddmm(t.ini)})` : t.fase === "fim" ? `encerrada em ${ddmm(t.fim)}` : `semana ${t.semana} de 8 · faltam ${t.faltam} ${t.faltam === 1 ? "dia" : "dias"}`;
+  function rankingSemanaHtml() {
+    const lista = G.membros.map((id) => ({ id, xp: xpSemanaDe(id) })).sort((a, b) => b.xp - a.xp);
+    const fim = addDays(mondayOf(hoje), 6), faltam = diffDays(hoje, fim);
+    const q = chefes().find((c) => c.k === "sr-q");
     return `<div class="section tp-box">
-      <div class="tp-head"><img src="${L.img}" alt=""><div><span class="tp-k">${esc(t.nome)} · ${esc(t.sub)}</span><b>Liga ${esc(L.nome)}</b><small>${quando}</small></div></div>
-      ${(() => { const q = chefes().find((c) => c.k === "sr-q"); return q && t.fase !== "antes" ? `<a class="tp-srq" href="#/chefes"><img src="${q.img}" alt=""><span><b>Sr. Q · desafios do grupo</b><span class="ch-hp"><i style="width:${q.hp}%"></i></span></span><em>${q.melhor}/8</em></a>` : ""; })()}
-      <div class="chips tp-ligas">${(ligas.length ? ligas : Object.keys(LIGA_T)).map((k) => `<button class="chip${k === sel ? " primary" : ""}" data-tp-liga="${k}">${ESTILOS[ESTILO_DA_LIGA[k]].ic} ${esc(LIGA_T[k].nome)}${k === minha ? " · você" : ""}</button>`).join("")}</div>
-      ${t.fase === "antes" ? `<p class="note small">A temporada começa na segunda, ${ddmm(t.ini)}, e vai até ${ddmm(t.fim)}. Cada pessoa entra numa liga pelo que treinar: quem fizer duas ou mais modalidades entra no Híbrido.</p>`
-        : lista.length ? `<ol class="tp-rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}"><span class="tp-pos">${i + 1}º</span>${avatar(G.perfis[x.id], 32)}<span class="tp-nome"><b>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</b><small>${x.treinos} ${sel === "insanity" ? (x.treinos === 1 ? "vídeo" : "vídeos") : x.treinos === 1 ? "treino" : "treinos"}${x.ins ? ` · +${x.ins} insígnias` : ""}${x.max ? ` · ${x.max} Max Out` : ""}${x.chefes ? ` · ${x.chefes} chefe` : ""}</small></span><strong>${x.total}</strong></li>`).join("")}</ol>`
-        : `<p class="note small">Ninguém nesta liga ainda.</p>`}
+      <div class="tp-head"><span class="tp-ic">⚡</span><div><span class="tp-k">Ranking da semana</span><b>XP de segunda até hoje</b><small>${faltam ? `zera em ${faltam} ${faltam === 1 ? "dia" : "dias"} (segunda)` : "último dia: zera amanhã"}</small></div></div>
+      ${q ? `<a class="tp-srq" href="#/chefes"><img src="${q.img}" alt=""><span><b>Sr. Q · desafios do grupo</b><span class="ch-hp"><i style="width:${q.hp}%"></i></span></span><em>${q.melhor}/8</em></a>` : ""}
+      <ol class="tp-rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}" data-membro="${x.id}" role="link" tabindex="0"><span class="tp-pos">${i + 1}º</span>${avatar(G.perfis[x.id], 32)}<span class="tp-nome"><b>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</b><small>${esc(cfgNivel(x.id)?.nivel_xp ? `Nível ${cfgNivel(x.id).nivel_xp}` : "")}</small></span><strong>${x.xp}<small> XP</small></strong></li>`).join("")}</ol>
       <details class="xp-regras"><summary>Como funciona</summary><ul class="note small">
-        <li>${esc(t.nome)} vai de ${ddmm(t.ini)} a ${ddmm(t.fim)}${t.sub === "Aquecimento" ? ": é o aquecimento, sem prêmio por posição" : ""}.</li>
-        <li>Sua liga é a modalidade que você treina. Duas modalidades com 25%+ do total cada, ou 3 modalidades com 2+ treinos cada = Híbrido.</li>
-        <li>Pontos: +10 por treino (no Insanity, por vídeo), +10/20/30 por insígnia nova ou faixa que subiu, +50 por chefe derrotado, +10 por Max Out melhorado.</li>
-        ${t.herda ? `<li>Quem já treinava parte de onde parou: treinos e insígnias de antes de ${ddmm(t.ini)} também contam, e quem começou antes ganhou +${XP.veterano} XP de veterano.</li>` : ""}
-        ${t.beta ? `<li>${esc(t.nome)} é o beta: todo mundo que entrar tem todos os recursos liberados.</li>` : ""}
-        <li>Sr. Q é o chefe da temporada: cada desafio semanal do grupo que você cumprir é um golpe. São 8 semanas, então ele cai com os 8 desafios.</li>
-        <li>Quem treinar na temporada ganha a insígnia Pioneiro; quem fizer o Cardio Challenge final do MAX:30 até ${ddmm(t.fim)}, a Finalista.</li></ul></details>
+        <li>Vale o XP ganho na semana: treinos, recordes, meta da semana batida, água, desafio do grupo e o ${esc(D7.recruta.nome)}.</li>
+        <li>Zera toda segunda, então quem chegou agora disputa de igual para igual.</li>
+        <li>O XP de cada pessoa atualiza quando ela abre o app.</li></ul></details>
     </div>`;
   }
-  // Pop-up da temporada: aparece uma vez por dia ao abrir o app (tela inicial), enquanto a temporada não acabou
-  function popTemporada() {
-    const t = temporada();
-    if (t.fase === "fim" || S.popTemp === hojeKey || document.getElementById("tp-pop")?.open || document.querySelector("dialog[open]")) return;
-    S.popTemp = hojeKey; save();
-    const liga = ligaTemporada(linhasLocais(), t), pts = liga && t.fase === "agora" ? pontosTemporada(linhasLocais(), liga, meuOpts(), t).total : null;
-    const q = chefes().find((c) => c.k === "sr-q");
-    const linha = t.fase === "antes" ? `Começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`}: ${ddmm(t.ini)} a ${ddmm(t.fim)}.` : `Semana ${t.semana} de 8 · faltam ${t.faltam} ${t.faltam === 1 ? "dia" : "dias"}.`;
-    let d = document.getElementById("tp-pop");
-    if (!d) { d = document.createElement("dialog"); d.id = "tp-pop"; document.body.appendChild(d);
-      d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-tp-fechar]")) d.close(); else if (e.target.closest("[data-tp-ir]")) { d.close(); location.hash = "#/grupo"; } }); }
-    d.innerHTML = `<div class="tp-pop-box"><button class="tp-pop-x" data-tp-fechar aria-label="Fechar">✕</button>
-      <img src="assets/temporada-1.webp" alt="Temporada 1 · Aquecimento, 23/11 a 17/01">
-      <div class="tp-pop-txt"><p><b>${esc(linha)}</b></p>
-        <p>${liga ? `Você está na <b>Liga ${esc(LIGA_T[liga].nome)}</b>${pts != null ? ` com <b>${pts} pontos</b>` : ""}.` : "Treine para entrar numa liga: cada uma tem um chefe para derrubar."}${q && t.fase === "agora" ? ` Sr. Q: ${q.melhor}/8 desafios.` : ""}</p>
-        <button class="btn btn-blue" data-tp-ir>${uid ? "Ver ranking da temporada" : "Ver a temporada"}</button>
-        <button class="lnk-btn" data-tp-fechar>Agora não</button></div></div>`;
-    d.showModal();
+  // Contexto para o Coach: ranking da semana, Sr. Q, desafio do grupo e desafio de 7 dias
+  function semanaContexto() {
+    const out = [];
+    if (uid && G.membros?.length) { const l = G.membros.map((id) => ({ id, xp: xpSemanaDe(id) })).sort((a, b) => b.xp - a.xp), i = l.findIndex((x) => x.id === uid);
+      if (i >= 0) out.push(`Ranking da semana do grupo (XP de segunda até hoje): ${i + 1}º de ${l.length} com ${l[i].xp} XP${i > 0 ? `, ${l[i - 1].xp - l[i].xp} XP atrás de quem está na frente` : ""}.`); }
+    const q = chefes().find((c) => c.k === "sr-q"), d = uid && desafioDaSemana();
+    if (q) out.push(`Sr. Q (chefe dos desafios do grupo): ${q.melhor}/8 desafios cumpridos.${d ? ` Desafio desta semana: "${d.titulo}" (${(G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid) ? "já cumprido" : `ainda não cumprido, ${faltaDesafio(d)}`}).` : ""}`);
+    out.push(d7Contexto());
+    out.push("Quando fizer sentido, dê 1 ou 2 dicas concretas tiradas daqui (desafio pendente, o que falta no desafio de 7 dias). Sem inventar números que não estão aqui.");
+    return out.filter(Boolean).join("\n");
   }
-  // Contexto da temporada para o Coach: liga, pontos, posição, Sr. Q, desafio da semana e as insígnias mais perto de subir
-  function temporadaContexto() {
-    const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t), o = meuOpts(), out = [];
-    out.push(`${t.nome} · ${t.sub} (${ddmm(t.ini)} a ${ddmm(t.fim)}): ${t.fase === "antes" ? `começa em ${t.faltam} dias` : t.fase === "fim" ? "encerrada" : `semana ${t.semana} de 8, faltam ${t.faltam} dias`}.`);
-    if (liga) {
-      const p = pontosTemporada(rows, liga, o, t);
-      let pos = ""; if (uid && G.membros?.length) { const l = tabelaTemporada(t).filter((x) => x.liga === liga).sort((a, b) => b.total - a.total), i = l.findIndex((x) => x.id === uid); if (i >= 0) pos = ` · ${i + 1}º de ${l.length}${i > 0 ? `, ${l[i - 1].total - p.total} pontos atrás de quem está na frente` : ""}`; }
-      out.push(`Liga ${LIGA_T[liga].nome} (chefe: ${LIGA_T[liga].rot}): ${p.total} pontos (${p.treinos} treinos, +${p.ins} de insígnias, ${p.chefes} chefes, ${p.max} Max Out melhorados)${pos}.`);
-      const ins = LIGAS.filter((L) => liga === "hibrido" ? L.vis() : L.k === liga).flatMap((L) => L.ins(rows, o).map((x) => ({ ...x, liga: L.nome })))
-        .filter((x) => x.tier < 3).sort((a, b) => (b.tier - a.tier) || ((b.pct || 0) - (a.pct || 0))).slice(0, 5);
-      if (ins.length) out.push(`Insígnias mais perto de subir (cada faixa nova vale +10 a +30 pontos): ${ins.map((x) => `${x.nome} [${x.liga}] (${x.tier ? `hoje ${TIER_TXT[x.tier]}` : "ainda não tem"}${x.det ? `; ${x.det}` : ""})`).join("; ")}.`);
-    } else out.push("Ainda sem liga: precisa treinar na temporada para entrar numa.");
-    const q = chefes().find((c) => c.k === "sr-q"), d = desafioDaSemana();
-    if (q) out.push(`Sr. Q (chefe da temporada): ${q.melhor}/8 desafios do grupo cumpridos.${d ? ` Desafio desta semana: "${d.titulo}" (${(G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid) ? "já cumprido" : `ainda não cumprido, ${faltaDesafio(d)}`}).` : ""}`);
-    out.push("Quando fizer sentido (ou se a pessoa perguntar como vencer a temporada), dê 1 ou 2 dicas concretas tiradas daqui: o desafio da semana pendente, a insígnia mais fácil de subir, o movimento a melhorar. Sem inventar números que não estão aqui.");
-    return out.join("\n");
-  }
-  function temporadaHome() {
-    const t = temporada(), rows = linhasLocais(), liga = ligaTemporada(rows, t);
-    if (t.fase === "fim" && hojeKey > keyOf(addDays(parseKey(t.fim), 14))) return "";
-    let pos = "";
-    if (liga && uid && G.grupos?.length && G.membros?.length) { const l = tabelaTemporada(t).filter((x) => x.liga === liga).sort((a, b) => b.total - a.total), i = l.findIndex((x) => x.id === uid); if (i >= 0) pos = ` · ${i + 1}º de ${l.length}`; }
-    const txt = t.fase === "antes" ? `Começa ${t.faltam === 1 ? "amanhã" : `em ${t.faltam} dias`} · ${ddmm(t.ini)} a ${ddmm(t.fim)}` : t.fase === "fim" ? "Temporada encerrada" : `Semana ${t.semana} de 8${liga ? ` · Liga ${LIGA_T[liga].nome}${pos}` : " · treine para entrar numa liga"}`;
-    const p = liga && t.fase !== "antes" ? pontosTemporada(rows, liga, meuOpts(), t).total : null;
+  // Card da home: desafio de 7 dias e o chefe da modalidade principal
+  function semanaHome() {
+    const liga = estiloAtual().liga;
     const bk = liga === "insanity" ? (VP.insanity && (principal() === "insanity" || !VP.insanity60) ? "shaunt-cc" : "shaunt-ft") : liga ? LIGAS.find((L) => L.k === liga)?.chefe : null;
     const boss = bk && chefes().find((c) => c.k === bk);
-    const bossHtml = boss && t.fase !== "fim" ? `<a class="tp-srq tp-boss" href="#/chefes"><img src="${boss.img}" alt=""><span><b>${esc(boss.nome)}${boss.derrotado ? " · derrotado!" : ""}</b><span class="ch-hp"><i style="width:${boss.hp}%"></i></span></span><em>HP ${boss.hp}%</em></a>` : "";
-    return bossHtml ? `<div class="tp-home-wrap">${temporadaCard(t, liga, txt, p)}${bossHtml}</div>` : temporadaCard(t, liga, txt, p);
+    const bossHtml = boss ? `<a class="tp-srq tp-boss" href="#/chefes"><img src="${boss.img}" alt=""><span><b>${esc(boss.nome)}${boss.derrotado ? " · derrotado!" : ""}</b><span class="ch-hp"><i style="width:${boss.hp}%"></i></span></span><em>HP ${boss.hp}%</em></a>` : "";
+    const d7 = d7Home();
+    return d7 || bossHtml ? `<div class="tp-home-wrap">${d7}${bossHtml}</div>` : "";
   }
-  function temporadaCard(t, liga, txt, p) {
-    return `<a class="tp-home" href="#/grupo"><img src="${LIGA_T[liga || "hibrido"].img}" alt=""><span><b>${esc(t.nome)} · ${esc(t.sub)}</b><small>${esc(txt)}</small></span>${p != null ? `<strong>${p}<small>pts</small></strong>` : ""}</a>`;
-  }
-  document.addEventListener("click", (e) => { const b = e.target.closest("[data-tp-liga]"); if (b) { G.ligaSel = b.dataset.tpLiga; render(); } });
 
   /* ==========================================================
-     Estilo = como você treina. É a mesma coisa que a liga da temporada ("Escudeiro · 🥷 Ninja" compete na Liga Insanity).
-     Regra única: conta as sessões da temporada por modalidade; entra toda modalidade com 2+ treinos e 25%+ do total.
+     Desafios de 7 dias (dinâmicas curtas, no lugar da temporada). O primeiro é o Desafio do Recruta:
+     Despertar (dias 1-2), Dungeon (3-5) e Chefe final (6-7). Um dia por data: as missões do dia
+     cumpridas fecham o dia e o próximo abre amanhã. Dá para chamar alguém do grupo para a dupla:
+     quem completar os 7 dias primeiro vence. S.d7 = execução atual; S.d7Feito = a primeira concluída
+     (o XP vale uma vez; refazer é só pelo desafio).
+     ========================================================== */
+  const D7 = {
+    recruta: { nome: "Desafio do Recruta", sub: "7 dias · sem academia", titulo: "Recruta Forjado", bonus: 100,
+      chefe: { nome: "Sargento de Ferro", ic: "🪖" },
+      fases: [
+        { nome: "Despertar", dias: [1, 2], xp: 30, itens: [["flex", "💪", "20 flexões"], ["agach", "🦵", "30 agachamentos"], ["prancha", "🧱", "30 s de prancha"]] },
+        { nome: "Dungeon", dias: [3, 4, 5], xp: 45, itens: [["flex", "💪", "3×12 flexões"], ["agach", "🦵", "3×20 agachamentos"], ["abd", "🔥", "3×10 abdominais"], ["prancha", "🧱", "45 s de prancha"]] },
+        { nome: "Chefe final", dias: [6, 7], xp: 60, chefe: true, itens: [["max", "💪", "Flexões seguidas (máx.)", true], ["agach", "🦵", "100 agachamentos no total"], ["prancha", "🧱", "1 min de prancha"]] },
+      ] },
+  };
+  const d7Fase = (n, D = D7.recruta) => D.fases.find((f) => f.dias.includes(n));
+  const d7Feitos = (d) => (d?.dias || []).filter((x) => x?.em).length;
+  // XP de uma pessoa no desafio desde uma data (c = { d7, d7Feito }, o meu ou o sincronizado de outra pessoa)
+  function d7XpDesde(c, desde = "0000") {
+    const d = c?.d7, f = c?.d7Feito, D = D7[d?.k || f?.k || "recruta"];
+    if (f && !(d && d.ini === f.ini)) return desde === "0000" ? f.xp || 0 : 0; // refazendo depois da primeira: o XP é só o da primeira
+    if (!d || !D) return 0;
+    let xp = 0;
+    d.dias.forEach((x, i) => { if (x?.em && x.em >= desde) xp += d7Fase(i + 1, D).xp; });
+    if (d.fim && d.fim >= desde) xp += D.bonus;
+    return xp;
+  }
+  const d7Xp = () => d7XpDesde({ d7: S.d7, d7Feito: S.d7Feito });
+  // Dia que está valendo: o fechado hoje (para mostrar "volte amanhã") ou o próximo
+  function d7Estado(d = S.d7) {
+    if (!d) return null;
+    const n = d7Feitos(d), hojeOk = d.dias.some((x) => x?.em === hojeKey);
+    const dia = d.fim ? 7 : hojeOk ? n : n + 1;
+    return { n, hojeOk, dia, fase: d7Fase(dia), reg: d.dias[dia - 1] || {}, fim: d.fim };
+  }
+  const d7Nome = (id) => esc((G.perfis[id]?.nome || "Atleta").split(" ")[0]);
+  // Dupla: o progresso da outra pessoa vem do que ela sincronizou (perfis.config.d7)
+  function d7Dupla() {
+    const d = S.d7, id = d?.dupla; if (!id) return null;
+    const o = G.perfis[id]?.config?.d7, dela = o && o.ini >= keyOf(addDays(parseKey(d.ini), -7)) ? o : null;
+    const eu = d.fim, ela = dela?.fim;
+    const venc = eu && ela ? (eu < ela ? "eu" : ela < eu ? "ela" : "empate") : eu ? "eu" : ela ? "ela" : null;
+    return { id, n: dela ? d7Feitos(dela) : 0, comecou: !!dela, venc };
+  }
+  function d7Home() {
+    const D = D7.recruta, e = d7Estado();
+    if (e?.fim && S.d7.fim < keyOf(addDays(hoje, -7))) return "";
+    const txt = !e ? `${D.sub} · ${D.fases.length} fases e um chefe` : e.fim ? `Concluído! Título: ${D.titulo}` : e.hojeOk ? `Dia ${e.dia} feito ✓ · o dia ${e.dia + 1} abre amanhã` : `Dia ${e.dia} de 7 · ${e.fase.nome}`;
+    return `<a class="tp-home d7-home" href="#/recruta"><span class="d7-ic">${e?.fim ? "🎖️" : "🎯"}</span><span><b>${esc(D.nome)}</b><small>${esc(txt)}</small></span>${e ? `<strong>${e.n}<small>/7</small></strong>` : `<strong class="d7-go">Começar ›</strong>`}</a>`;
+  }
+  function d7Contexto() {
+    const e = d7Estado(), D = D7.recruta;
+    if (!e) return `${D.nome} (${D.sub}): ainda não começou. Dá para sugerir quando a pessoa quiser algo curto e sem equipamento.`;
+    if (e.fim) return `${D.nome}: concluído em ${ddmm(S.d7.fim)}, título ${D.titulo}.`;
+    return `${D.nome}: dia ${e.dia} de 7 (${e.fase.nome})${e.hojeOk ? ", o de hoje já foi feito" : `; missões de hoje: ${e.fase.itens.map((x) => x[2]).join(", ")}`}.`;
+  }
+  telas.recruta = () => {
+    setToolbar(null);
+    const D = D7.recruta, e = d7Estado(), du = d7Dupla();
+    const capa = `<div class="d7-capa"><img src="${cartaClasse("recruta")}" alt=""><div><span class="qz-kicker">Missão especial</span><h1 class="fc-h1">${esc(D.nome)}</h1><p class="d7-sub">${esc(D.sub)}</p></div></div>`;
+    const trilhaFases = `<ol class="d7-fases">${D.fases.map((f) => `<li class="${e && f.dias.includes(e.dia) && !e.fim ? "on" : e && (e.fim || f.dias[f.dias.length - 1] < e.dia || (f.dias.includes(e.dia) && e.hojeOk && e.dia === f.dias[f.dias.length - 1])) ? "ok" : ""}"><b>Dias ${f.dias[0]}–${f.dias[f.dias.length - 1]}</b><span>${f.chefe ? D.chefe.ic : ""} ${esc(f.nome)}</span><small>+${f.xp} XP/dia</small></li>`).join("")}</ol>`;
+    if (!e) return `<section class="screen quiz d7-tela"><header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>${capa}${trilhaFases}
+      <p class="d7-txt">Uma missão por dia, sem equipamento. Fechou as missões do dia, o próximo abre amanhã. Nos dias 6 e 7 você enfrenta o <b>${esc(D.chefe.nome)}</b>. Completou os 7 dias: <b>+${D.bonus} XP</b> e o título <b>${esc(D.titulo)}</b>.</p>
+      <button class="btn btn-blue fc-btn grande" data-d7-comecar>Aceitar a missão 🎯</button></section>`;
+    const f = e.fase, reg = e.reg, hp = f.chefe ? (e.fim ? 0 : S.d7.dias[5]?.em ? 50 : 100) : null;
+    const itens = f.itens.map(([k, ic, nome, num]) => { const ok = num ? reg.max > 0 : !!reg.ok?.[k], trava = e.hojeOk || e.fim;
+      return num ? `<div class="d7-item${ok ? " on" : ""}"><span class="d7-ck">${ok ? "✓" : ic}</span><span class="d7-nm">${esc(nome)}</span>${trava ? `<b>${reg.max || 0}</b>` : `<input type="number" inputmode="numeric" min="1" max="300" class="d7-num" data-d7-max placeholder="reps" value="${reg.max || ""}"><button class="btn btn-outline d7-ok" data-d7-max-ok>OK</button>`}</div>`
+        : `<button class="d7-item${ok ? " on" : ""}" data-d7-item="${k}" ${trava ? "disabled" : ""}><span class="d7-ck">${ok ? "✓" : ic}</span><span class="d7-nm">${esc(nome)}</span></button>`; }).join("");
+    const recMax = Math.max(0, ...S.d7.dias.map((x) => x?.max || 0));
+    const duplaHtml = du ? `<div class="d7-dupla"><span class="qz-kicker">Sua dupla</span>
+        <div class="d7-vs"><div><b>Você</b><span class="d7-bar"><i style="width:${Math.round((e.n / 7) * 100)}%"></i></span><small>${e.n}/7</small></div>
+          <div><b>${d7Nome(du.id)}</b><span class="d7-bar"><i style="width:${Math.round((du.n / 7) * 100)}%"></i></span><small>${du.comecou ? `${du.n}/7` : "ainda não começou"}</small></div></div>
+        ${du.venc ? `<p class="d7-venc">${du.venc === "eu" ? "🏆 Você completou primeiro!" : du.venc === "ela" ? `🏆 ${d7Nome(du.id)} completou primeiro` : "🤝 Empate: completaram no mesmo dia"}</p>` : `<p class="note small">Quem completar os 7 dias primeiro vence.</p>`}</div>`
+      : uid && G.membros?.length > 1 ? `<div class="d7-dupla"><span class="qz-kicker">Marque sua dupla</span><p class="note small">Chame alguém do grupo: quem completar os 7 dias primeiro vence.</p>
+        <div class="chips">${G.membros.filter((id) => id !== uid).map((id) => `<button class="chip" data-d7-dupla="${id}">${d7Nome(id)}</button>`).join("")}</div></div>` : "";
+    return `<section class="screen quiz d7-tela"><header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>${capa}${trilhaFases}
+      ${e.fim ? `<div class="d7-fim"><span>🎖️</span><b>${esc(D.titulo)}</b><small>7 dias concluídos em ${ddmm(S.d7.fim)}${S.d7Feito && S.d7Feito.ini !== S.d7.ini ? " · refeito sem XP" : ` · +${d7XpDesde({ d7: S.d7, d7Feito: S.d7Feito })} XP`}</small></div>`
+        : `<div class="d7-dia"><div class="sec-head"><h2>Dia ${e.dia} · ${esc(f.nome)}</h2><span>+${f.xp} XP</span></div>
+        ${f.chefe ? `<div class="d7-chefe"><span class="d7-ch-ic">${D.chefe.ic}</span><div><b>${esc(D.chefe.nome)}</b><span class="ch-hp"><i style="width:${hp}%"></i></span><small>HP ${hp}% · cada dia de chefe tira metade${recMax ? ` · seu recorde: ${recMax} flexões` : ""}</small></div></div>` : ""}
+        <div class="d7-itens">${itens}</div>
+        ${e.hojeOk ? `<p class="d7-txt">Missão de hoje cumprida ✓ O dia ${e.dia + 1} abre amanhã.</p>` : `<p class="note small">Toque em cada missão quando terminar. Fechou todas, o dia conta.</p>`}</div>`}
+      ${duplaHtml}
+      ${e.fim ? `<button class="lnk-btn" data-d7-comecar>Refazer o desafio${S.d7Feito ? " (sem XP)" : ""}</button>` : ""}
+    </section>`;
+  };
+  function d7Fechar() {
+    const e = d7Estado(), d = S.d7, f = e.fase, reg = d.dias[e.dia - 1] || {};
+    const pronto = f.itens.every(([k, , , num]) => (num ? reg.max > 0 : reg.ok?.[k]));
+    if (!pronto) return;
+    reg.em = hojeKey; d.dias[e.dia - 1] = reg;
+    if (e.dia === 7) { d.fim = hojeKey; if (!S.d7Feito) S.d7Feito = { k: d.k, ini: d.ini, fim: hojeKey, xp: d7XpDesde({ d7: d }) }; }
+    save(); conferirXp(false, `${D7.recruta.nome} · dia ${e.dia}`);
+    const D = D7.recruta;
+    if (e.dia === 7) {
+      autoPost(`d7fim:${d.ini}`, `🎖️ Completei o ${D.nome}: 7 dias sem academia! Agora sou ${D.titulo}.`);
+      setTimeout(() => dlgGami(`<div class="gami-crest ch-crest">🎖️</div><p class="gami-k">${esc(D.chefe.nome)} derrotado</p><h2>${esc(D.titulo)}</h2><p class="note">Você completou os 7 dias do ${esc(D.nome)}.</p>`), 1500);
+    } else if (e.dia === 6) setTimeout(() => toast(`${D.chefe.ic} ${D.chefe.nome} perdeu metade da vida! Amanhã é o golpe final.`), 1600);
+  }
+  document.addEventListener("click", (ev) => {
+    const t = ev.target;
+    if (t.closest("[data-d7-comecar]")) { S.d7 = { k: "recruta", ini: hojeKey, dias: [], dupla: S.d7?.fim ? null : S.d7?.dupla || null, fim: null }; save(); render(); scrollTo(0, 0); return; }
+    const it = t.closest("[data-d7-item]");
+    if (it && S.d7) { const e = d7Estado(); if (e.hojeOk || e.fim) return; const reg = S.d7.dias[e.dia - 1] || (S.d7.dias[e.dia - 1] = {}); reg.ok = { ...(reg.ok || {}), [it.dataset.d7Item]: !reg.ok?.[it.dataset.d7Item] }; save(); d7Fechar(); render(); return; }
+    if (t.closest("[data-d7-max-ok]") && S.d7) { const v = Math.round(Number($("[data-d7-max]")?.value) || 0); if (v < 1) return toast("Quantas flexões seguidas?");
+      const e = d7Estado(); const reg = S.d7.dias[e.dia - 1] || (S.d7.dias[e.dia - 1] = {}); reg.max = Math.min(300, v); save(); d7Fechar(); render(); return; }
+    const du = t.closest("[data-d7-dupla]");
+    if (du && S.d7) { S.d7.dupla = du.dataset.d7Dupla; save(); render();
+      autoPost(`d7dupla:${S.d7.ini}:${S.d7.dupla}`, `⚔️ Chamei ${(G.perfis[S.d7.dupla]?.nome || "").split(" ")[0]} para o ${D7.recruta.nome}: quem completar os 7 dias primeiro vence!`);
+      toast("Dupla marcada! Avisei no mural do grupo."); }
+  });
+
+  /* ==========================================================
+     Estilo = como você treina ("Escudeiro · 🥷 Ninja"). Também diz qual chefe de modalidade aparece na home.
+     Regra única: conta as sessões de todo o histórico por modalidade; entra toda modalidade com 2+ treinos e 25%+ do total.
      Também vira Ronin quem treina 3+ modalidades com 2+ treinos em cada (variedade), mesmo com uma delas dominando.
      Uma modalidade dá o estilo dela; duas ou mais, Ronin (Híbrido).
      ========================================================== */
@@ -6367,8 +6397,8 @@
   const ESTILO_DA_LIGA = Object.fromEntries(Object.entries(ESTILOS).map(([k, e]) => [e.liga, k]));
   const TIPOS_TREINO = [["insanity", "Insanity", "#ff6b8b"], ["calistenia", "Calistenia", "#4fd2ff"], ["hipertrofia", "Academia", "#ffb45e"], ["corrida", "Corrida", "#4ee39b"], ["cross", "Cross", "#c78bff"]];
   const RONIN_VARIEDADE = 3;
-  function estiloDe(rows, t = temporada()) {
-    const fe = feitas(noIntervalo(rows, t.herda ? "0000" : t.ini, t.fim)), n = {}; // Temporada 1: o que já foi feito antes também conta
+  function estiloDe(rows) {
+    const fe = feitas(rows), n = {}; // todo o histórico conta
     for (const r of fe) { const m = MOD_DE(r.programa); if (m) n[m] = (n[m] || 0) + 1; }
     const total = soma(Object.values(n)), pct = Object.fromEntries(TIPOS_TREINO.map(([k]) => [k, total ? Math.round(((n[k] || 0) / total) * 100) : 0]));
     if (!total) return { slug: null, liga: null, pct, treinos: 0 };
@@ -6384,13 +6414,13 @@
     const e = estiloAtual();
     const barra = `<span class="es-bar">${TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("")}</span>
       <span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span>`;
-    if (!e.slug) return `<div class="es-box"><div class="es-top"><span class="es-ic">❔</span><div><b>Estilo: a descobrir</b><small>Faça o primeiro treino e ele aparece, pelo que você realmente treina. O estilo também é a sua liga na temporada.</small></div></div></div>`;
+    if (!e.slug) return `<div class="es-box"><div class="es-top"><span class="es-ic">❔</span><div><b>Estilo: a descobrir</b><small>Faça o primeiro treino e ele aparece, pelo que você realmente treina.</small></div></div></div>`;
     const nome = (k) => TIPOS_TREINO.find(([x]) => x === k)[1];
     const lista = (ks) => ks.map(nome).join(", ").replace(/, ([^,]*)$/, " e $1");
     const falta = RONIN_VARIEDADE - e.varias.length;
-    const nota = e.slug === "ronin" ? (e.porVariedade ? `Você treina ${lista(e.contam)} (2 treinos ou mais em cada): você é híbrido e compete na Liga Híbrido.` : `${lista(e.contam)} passam de 25% do seu treino: você é híbrido e compete na Liga Híbrido.`)
-      : `Você compete na Liga ${esc(LIGA_T[e.liga].nome)}. Você vira Ronin se outra modalidade chegar a 25% ou se treinar ${falta > 1 ? `mais ${falta} modalidades` : "mais 1 modalidade"} (2 treinos ou mais em cada).`;
-    return `<div class="es-box"><div class="es-top"><span class="es-ic">${e.ic}</span><div><b>Estilo: ${esc(e.nome)}</b><small>Você ${esc(e.desc)} · nesta temporada</small></div></div>${barra}<p class="es-nota">${nota}</p></div>`;
+    const nota = e.slug === "ronin" ? (e.porVariedade ? `Você treina ${lista(e.contam)} (2 treinos ou mais em cada): você é híbrido.` : `${lista(e.contam)} passam de 25% do seu treino: você é híbrido.`)
+      : `Você vira Ronin se outra modalidade chegar a 25% ou se treinar ${falta > 1 ? `mais ${falta} modalidades` : "mais 1 modalidade"} (2 treinos ou mais em cada).`;
+    return `<div class="es-box"><div class="es-top"><span class="es-ic">${e.ic}</span><div><b>Estilo: ${esc(e.nome)}</b><small>Você ${esc(e.desc)}</small></div></div>${barra}<p class="es-nota">${nota}</p></div>`;
   }
   const estiloTxt = () => { const e = estiloAtual(); return e.slug ? `${e.ic} ${e.nome}` : ""; };
 
@@ -6441,10 +6471,10 @@
       desc: "Cada sessão do Insanity é um golpe; o golpe final é o último Fit Test", meta: () => 1,
       calc: () => canguruCalc("insanity60", () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60");
         return ft.length >= 2 && ft[ft.length - 1].total > ft[0].total ? `Fit Test: ${ft[0].total} → ${ft[ft.length - 1].total} repetições` : null; }) },
-    // Sr. Q: chefe da temporada, inspirado nos desafios do grupo. Cada desafio semanal cumprido dentro da temporada é um golpe (8 semanas = 8 golpes)
-    { k: "sr-q", nome: "Sr. Q", tag: "Chefe da temporada", img: "assets/chefes/sr-q-rosto.webp", banner: "assets/chefes/sr-q.webp", met: "ins",
-      desc: "Cumprir os desafios do grupo da temporada, um por semana", vis: () => !!(uid && G.grupos?.length),
-      meta: () => 8, calc: () => { const t = temporada(), ds = (G.desafios || []).filter((d) => d.semana >= t.ini && d.semana <= t.fim);
+    // Sr. Q: chefe dos desafios do grupo. Cada desafio semanal cumprido é um golpe; cai com 8
+    { k: "sr-q", nome: "Sr. Q", tag: "Chefe dos desafios do grupo", img: "assets/chefes/sr-q-rosto.webp", banner: "assets/chefes/sr-q.webp", met: "ins",
+      desc: "Cumprir 8 desafios semanais do grupo", vis: () => !!(uid && G.grupos?.length),
+      meta: () => 8, calc: () => { const ds = G.desafios || [];
         const meus = ds.filter((d) => (G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid)).map((d) => d.semana).sort();
         const n = new Set(meus).size; return { tem: n > 0, melhor: n, meta: 8, em: n >= 8 ? meus[meus.length - 1] : null }; } },
     // Chefes das ligas: caem quando todas as insígnias da liga são conquistadas (em qualquer faixa)
@@ -6482,8 +6512,8 @@
   }
   const marcaChefe = (c) => (c.met === "sess" ? `${c.melhor}/${c.metaV} sessões` : c.k === "sr-q" ? `${c.melhor}/${c.metaV} desafios` : c.met === "ins" ? `${c.melhor}/${c.metaV} insígnias` : c.met === "s" && c.k.startsWith("shaunt") ? `${mmss(c.melhor)} de ${mmss(c.metaV)}` : fmtMarca(c.met, c.melhor));
   const fmtMarca = (met, v) => (met === "ins" ? `${v} insígnias` : met === "pct" ? `${v > 0 ? "+" : ""}${v}%` : met === "kg" ? `${fmtKg(v)} kg` : met === "s" ? (v >= 60 ? `${Math.floor(v / 60)}:${pad(Math.round(v % 60))} min` : `${Math.round(v)} s`) : met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${v} ${v === 1 ? "rep" : "reps"}`);
-  // Bônus de veterano: treinou antes do começo da Temporada 1
-  const veterano = () => feitas(linhasLocais()).some((r) => r.data < TEMPORADAS[0].ini);
+  // Bônus de veterano: treinou antes de o app abrir para todos
+  const veterano = () => feitas(linhasLocais()).some((r) => r.data < INICIO_ABERTO);
   const chefesXp = () => (chefes().filter((c) => c.derrotado).length + recordes().filter((c) => c.derrotado).length) * XP.chefe + chefes().filter((c) => c.bonus).length * XP.chefeBonus;
   function chefeCard(c) {
     const cls = c.derrotado ? "ch-ok" : c.tem ? "" : "ch-novo";
@@ -7044,7 +7074,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
         <small class="pf-sub">${esc(n.classe)} · Nível ${n.nivel}</small>
         <div class="pf-rank"><b class="rk rk-${f.rank}">${f.rank}</b><small>meta <b class="rk-${F.meta}">${F.meta}</b></small></div>
         ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
-        ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? `${esc(e.desc)} · nesta temporada` : "Estilo aparece no primeiro treino"}</small>` : ""}
+        ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? esc(e.desc) : "Estilo aparece no primeiro treino"}</small>` : ""}
         <a class="pf-ver" href="#/ficha">Ver ficha completa ›</a></div>`;
     return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: comArte || niveis ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
   }
