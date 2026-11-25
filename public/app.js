@@ -3466,8 +3466,12 @@
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
   // Artes das classes (cartas desenhadas pelo Eduardo): versão masculina ou feminina pelo sexo informado, ou pela escolha no Perfil
   const sexoArte = () => (S.arte === "f" || S.arte === "m" ? S.arte : /^fem/.test(norm(S.quiz?.sexo === "f" ? "feminino" : S.quiz?.sexo === "m" ? "masculino" : nutriSexo())) ? "f" : "m");
-  const avatarClasse = (slug) => `assets/classes/avatar/${slug}-${sexoArte()}.webp`;
-  const cartaClasse = (slug, g = sexoArte()) => `assets/classes/cartas/${slug}-${g}.webp`;
+  // Estilos que já têm uma carta para cada classe (Ninja Recruta … Ninja Imortal): o personagem evolui dentro do próprio estilo.
+  // Os outros estilos continuam com as cartas genéricas das classes até ganharem as suas.
+  const NIVEIS_ARTE = new Set(["ninja"]);
+  const estiloComNiveis = () => { try { const e = estiloAtual().slug; return NIVEIS_ARTE.has(e) ? e : null; } catch { return null; } };
+  const avatarClasse = (slug) => { const e = estiloComNiveis(), g = sexoArte(); return e ? `assets/estilos/niveis/avatar/${e}-${g}-${slug}.webp` : `assets/classes/avatar/${slug}-${g}.webp`; };
+  const cartaClasse = (slug, g = sexoArte()) => { const e = estiloComNiveis(); return e ? `assets/estilos/niveis/${e}-${g}-${slug}.webp` : `assets/classes/cartas/${slug}-${g}.webp`; };
   function galeriaCartas(n) {
     return `<div class="carta-gal">${CLASSES.map(([slug, nome], i) => `<div class="carta-it${i === n.ci ? " on" : i > n.ci ? " off" : ""}"><img src="${cartaClasse(slug)}" alt="${esc(nome)}${i > n.ci ? " (bloqueada)" : ""}" loading="lazy">${i > n.ci ? `<span class="carta-lock">🔒</span>` : ""}</div>`).join("")}</div>
       <p class="arte-lbl">Gênero do personagem</p><div class="seg arte-seg"><button class="${sexoArte() === "m" ? "on" : ""}" data-arte="m">♂ Masculino</button><button class="${sexoArte() === "f" ? "on" : ""}" data-arte="f">♀ Feminino</button></div>`;
@@ -6903,7 +6907,8 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     if (!S.ficha) return `<a class="pf-ficha vazia" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de herói</strong><small>${QUIZ.length} perguntas rápidas · +${XP.ficha} XP · rank, atributos e meta de 30 dias</small></span><b class="pf-ir">›</b></a>`;
     const f = fichaAtual(), n = meuNivel(), F = S.ficha, e = estiloAtual(), g = sexoArte();
     const comArte = !!e.slug;
-    const arte = comArte ? `assets/estilos/${e.slug}-${g}` : cartaClasse(n.slug, g).replace(/\.webp$/, "");
+    const niveis = !!estiloComNiveis(); // com carta por classe, a ficha mostra a carta da classe atual dentro do estilo
+    const arte = comArte && !niveis ? `assets/estilos/${e.slug}-${g}` : cartaClasse(n.slug, g).replace(/\.webp$/, "");
     const barra = TIPOS_TREINO.map(([k, , cor]) => (e.pct[k] ? `<i style="width:${e.pct[k]}%;background:${cor}"></i>` : "")).join("");
     const back = `<div class="pf-verso">
         <span class="pf-k">Ficha de herói</span>
@@ -6913,7 +6918,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
         ${ATRIB.map(([k, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[k]}%"></i></span><strong>${f.attrs[k]}</strong></div>`).join("")}
         ${barra ? `<span class="es-bar pf-es">${barra}</span><span class="es-leg">${TIPOS_TREINO.filter(([k]) => e.pct[k]).map(([k, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)} ${e.pct[k]}%</span>`).join("")}</span><small class="pf-es-leg">${e.slug ? `${esc(e.desc)} · nesta temporada` : "Estilo aparece no primeiro treino"}</small>` : ""}
         <a class="pf-ver" href="#/ficha">Ver ficha completa ›</a></div>`;
-    return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: comArte ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
+    return `<div class="pf-carta">${holoCard({ img: `${arte}.webp`, tex: `${arte}-g.webp`, ratio: comArte || niveis ? 2 / 3 : 3 / 5, back, label: "ficha" })}<small class="pf-dica">Toque na carta para virar</small></div>`;
   }
   function fichaMini() {
     if (!S.ficha) return `<a class="evo-card fc-mini" href="#/ficha"><span class="rk rk-q">?</span><span><strong>Monte a sua ficha de atleta</strong><span class="t">${QUIZ.length} perguntas rápidas, +${XP.ficha} XP: rank, atributos e uma meta de 30 dias.</span></span></a>`;
