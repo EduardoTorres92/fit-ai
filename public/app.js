@@ -7398,43 +7398,52 @@
     }
     return { lib: lib.size, tot: tot.size };
   };
+  /* Loja/Inventário no formato de jogo: categorias na lateral, grade de itens, painel do item escolhido e o herói com balão */
+  let ivCat = "armas", ivSel = "", mercCat = "armas", mkSel = "";
+  const MERC_FALA = { armas: "Armas novas, novos exercícios! Escolha bem.", armaduras: "Roupa boa não muda o treino, mas muda o ânimo.", pocoes: "Poções só com a bênção de um nutricionista!", artefatos: "Relógios que medem cada passo da jornada." };
+  const lojaCats = (cat, attr) => `<nav class="lj-cats" aria-label="Categorias">${INV.CATS.map((c) => `<button type="button" class="lj-cat rp-rebites" ${attr}="${c.id}" aria-pressed="${c.id === cat}">${c.img ? `<img class="lj-cat-ic" src="${c.img}" alt="">` : INV.icone(c.ic, "lj-cat-ic", true)}<span>${esc(c.nome)}</span></button>`).join("")}</nav>`;
+  const lojaFala = (fala) => `<p class="lj-fala rp-rebites">${esc(fala)}</p>`;
   telas.arsenal = () => {
     setToolbar("vilarejo");
     const n = meuNivel(), { lib, tot } = invLiberados(inventario()), pct = tot ? Math.round((lib / tot) * 100) : 0;
-    const eq = INV.ITENS.filter((i) => i.eq), sup = INV.ITENS.filter((i) => !i.eq);
-    const slot = (i) => { const on = invTem(i.id), q = i.eq ? INV.liberados(i.id) : 0;
-      return `<button type="button" class="gd-slot${on ? " on" : ""}" data-inv="${i.id}" aria-pressed="${on}" aria-label="${esc(i.nome)}${on ? ", no seu arsenal" : ""}">
-        <span class="gd-ic">${INV.icone(i.id)}</span><b>${esc(i.curto)}</b>
-        <small>${on ? "✓ No arsenal" : q ? `+${q} exercícios` : "Toque se tiver"}</small></button>`; };
-    const tem = (l) => l.filter((i) => invTem(i.id)).length;
-    return `<section class="screen has-toolbar vila gd">
-      ${vlTopo("Guilda", "Seu herói e o seu arsenal")}
-      <a class="gd-card gd-heroi" href="#/perfil"><img src="${cartaClasse(n.slug)}" alt=""><div><span class="gd-k">Seu herói</span><b>${esc(primeiroNome())}</b><small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="gd-mais">Carta, conquistas e recordes</span></div><span class="gd-seta" aria-hidden="true">›</span></a>
-      <div class="gd-card gd-poder"><div class="gd-poder-top"><span class="gd-k">Poder do arsenal</span><span class="gd-poder-n"><b>${lib}</b> / ${tot}</span></div>
-        <span class="gd-bar"><i style="width:${pct}%"></i></span>
-        <p>exercícios com equipamento liberados. O Sensei monta os treinos só com o que você tem.</p></div>
-      <div class="gd-sec"><h2>Equipamentos</h2><span>${tem(eq)} de ${eq.length} · mudam o treino</span></div>
-      <div class="gd-grade">${eq.map(slot).join("")}</div>
-      <div class="gd-sec"><h2>Suporte</h2><span>${tem(sup)} de ${sup.length} · não mudam o treino</span></div>
-      <div class="gd-grade">${sup.map(slot).join("")}</div>
-      <a class="gd-merc" href="#/mercado"><span>🛒</span><div><b>Falta alguma arma?</b><small>Veja os equipamentos no Mercado</small></div><span aria-hidden="true">›</span></a>
+    const lista = INV.ITENS.filter((i) => i.cat === ivCat), it = lista.find((i) => i.id === ivSel) || lista[0];
+    const on = it && invTem(it.id), q = it?.eq ? INV.liberados(it.id) : 0;
+    return `<section class="screen has-toolbar vila lj">
+      <header class="lj-cena iv-cena"><img class="lj-cena-bg" src="${A("banner-home-cena.jpg")}" alt="">
+        <a class="lj-voltar rp-rebites" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
+        <h1 class="lj-titulo rp-rebites">Inventário</h1>
+        <a class="iv-ficha" href="#/perfil"><img class="iv-carta" src="${cartaClasse(n.slug)}" alt="">
+          <span><b>${esc(primeiroNome())}</b><small>Nível ${n.nivel} · ${esc(n.classe)}</small>
+          <span class="iv-medidor"><em>XP</em><span class="iv-bar xp"><i style="width:${n.pct}%"></i></span></span>
+          <span class="iv-medidor"><em>Poder</em><span class="iv-bar poder"><i style="width:${pct}%"></i></span><strong>${lib}/${tot}</strong></span></span></a>
+      </header>
+      <div class="lj-loja">
+        ${lojaCats(ivCat, "data-iv-cat")}
+        <div class="lj-grade">${lista.map((i) => `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}${invTem(i.id) ? " tem" : " falta"}" data-iv-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}${invTem(i.id) ? ", você tem" : ""}">${INV.icone(i.id)}<span class="lj-etq">${invTem(i.id) ? "✓ Tenho" : esc(i.curto)}</span></button>`).join("")}</div>
+        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img">${INV.icone(it.id)}</div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
+          <button type="button" class="lj-btn${on ? " sec" : ""}" data-inv="${it.id}">${on ? "✓ No inventário<small>tocar para tirar</small>" : "Tenho este item"}</button></aside>` : ""}
+      </div>
+      ${lojaFala(`Poder do arsenal: ${lib} de ${tot} exercícios com equipamento liberados.`)}
+      <a class="lj-placa" href="#/mercado">🛒 <b>Ir ao Mercado</b> ›</a>
     </section>`;
   };
-  let mercCat = "armas";
   telas.mercado = () => {
     setToolbar("vilarejo");
-    const lista = INV.ITENS.filter((i) => i.cat === mercCat);
-    const item = (i) => { const q = i.eq ? INV.liberados(i.id) : 0, on = invTem(i.id);
-      return `<article class="mk-item${on ? " on" : ""}"><span class="mk-ic">${INV.icone(i.id)}</span>
-        <div class="mk-txt"><h3>${esc(i.nome)}</h3><p>${esc(i.txt)}</p>${q ? `<span class="mk-lib">⚡ +${q} exercícios</span>` : ""}</div>
-        <div class="mk-acao">${on ? `<span class="mk-tem">✓ Já é seu</span>`
-          : i.semLoja ? `<a class="mk-btn sec" href="#/arsenal">Marcar</a>`
-          : `<button type="button" class="mk-btn${i.link ? "" : " sec"}" data-mc-oferta="${i.id}">${i.link ? "Ver oferta" : "Em breve"}</button>`}</div></article>`; };
-    return `<section class="screen has-toolbar vila mk">
-      ${vlTopo("Mercado", "Equipamentos para o seu arsenal")}
-      <div class="gd-card mk-fala">${INV.icone("merc", "mk-av")}<div><span class="gd-k">Mercador</span><p>Bem-vindo, aventureiro! Cada arma nova libera exercícios novos com o Sensei.</p></div></div>
-      <div class="mk-cats" role="tablist">${INV.CATS.map((c) => `<button type="button" class="mk-cat" role="tab" data-mc-cat="${c.id}" aria-pressed="${c.id === mercCat}">${INV.icone(c.ic, "mk-cat-ic", true)}<span>${esc(c.nome)}</span></button>`).join("")}</div>
-      <div class="mk-lista">${lista.map(item).join("")}</div>
+    const lista = INV.ITENS.filter((i) => i.cat === mercCat), it = lista.find((i) => i.id === mkSel) || lista[0];
+    const on = it && invTem(it.id), q = it?.eq ? INV.liberados(it.id) : 0;
+    return `<section class="screen has-toolbar vila lj">
+      <header class="lj-cena"><img class="lj-cena-bg" src="assets/mercado-cena.webp" alt="O mercador na barraca">
+        <a class="lj-voltar rp-rebites" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
+        <h1 class="lj-titulo rp-rebites">Mercado</h1></header>
+      <div class="lj-loja">
+        ${lojaCats(mercCat, "data-mc-cat")}
+        <div class="lj-grade">${lista.map((i) => { const n = i.eq ? INV.liberados(i.id) : 0;
+          return `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}" data-mk-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}">${INV.icone(i.id)}<span class="lj-etq">${invTem(i.id) ? "✓ Tenho" : n ? `⚡ +${n}` : esc(i.curto)}</span></button>`; }).join("")}</div>
+        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img">${INV.icone(it.id)}</div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
+          ${on ? `<span class="lj-tem">✓ Já é seu</span>` : it.semLoja ? `<a class="lj-btn sec" href="#/arsenal">Marcar no inventário</a>`
+            : `<button type="button" class="lj-btn${it.link ? "" : " breve"}" data-mc-oferta="${it.id}">${it.link ? "Ver oferta" : "Em breve"}</button>`}</aside>` : ""}
+      </div>
+      ${lojaFala(MERC_FALA[mercCat] || MERC_FALA.armas)}
       <p class="mk-nota">Links de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
     </section>`;
   };
@@ -7447,7 +7456,13 @@
       return;
     }
     const c = e.target.closest?.("[data-mc-cat]");
-    if (c) { mercCat = c.dataset.mcCat; render(); return; }
+    if (c) { mercCat = c.dataset.mcCat; mkSel = ""; render(); return; }
+    const ic = e.target.closest?.("[data-iv-cat]");
+    if (ic) { ivCat = ic.dataset.ivCat; ivSel = ""; render(); return; }
+    const is = e.target.closest?.("[data-iv-sel]");
+    if (is) { ivSel = is.dataset.ivSel; render(); return; }
+    const ms = e.target.closest?.("[data-mk-sel]");
+    if (ms) { mkSel = ms.dataset.mkSel; render(); return; }
     const o = e.target.closest?.("[data-mc-oferta]");
     if (o) {
       const it = INV.ITENS.find((x) => x.id === o.dataset.mcOferta);
@@ -7587,7 +7602,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
         </div>
         <div class="ac-sprite">${sp ? `<img src="${sp}" alt="${esc(n.classe)} animado">` : `<img class="ac-av" src="${avatarClasse(n.slug)}" alt="">`}</div>
         <nav class="ac-lado" aria-label="Atalhos">
-          <a href="#/ficha"><span>📜</span>Ficha</a><a href="#/album"><span>🃏</span>Álbum</a><a href="#/dojo"><span>⛩️</span>Dojo</a>
+          <a href="#/ficha"><span>📜</span>Ficha</a><a href="#/album"><span>🃏</span>Álbum</a><a href="#/arsenal"><span>🎒</span>Inventário</a>
         </nav>
       </div>
     </div>`;
