@@ -7431,7 +7431,7 @@
   let ivCat = "armas", ivSel = "", mercCat = "armas", mkSel = "";
   const MERC_FALA = { armas: "Armas novas, novos exercícios! Escolha bem.", armaduras: "Roupa boa não muda o treino, mas muda o ânimo.", pocoes: "Poções só com a bênção de um nutricionista!", artefatos: "Relógios que medem cada passo da jornada." };
   const lojaCats = (cat, attr) => `<nav class="lj-cats" aria-label="Categorias">${INV.CATS.map((c) => `<button type="button" class="lj-cat rp-rebites" ${attr}="${c.id}" aria-pressed="${c.id === cat}">${c.img ? `<img class="lj-cat-ic" src="${c.img}" alt="">` : INV.icone(c.ic, "lj-cat-ic", true)}<span>${esc(c.nome)}</span></button>`).join("")}</nav>`;
-  const lojaFala = (fala) => `<p class="lj-fala rp-rebites">${esc(fala)}</p>`;
+  const lojaFala = (fala, cls = "") => `<p class="lj-fala rp-rebites${cls}">${esc(fala)}</p>`;
   telas.arsenal = () => {
     setToolbar("vilarejo");
     const n = meuNivel(), { lib, tot } = invLiberados(inventario()), pct = tot ? Math.round((lib / tot) * 100) : 0;
@@ -7463,7 +7463,8 @@
     return `<section class="screen has-toolbar vila lj">
       <header class="lj-cena"><img class="lj-cena-bg" src="assets/mercado-cena.webp" alt="O mercador na barraca">
         <a class="lj-voltar rp-rebites" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
-        <h1 class="lj-titulo rp-rebites">Mercado</h1></header>
+        <h1 class="lj-titulo rp-rebites">Mercado</h1>
+        ${lojaFala(MERC_FALA[mercCat] || MERC_FALA.armas, " na-cena")}</header>
       <div class="lj-loja">
         ${lojaCats(mercCat, "data-mc-cat")}
         <div class="lj-grade">${lista.map((i) => { const n = i.eq ? INV.liberados(i.id) : 0;
@@ -7472,7 +7473,6 @@
           ${on ? `<span class="lj-tem">✓ Já é seu</span>` : it.semLoja ? `<a class="lj-btn sec" href="#/arsenal">Marcar no inventário</a>`
             : `<button type="button" class="lj-btn${it.link ? "" : " breve"}" data-mc-oferta="${it.id}">${it.link ? "Ver oferta" : "Em breve"}</button>`}</aside>` : ""}
       </div>
-      ${lojaFala(MERC_FALA[mercCat] || MERC_FALA.armas)}
       <p class="mk-nota">Links de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
     </section>`;
   };

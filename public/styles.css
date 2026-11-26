@@ -2030,3 +2030,7 @@ button.alb-it:active { transform: scale(0.96); }
 .eq-ver { background: var(--blue); color: #fff; }
 @media (hover: hover) { .eq-tenho:hover { color: var(--fg); } .eq-ver:hover { filter: brightness(1.1); } }
 .cf-wod .eq-cta { margin-top: 12px; }
+
+/* Mercado: a fala do mercador vira caixa de diálogo dentro da cena (não fica atrás da barra de navegação no celular) */
+.lj-cena .lj-fala.na-cena { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; margin: 0; padding: 8px 12px; font-size: 13px; background-color: rgba(21, 16, 12, .9); }
+@media (min-width: 768px) { .lj-cena .lj-fala.na-cena { left: auto; right: 16px; bottom: 14px; max-width: 420px; font-size: 14px; } }
