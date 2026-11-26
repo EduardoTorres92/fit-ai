@@ -693,37 +693,20 @@
     home() {
       setToolbar("home");
       const { w, d } = ativoHoje();
-      const t = treino(w, d);
       const ult = ultimoTreino();
       const parado = ult && diffDays(parseKey(ult), hoje) > 7 && !parcial(hojeKey);
-      const sub = semanaDe(hoje) < 0 ? "Seu programa começa em breve." : feito(hojeKey) ? "Treino de hoje concluído! 🔥" : parcial(hojeKey) ? "Bora terminar o treino?" : "Bora treinar hoje?";
-      return `<section class="screen has-toolbar">
-        ${meuSprite() ? topoSprite(sub, w, d) : `<div class="banner" style="--grad: linear-gradient(242.47deg, rgba(0,0,0,0) 34.46%, #000 100%)">
-          <div class="banner-bg"><img class="home-img" src="${A("banner-home.jpg")}" alt=""></div>
-          <span class="logo-txt">Fit.ai</span>
-          <div class="banner-row">
-            <div class="hello"><h1>Olá, ${esc(primeiroNome())}</h1><p>${sub}</p></div>
-            <a class="btn btn-blue" href="${linkBora(w, d)}">Bora!</a>
-          </div>
-        </div>`}
-        <div class="section">
-          <div class="sec-head"><h2>Consistência</h2><a href="#/evolucao">Ver histórico</a></div>
-          <div class="week-row">
-            <div class="week">${weekStrip()}</div>
-            <div class="flame" aria-label="${sequencia()} dias de sequência">${icon("flame.svg", 16)}<span>${sequencia()}</span></div>
-          </div>
-        </div>
-        <div class="section">
-          ${principal() === "cf" ? cfHome(true) : principal() === "plano" ? `<div class="sec-head"><h2>Treino de Hoje</h2><a href="#/plano">${nomeSemana(w)}${w !== "E" && cicloDe(hoje) > 1 ? ` · Ciclo ${cicloDe(hoje)}` : ""}</a></div>` : IA[principal()] ? iaHome(principal(), true) : treinoHojeVideo(principal())}
-          ${parado ? `<p class="note retomada"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
-          ${t && principal() === "plano" ? workoutCard(w, d) : ""}
-          ${trilha() === "hibrido" && !donoAtivo() && IA[forcaHibrido()] && principal() !== forcaHibrido() ? iaHome(forcaHibrido(), false) : ""}
-          ${semanaHome()}
-          ${missoesHome()}
-          ${pesagemHome()}
-          ${ativHome()}
-          ${desafioHome()}
+      return `<section class="screen has-toolbar acamp">
+        ${acampTopo()}
+        ${acampEnergia()}
+        ${acampProximo(w, d)}
+        ${parado ? `<p class="note retomada ac-pad"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
+        ${acampTrilhas()}
+        <div class="section ac-extras">
+          ${d7Convites()[0] ? d7Home() : ""}
           ${grupoHome()}
+          ${desafioHome()}
+          ${pesagemPendente() ? `<details class="ac-linha ac-det"><summary><span class="ac-li-ic">⚖️</span><span><b>Pesagem da semana</b><small>Anote o peso e veja a evolução · +${XP.pesagem} XP</small></span><em>Anotar</em></summary><div class="ac-pz">${pesagemForm(true)}</div></details>` : ""}
+          ${ativHome()}
           <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
@@ -7473,6 +7456,78 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
   const meuSprite = () => { try { return spriteDe(estiloComNiveis(), sexoArte(), meuNivel().slug); } catch { return null; } };
   const linkBora = (w, d) => (principal() === "plano" ? `#/treino/${w}/${d}` : principal() === "cf" ? "#/cf" : IA[principal()] ? iaLinkHoje(principal()) : linkHojeVideo(principal()));
   // Topo da home com personagem animado: cenário sem personagem e o sprite grande à direita, cortado pela borda de baixo
+  /* ---------- Home "acampamento": quem você é, como está o dia, o próximo passo e o progresso ---------- */
+  const saudacao = () => { const h = new Date().getHours(); return h < 5 ? "Boa noite" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
+  const feitosSemana = () => [...Array(7)].map((_, i) => keyOf(addDays(mondayOf(hoje), i))).filter((k) => k <= hojeKey && feito(k)).length;
+  function acampTopo() {
+    const n = meuNivel(), sp = meuSprite(), seq = sequencia(), meta = metaSemana(), fs = feitosSemana();
+    return `<div class="ac-topo">
+      <div class="ac-bg"><img src="${A("banner-home-cena.jpg")}" alt=""></div>
+      <div class="ac-chips"><span class="ac-chip fogo">🔥 ${seq} ${seq === 1 ? "dia" : "dias"}</span><span class="ac-chip">🎯 ${fs}/${meta} na semana</span><a class="ac-chip ac-cfg" href="#/perfil" aria-label="Perfil">⚙️</a></div>
+      <div class="ac-hero">
+        <div class="ac-id">
+          <p class="ac-oi">${saudacao()},</p><h1>${esc(primeiroNome())}</h1>
+          <p class="ac-nv-k">Nível</p><p class="ac-nv">${n.nivel}</p>
+          <p class="ac-classe">${esc(n.classe)}</p>
+          <p class="ac-xp">${n.xp.toLocaleString("pt-BR")} / ${n.fim.toLocaleString("pt-BR")} XP</p>
+          <span class="ac-bar"><i style="width:${n.pct}%"></i></span>
+          <p class="ac-xp-k">para o nível ${n.nivel + 1}</p>
+        </div>
+        <div class="ac-sprite">${sp ? `<img src="${sp}" alt="${esc(n.classe)} animado">` : `<img class="ac-av" src="${avatarClasse(n.slug)}" alt="">`}</div>
+        <nav class="ac-lado" aria-label="Atalhos">
+          <a href="#/ficha"><span>📜</span>Ficha</a><a href="#/album"><span>🃏</span>Álbum</a><a href="#/dojo"><span>⛩️</span>Dojo</a>
+        </nav>
+      </div>
+    </div>`;
+  }
+  function acampEnergia() {
+    const ms = missoesDe(hojeKey), ok = ms.filter((m) => m.ok).length, pct = Math.round(soma(ms.map((m) => Math.min(100, m.pct || 0))) / Math.max(1, ms.length));
+    const nivel = pct >= 100 ? ["COMPLETA", "alta"] : pct >= 50 ? ["MÉDIA", "media"] : ["BAIXA", "baixa"];
+    const falta = ms.find((m) => !m.ok);
+    const R = 30, C = 2 * Math.PI * R;
+    return `<div class="ac-card ac-energia">
+      <p class="ac-k">⚡ Energia do dia <span data-renova>renovam em ${renovaEm()}</span></p>
+      <div class="ac-cols" style="--n:${ms.length}">${ms.map((m) => `<div class="ac-col${m.ok ? " ok" : ""}"><span class="ac-col-ic">${m.ok ? "✓" : m.ic}</span><b>${esc(m.ok ? `+${XP.missao} XP` : m.fmt(m.valor, m.alvoV))}</b><small>${esc(m.t)}</small><span class="ac-mini"><i style="width:${Math.min(100, m.pct || 0)}%"></i></span></div>`).join("")}</div>
+      <div class="ac-pront">
+        <span class="ac-pront-ic">🛡️</span>
+        <div><b>Prontidão: <em class="${nivel[1]}">${nivel[0]}</em></b><small>${ok >= ms.length ? `Todas cumpridas: +${XP.missoesTodas} XP de bônus! 🏆` : `${esc(falta?.t || "")} · feche as ${ms.length} e ganhe +${XP.missoesTodas} XP`}</small></div>
+        <svg class="ac-anel ${nivel[1]}" viewBox="0 0 72 72" aria-label="${pct}%"><circle cx="36" cy="36" r="${R}" class="fundo"/><circle cx="36" cy="36" r="${R}" class="valor" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/><text x="36" y="41">${pct}%</text></svg>
+      </div>
+    </div>`;
+  }
+  function acampProximo(w, d) {
+    const s = senseiDe(), a = (() => { try { return tgDia(hoje); } catch { return null; } })(), pk = principal();
+    const xpT = pk === "cf" ? XP.cf : VP[pk] ? XP.video : XP.sessao;
+    let titulo, txt, href, botao;
+    if (feito(hojeKey)) { titulo = "Treino de hoje concluído ✓"; txt = desafioPendente(hojeKey) ? "Agora o desafio da semana do grupo." : "Hidrate, alongue e volte amanhã."; href = desafioPendente(hojeKey) ? "#/grupo" : "#/dojo"; botao = desafioPendente(hojeKey) ? "Desafio" : "Dojo"; }
+    else if (a?.descanso) { titulo = "Dia de descanso"; txt = "Recuperar também é treino. Beba água e solte o corpo."; href = "#/dojo"; botao = "Dojo"; }
+    else { titulo = a?.titulo || "Treino de hoje"; txt = `${a?.prog ? `${esc(a.prog)} · ` : ""}${a?.itens?.length ? (VP[pk] ? `${a.itens.length} ${a.itens.length === 1 ? "vídeo" : "vídeos"}` : `${a.itens.length} ${a.itens.length === 1 ? "exercício" : "exercícios"}`) : "o treino do seu caminho"}`; href = linkBora(w, d); botao = "Bora!"; }
+    return `<a class="ac-card ac-prox" href="${href}">
+      <img class="ac-prox-carta" src="${s.carta}" alt="">
+      <div><p class="ac-k dourado">Próximo passo</p><b>${esc(titulo)}</b><small>${txt}</small>${!feito(hojeKey) && !a?.descanso ? `<span class="ac-ganho">⚡ +${xpT} XP · +${XP.missao} da missão</span>` : ""}</div>
+      <span class="btn btn-blue ac-prox-btn">${botao}</span>
+    </a>`;
+  }
+  function acampTrilhas() {
+    const out = [], pk = principal();
+    // Programa: semana atual de quantas
+    let sem = null, tot = null, nome = progDe(pk)?.nome || VP[pk]?.nome || IA[pk]?.nome || NOME_PROG;
+    if (VP[pk]) { sem = insSemanaDe(pk, hoje); tot = VP[pk].semanas.length; }
+    else if (IA[pk] && S[pk].plano) { sem = iaSemana(pk); tot = IA[pk].semanas || null; }
+    else if (pk === "plano") { sem = semanaDe(hoje); tot = PROGRAMA.length; }
+    if (sem != null && sem >= 0 && tot) out.push({ ic: TRILHAS[trilha()].ic, t: nome, sub: `Semana ${Math.min(sem + 1, tot)} de ${tot}`, pct: Math.round(((Math.min(sem, tot - 1) + feitosSemana() / Math.max(1, metaSemana())) / tot) * 100), fim: "🎓", href: `#/${pk === "plano" ? "plano" : pk}` });
+    // Desafio do Recruta
+    if (S.d7 && !S.d7.espera && !S.d7.fim) out.push({ ic: "🎯", t: D7.recruta.nome, sub: `Dia ${Math.min(7, d7Feitos(S.d7) + 1)} de 7`, pct: Math.round((d7Feitos(S.d7) / 7) * 100), fim: "🎖️", href: "#/recruta" });
+    else if (!S.d7Feito) out.push({ ic: "🎯", t: D7.recruta.nome, sub: "7 dias sem academia · sozinho ou em dupla", pct: 0, fim: "🎖️", href: "#/recruta", cta: "Começar" });
+    // Meta de 30 dias da ficha
+    if (S.ficha) { const f = fichaAtual(), iM = LETRAS.indexOf(S.ficha.meta), alvo = RANK_MIN[iM] || 1;
+      out.push({ ic: "📜", t: `Rank ${f.rank} → ${S.ficha.meta}`, sub: LETRAS.indexOf(f.rank) >= iM ? "Meta batida! 🎉" : `Faltam ${Math.max(0, alvo - f.media)} pontos de atributo`, pct: Math.min(100, Math.round((f.media / alvo) * 100)), fim: S.ficha.meta, href: "#/ficha" }); }
+    if (!out.length) return "";
+    return `<div class="section ac-trilhas"><p class="ac-k">Trilhas de progresso</p>
+      ${out.map((x) => `<a class="ac-trilha" href="${x.href}"><span class="ac-tr-ic">${x.ic}</span><span class="ac-tr-txt"><b>${esc(x.t)}</b><small>${esc(x.sub)}</small>
+        <span class="ac-tr-linha"><i style="width:${x.pct}%"></i><em style="left:${x.pct}%"></em></span></span>${x.cta ? `<strong class="ac-tr-cta">${x.cta} ›</strong>` : `<span class="ac-tr-fim">${esc(x.fim)}</span>`}</a>`).join("")}
+    </div>`;
+  }
   function topoSprite(sub, w, d) {
     const sp = meuSprite(), n = meuNivel();
     return `<div class="banner com-sprite" style="--grad: linear-gradient(242.47deg, rgba(0,0,0,0) 34.46%, #000 100%)">

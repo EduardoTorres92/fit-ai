@@ -1787,3 +1787,81 @@ button.alb-it:active { transform: scale(0.96); }
 .qz-mestre.rec { border-color: #c9a23a; box-shadow: 0 0 22px rgba(255, 215, 106, .18); }
 .qz-mestre.on { border-color: #4fd2ff; box-shadow: 0 0 0 1px #4fd2ff inset, 0 0 22px rgba(79, 210, 255, .25); }
 .qz-mestre .qz-rec { top: -9px; left: 50%; right: auto; transform: translateX(-50%); white-space: nowrap; z-index: 1; }
+
+/* ---------- Home "acampamento" ---------- */
+.acamp { --ouro: #ffd23f; --card-ac: rgba(20, 18, 34, .92); --borda-ac: rgba(255, 210, 63, .22); }
+.acamp .ac-topo { position: relative; overflow: hidden; padding: 14px 18px 20px; border-radius: 0 0 26px 26px; }
+.acamp .ac-bg { position: absolute; inset: 0; z-index: 0; }
+.acamp .ac-bg img { width: 100%; height: 100%; object-fit: cover; filter: brightness(.38) saturate(1.1); }
+.acamp .ac-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(8,8,14,.92)); }
+.acamp .ac-topo > *:not(.ac-bg) { position: relative; z-index: 1; }
+.acamp .ac-chips { display: flex; gap: 8px; align-items: center; }
+.acamp .ac-chip { font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 99px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.14); color: #f4f1ff; text-decoration: none; }
+.acamp .ac-chip.fogo { color: #ffb36b; border-color: rgba(255, 140, 60, .45); background: rgba(120, 40, 10, .45); }
+.acamp .ac-cfg { margin-left: auto; padding: 6px 9px; }
+.acamp .ac-hero { display: grid; grid-template-columns: 1fr 112px 64px; gap: 8px; align-items: end; margin-top: 14px; }
+.acamp .ac-id p, .acamp .ac-id h1 { margin: 0; }
+.acamp .ac-oi { font-size: 14px; opacity: .8; }
+.acamp .ac-id h1 { font-size: 24px; line-height: 1.1; margin-bottom: 10px !important; }
+.acamp .ac-nv-k { font-size: 12px; opacity: .7; }
+.acamp .ac-nv { font-size: 40px; font-weight: 800; line-height: 1; }
+.acamp .ac-classe { color: var(--ouro); font-weight: 700; font-size: 14px; margin-top: 2px !important; }
+.acamp .ac-xp { font-size: 11px; opacity: .7; margin-top: 6px !important; }
+.acamp .ac-bar { display: block; height: 7px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; margin: 4px 0; max-width: 150px; }
+.acamp .ac-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffb800, #ffd23f); border-radius: 99px; }
+.acamp .ac-xp-k { font-size: 11px; opacity: .6; }
+.acamp .ac-sprite { display: flex; justify-content: center; align-items: flex-end; height: 150px; }
+.acamp .ac-sprite img { max-height: 150px; max-width: 120px; image-rendering: pixelated; filter: drop-shadow(0 8px 10px rgba(0,0,0,.6)); }
+.acamp .ac-sprite .ac-av { border-radius: 16px; max-height: 110px; }
+.acamp .ac-lado { display: flex; flex-direction: column; gap: 8px; }
+.acamp .ac-lado a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); color: #f4f1ff; font-size: 11px; text-decoration: none; }
+.acamp .ac-lado span { font-size: 18px; }
+.acamp .ac-card { display: block; margin: 14px 18px 0; padding: 14px; border-radius: 20px; background: var(--card-ac); border: 1px solid var(--borda-ac); color: #f4f1ff; text-decoration: none; }
+.acamp .ac-k { margin: 0 0 10px; font: 700 12px/1.2 inherit; letter-spacing: .14em; text-transform: uppercase; color: var(--ouro); display: flex; justify-content: space-between; align-items: center; }
+.acamp .ac-k span { letter-spacing: 0; text-transform: none; font-weight: 500; font-size: 12px; color: #a9a3cf; }
+.acamp .ac-cols { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; }
+.acamp .ac-col { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; padding: 8px 4px; border-radius: 14px; background: rgba(255,255,255,.04); }
+.acamp .ac-col.ok { background: rgba(78, 227, 155, .1); }
+.acamp .ac-col-ic { font-size: 18px; }
+.acamp .ac-col b { font-size: 15px; }
+.acamp .ac-col small { font-size: 11px; line-height: 1.25; opacity: .75; min-height: 28px; }
+.acamp .ac-mini { width: 80%; height: 5px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+.acamp .ac-mini i { display: block; height: 100%; background: #4ee39b; border-radius: 99px; }
+.acamp .ac-pront { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); }
+.acamp .ac-pront-ic { font-size: 26px; }
+.acamp .ac-pront > div { flex: 1; min-width: 0; }
+.acamp .ac-pront b { font-size: 14px; } .acamp .ac-pront small { display: block; font-size: 12px; opacity: .75; line-height: 1.35; margin-top: 2px; }
+.acamp .ac-pront em { font-style: normal; } .acamp em.baixa { color: #ff6b6b; } .acamp em.media { color: #ffd23f; } .acamp em.alta { color: #4ee39b; }
+.acamp .ac-anel { width: 64px; height: 64px; flex: none; transform: rotate(-90deg); }
+.acamp .ac-anel circle { fill: none; stroke-width: 7; } .acamp .ac-anel .fundo { stroke: rgba(255,255,255,.1); } .acamp .ac-anel .valor { stroke-linecap: round; transition: stroke-dashoffset .6s; }
+.acamp .ac-anel.baixa .valor { stroke: #ff6b6b; } .acamp .ac-anel.media .valor { stroke: #ffd23f; } .acamp .ac-anel.alta .valor { stroke: #4ee39b; }
+.acamp .ac-anel text { transform: rotate(90deg); transform-origin: 36px 36px; fill: #f4f1ff; font: 800 16px/1 system-ui, sans-serif; text-anchor: middle; }
+.acamp .ac-prox { display: flex; align-items: center; gap: 12px; }
+.acamp .ac-prox-carta { width: 56px; aspect-ratio: 5/7; object-fit: cover; border-radius: 8px; flex: none; }
+.acamp .ac-prox > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.acamp .ac-k.dourado { margin-bottom: 4px; }
+.acamp .ac-prox b { font-size: 17px; } .acamp .ac-prox small { font-size: 13px; opacity: .75; }
+.acamp .ac-ganho { font-size: 12px; font-weight: 700; color: var(--ouro); margin-top: 4px; }
+.acamp .ac-prox-btn { flex: none; padding: 10px 14px; }
+.acamp .ac-trilhas { padding-top: 18px; }
+.acamp .ac-trilhas .ac-k { margin-left: 2px; }
+.acamp .ac-trilha { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 10px; border-radius: 16px; background: var(--card-ac); border: 1px solid rgba(255,255,255,.08); color: #f4f1ff; text-decoration: none; }
+.acamp .ac-tr-ic { width: 40px; height: 40px; flex: none; display: grid; place-items: center; font-size: 20px; border-radius: 12px; background: rgba(255,255,255,.06); }
+.acamp .ac-tr-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.acamp .ac-tr-txt b { font-size: 15px; } .acamp .ac-tr-txt small { font-size: 12px; opacity: .7; }
+.acamp .ac-tr-linha { position: relative; height: 6px; margin: 8px 6px 2px 0; border-radius: 99px; background: rgba(255,255,255,.1); }
+.acamp .ac-tr-linha i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: #4ee39b; }
+.acamp .ac-tr-linha em { position: absolute; top: 50%; width: 12px; height: 12px; margin-left: -6px; transform: translateY(-50%); border-radius: 50%; background: #0c0b16; border: 3px solid #4ee39b; }
+.acamp .ac-tr-fim { font-size: 18px; font-weight: 800; color: var(--ouro); flex: none; }
+.acamp .ac-tr-cta { color: var(--ouro); font-size: 13px; flex: none; }
+.acamp .ac-extras { padding-top: 4px; }
+.acamp .ac-linha { display: block; margin: 0 0 12px; border-radius: 16px; border: 1px dashed rgba(255,255,255,.18); }
+.acamp .ac-det summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.acamp .ac-det summary::-webkit-details-marker { display: none; }
+.acamp .ac-det summary > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; } .acamp .ac-det summary small { opacity: .7; font-size: 13px; }
+.acamp .ac-det summary em { font-style: normal; font-weight: 700; color: #4f7bff; }
+.acamp .ac-det[open] summary em { display: none; }
+.acamp .ac-li-ic { font-size: 22px; }
+.acamp .ac-det > .pz-card, .acamp .ac-det > div { margin: 0 12px 12px; }
+.acamp .ac-pad { margin: 12px 18px 0; }
+.acamp .ac-pz { padding: 0 14px 14px; }
