@@ -2378,8 +2378,26 @@
     } catch (e) { toast("Não consegui ligar o lembrete agora. Tente de novo."); }
   }
   async function aguaPushCancelar() {
-    try { if (pushOk()) { const sub = await aguaAssinatura(false); if (sub) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: "cancelar", endpoint: sub.endpoint }) }); await sub.unsubscribe(); } } } catch {}
+    try { if (pushOk()) { const sub = await aguaAssinatura(false); if (sub) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: "cancelar", endpoint: sub.endpoint }) }); if (!S.avisosPush) await sub.unsubscribe(); } } } catch {}
   }
+  /* ---------- Avisos no celular (convite de dupla, aviso do dono): a mesma notificação do lembrete de água, sem a água ---------- */
+  const avisosLigados = () => pushOk() && Notification.permission === "granted" && !!S.avisosPush;
+  async function avisosLigar(pedir = false) {
+    if (!uid || !pushOk()) return false;
+    try {
+      if (Notification.permission === "default" && pedir) await Notification.requestPermission();
+      if (Notification.permission !== "granted") { if (pedir) toast("As notificações estão bloqueadas neste aparelho. Libere nas configurações do navegador.", 5000); return false; }
+      const sub = await aguaAssinatura(true), tk = await tokenSB();
+      if (!sub || !tk) return false;
+      const r = await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ acao: "avisos", assinatura: sub.toJSON(), tz: -new Date().getTimezoneOffset() }) });
+      if (!r.ok) return false;
+      S.avisosPush = true; S.pushUid = uid; save();
+      if (pedir) toast("🔔 Pronto! Você recebe no celular quando te desafiarem.");
+      return true;
+    } catch { if (pedir) toast("Não consegui ligar os avisos agora."); return false; }
+  }
+  const avisosCard = () => (uid && pushOk() && !avisosLigados() ? `<button type="button" class="avisos-card" data-avisos-ligar><span>🔔</span><span><b>Avisos no celular</b><small>Saiba na hora quando alguém te desafiar para a dupla.</small></span><em>Ligar</em></button>` : "");
+  document.addEventListener("click", (e) => { if (e.target.closest?.("[data-avisos-ligar]")) avisosLigar(true).then((ok) => ok && render()); });
   async function aguaDesligar() {
     if (S.aguaLembrete?.canal === "telegram") await tgApi("agua", { on: false }).catch(() => {});
     await aguaPushCancelar();
@@ -3982,6 +4000,7 @@
     } catch (e) { console.error("grupos", e); G.erro = true; G.carregadoEm = Date.now(); if (!G.grupos) G.grupos = []; }
     G.carregando = false;
     if (/^#\/(grupo|home|recruta)/.test(location.hash)) render();
+    if (!G.erro) setTimeout(d7PopupConvite, 700);
   }
   async function carregarGrupo(id) {
     const ms = await sb.from("membros").select("usuario_id").eq("grupo_id", id);
@@ -5124,6 +5143,8 @@
     S.contaId = u.id;
     uid = u.id;
     evento("abriu");
+    if (pushOk() && Notification.permission === "granted" && (!S.avisosPush || S.pushUid !== uid)) setTimeout(() => avisosLigar(false), 3500);
+    setTimeout(() => carregarGrupos(), 2500); // traz os convites de dupla para o pop-up
     // Aparelho com notificação ligada: liga ao id da conta, para receber avisos da dupla
     if (S.aguaLembrete?.push && S.pushUid !== uid && pushOk()) setTimeout(async () => { try { const sub = await aguaAssinatura(false), tk = await tokenSB();
       if (sub && tk) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ acao: "conta", endpoint: sub.endpoint }) }); S.pushUid = uid; save(); } } catch {} }, 3000);
@@ -6511,6 +6532,31 @@
   async function d7Avisar(para, tipo, n) {
     try { const tk = await tokenSB(); if (tk && para) fetch("/api/dupla", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ para, tipo, n }) }).catch(() => {}); } catch {}
   }
+  // Pop-up do convite de dupla ao abrir o app (uma vez por abertura, até a pessoa responder)
+  function d7PopupConvite() {
+    if (!uid || document.getElementById("dupla-pop") || location.hash.startsWith("#/recruta")) return;
+    const id = d7Convites().find((x) => { try { return sessionStorage.getItem(`fitai-pop-${x}-${d7Cfg(x).d7?.convidou}`) !== "1"; } catch { return true; } });
+    if (!id) return;
+    try { sessionStorage.setItem(`fitai-pop-${id}-${d7Cfg(id).d7?.convidou}`, "1"); } catch {}
+    const D = D7.recruta, ocupado = d7Ocupado(), dl = document.createElement("dialog");
+    dl.id = "dupla-pop"; dl.className = "dupla-pop";
+    dl.innerHTML = `<div class="dp-arte"><img src="${A("dupla-desafio.webp")}" alt=""><span class="dp-av">${avatar(pfDe(id), 64)}</span></div>
+      <div class="dp-txt"><span class="qz-kicker">⚔️ Desafio em dupla</span>
+        <h2>${d7Nome(id)} te desafiou!</h2>
+        <p>${esc(D.nome)}: ${esc(D.sub)}. Vocês começam juntos hoje e quem completar os 7 dias primeiro vence.</p>
+        ${ocupado ? `<p class="note small">Termine o seu desafio atual para aceitar.</p><div class="dp-acoes"><button class="btn btn-blue" data-dp-fechar>Entendi</button></div>`
+          : `<div class="dp-acoes"><button class="btn btn-blue" data-d7-aceitar="${id}" data-dp-ir>Aceitar ⚔️</button><button class="btn btn-outline" data-d7-recusar="${id}" data-dp-fechar>Agora não</button></div>`}
+        <button type="button" class="lnk-btn" data-dp-fechar>Ver depois</button>
+        ${avisosLigados() || !pushOk() ? "" : `<button type="button" class="lnk-btn dp-avisos" data-avisos-ligar>🔔 Me avisar no celular nos próximos desafios</button>`}
+      </div>`;
+    document.body.appendChild(dl);
+    dl.addEventListener("click", (e) => {
+      if (e.target === dl || e.target.closest("[data-dp-fechar]")) { setTimeout(() => dl.remove(), 0); dl.close(); }
+      else if (e.target.closest("[data-dp-ir]")) { setTimeout(() => { dl.close(); dl.remove(); location.hash = "#/recruta"; }, 0); }
+    });
+    dl.addEventListener("cancel", () => setTimeout(() => dl.remove(), 0));
+    dl.showModal();
+  }
   // Convites que chegaram para mim: alguém do grupo me marcou e está esperando
   function d7Convites() {
     if (!uid || !G.membros) return [];
@@ -6587,7 +6633,7 @@
           <a href="#/grupo/membro/${du.id}"><b>${d7Nome(du.id)}</b><span class="d7-bar"><i style="width:${Math.round((du.n / 7) * 100)}%"></i></span><small>${du.junto ? `${du.n}/7` : "atualiza quando abrir o app"}</small></a></div>
         ${du.venc ? `<p class="d7-venc">${du.venc === "eu" ? "🏆 Você completou primeiro!" : du.venc === "ela" ? `🏆 ${d7Nome(du.id)} completou primeiro` : "🤝 Empate: completaram no mesmo dia"}</p>` : `<p class="note small">Quem completar os 7 dias primeiro vence. Cada dia que um fecha, o outro recebe um aviso.</p>`}</div>`
       : temGrupo && !e.fim && e.n === 0 && !e.hojeOk ? `<div class="d7-dupla"><span class="qz-kicker">Chamar uma dupla</span><p class="note small">Ainda dá tempo: chame alguém e vocês largam juntos no dia do aceite.</p>${d7Chips("data-d7-convidar")}</div>` : "";
-    return `<section class="screen quiz d7-tela">${volta}${capa}${conviteHtml}${trilhaFases}
+    return `<section class="screen quiz d7-tela">${volta}${capa}${conviteHtml}${temGrupo ? avisosCard() : ""}${trilhaFases}
       ${e.fim ? `<div class="d7-fim"><span>🎖️</span><b>${esc(D.titulo)}</b><small>7 dias concluídos em ${ddmm(S.d7.fim)}${S.d7Feito && S.d7Feito.ini !== S.d7.ini ? " · refeito sem XP" : ` · +${d7XpDesde({ d7: S.d7, d7Feito: S.d7Feito })} XP`}</small></div>`
         : `<div class="d7-dia"><div class="sec-head"><h2>Dia ${e.dia} · ${esc(f.nome)}</h2><span>+${f.xp} XP</span></div>
         ${f.chefe ? `<div class="d7-chefe"><span class="d7-ch-ic">${D.chefe.ic}</span><div><b>${esc(D.chefe.nome)}</b><span class="ch-hp"><i style="width:${hp}%"></i></span><small>HP ${hp}% · cada dia de chefe tira metade${recMax ? ` · seu recorde: ${recMax} flexões` : ""}</small></div></div>` : ""}

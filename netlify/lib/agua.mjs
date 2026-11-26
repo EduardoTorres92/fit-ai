@@ -48,12 +48,23 @@ export async function assinar(a, uid = null) {
     sub: { endpoint: s.endpoint, keys: { p256dh: String(s.keys.p256dh).slice(0, 200), auth: String(s.keys.auth).slice(0, 100) } },
     intervalo: Math.min(240, Math.max(15, Math.round(Number(a.intervalo) || 60))), ml: Math.min(1000, Math.max(50, Math.round(Number(a.ml) || 300))),
     ini: hora(a.ini, 8 * 60), fim: hora(a.fim, 22 * 60), tz: Math.min(840, Math.max(-720, Math.round(Number(a.tz) || -180))),
-    ultimo: Date.now(), criado: lista[id]?.criado || Date.now(), uid: uid || lista[id]?.uid || null,
+    ultimo: Date.now(), criado: lista[id]?.criado || Date.now(), uid: uid || lista[id]?.uid || null, agua: true,
   };
   salvar();
   return { ok: true };
 }
-export async function cancelar(endpoint) { const lista = await todas(), id = idDe(endpoint); if (lista[id]) { delete lista[id]; salvar(); } return { ok: true }; }
+// Só avisos (convite de dupla, aviso do dono), sem lembrete de água: precisa de conta para saber de quem é o aparelho
+export async function assinarAvisos(s, uid, tz) {
+  if (!uid || !s || typeof s.endpoint !== "string" || !/^https:\/\//.test(s.endpoint) || s.endpoint.length > 1000 || !s.keys?.p256dh || !s.keys?.auth) return { erro: "assinatura" };
+  const lista = await todas(), id = idDe(s.endpoint);
+  if (lista[id]) { lista[id].uid = uid; lista[id].sub = { endpoint: s.endpoint, keys: { p256dh: String(s.keys.p256dh).slice(0, 200), auth: String(s.keys.auth).slice(0, 100) } }; salvar(); return { ok: true, agua: lista[id].agua !== false }; }
+  if (Object.keys(lista).length >= MAX_ASSINATURAS) return { erro: "cheio" };
+  lista[id] = { sub: { endpoint: s.endpoint, keys: { p256dh: String(s.keys.p256dh).slice(0, 200), auth: String(s.keys.auth).slice(0, 100) } },
+    intervalo: 60, ml: 300, ini: 8 * 60, fim: 22 * 60, tz: Math.min(840, Math.max(-720, Math.round(Number(tz) || -180))), ultimo: Date.now(), criado: Date.now(), uid, agua: false };
+  salvar();
+  return { ok: true, agua: false };
+}
+export async function cancelar(endpoint) { const lista = await todas(), id = idDe(endpoint); if (lista[id]) { if (lista[id].uid) lista[id].agua = false; else delete lista[id]; salvar(); } return { ok: true }; }
 export async function bebeu(endpoint) { const lista = await todas(), r = lista[idDe(endpoint)]; if (r) { r.ultimo = Date.now(); salvar(); } return { ok: !!r }; }
 
 async function enviar(id, r, teste = false) {
@@ -73,6 +84,7 @@ export async function rodada(agora = Date.now()) {
   const lista = await todas();
   let enviados = 0;
   for (const [id, r] of Object.entries(lista)) {
+    if (r.agua === false) continue; // aparelho só com avisos
     const minLocal = (((Math.floor(agora / 60000) + r.tz) % 1440) + 1440) % 1440;
     const dentro = r.ini <= r.fim ? minLocal >= r.ini && minLocal < r.fim : minLocal >= r.ini || minLocal < r.fim;
     if (!dentro || agora - r.ultimo < r.intervalo * 60000 - 20000) continue;
