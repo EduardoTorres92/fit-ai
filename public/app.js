@@ -3939,6 +3939,15 @@
       if (!meus.error) { G.meusDesafios = (meus.data || []).length; if (S.desafiosN !== G.meusDesafios) { S.desafiosN = G.meusDesafios; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } }
       if (G.sel) await carregarGrupo(G.sel);
       else { G.desafios = []; G.feitos = []; }
+      // Pessoas de todos os meus grupos (para convidar para a dupla quem está em outro grupo)
+      const gids = G.grupos.map((g) => g.id);
+      if (gids.length > 1) {
+        const mm = await sb.from("membros").select("usuario_id, grupo_id").in("grupo_id", gids);
+        G.todosMembros = mm.data || [];
+        const ids = [...new Set(G.todosMembros.map((m) => m.usuario_id))].filter((id) => !G.perfis[id]);
+        const pf = ids.length ? await sb.from("perfis").select("id, nome, foto_url, config").in("id", ids) : { data: [] };
+        G.perfisT = { ...Object.fromEntries((pf.data || []).map((x) => [x.id, x])), ...G.perfis };
+      } else { G.todosMembros = (G.membros || []).map((id) => ({ usuario_id: id, grupo_id: G.sel })); G.perfisT = { ...G.perfis }; }
       G.carregadoEm = Date.now(); G.erro = false;
     } catch (e) { console.error("grupos", e); G.erro = true; G.carregadoEm = Date.now(); if (!G.grupos) G.grupos = []; }
     G.carregando = false;
@@ -6348,8 +6357,11 @@
     const dia = d.fim ? 7 : hojeOk ? n : n + 1;
     return { n, hojeOk, dia, fase: d7Fase(dia), reg: d.dias[dia - 1] || {}, fim: d.fim };
   }
-  const d7Nome = (id) => esc((G.perfis[id]?.nome || "Atleta").split(" ")[0]);
-  const d7Cfg = (id) => G.perfis[id]?.config || {};
+  const d7Nome = (id) => esc((pfDe(id)?.nome || "Atleta").split(" ")[0]);
+  const pfDe = (id) => G.perfis[id] || G.perfisT?.[id] || null;
+  // Todo mundo dos meus grupos, menos eu
+  const d7Ids = () => [...new Set([...(G.todosMembros || []).map((m) => m.usuario_id), ...(G.membros || [])])].filter((id) => id !== uid);
+  const d7Cfg = (id) => pfDe(id)?.config || {};
   // Aviso para a dupla (Telegram e push, pelo servidor); falha em silêncio
   async function d7Avisar(para, tipo, n) {
     try { const tk = await tokenSB(); if (tk && para) fetch("/api/dupla", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ para, tipo, n }) }).catch(() => {}); } catch {}
@@ -6357,15 +6369,15 @@
   // Convites que chegaram para mim: alguém do grupo me marcou e está esperando
   function d7Convites() {
     if (!uid || !G.membros) return [];
-    return G.membros.filter((id) => { const o = d7Cfg(id).d7; return id !== uid && o?.espera && o.dupla === uid && !o.fim && S.d7Recusa?.[id] !== o.convidou && !(S.d7?.dupla === id && !S.d7.espera && S.d7.ini >= o.convidou); });
+    return d7Ids().filter((id) => { const o = d7Cfg(id).d7; return id !== uid && o?.espera && o.dupla === uid && !o.fim && S.d7Recusa?.[id] !== o.convidou && !(S.d7?.dupla === id && !S.d7.espera && S.d7.ini >= o.convidou); });
   }
   const d7Ocupado = () => !!(S.d7 && !S.d7.fim && (d7Feitos(S.d7) > 0 || S.d7.espera));
   // Quem convidou: quando a dupla aceita (ou recusa), a largada (ou o cancelamento) chega pelo perfil dela
   function d7SyncDupla() {
-    const d = S.d7; if (!d?.espera || !d.dupla || !G.perfis?.[d.dupla]) return;
+    const d = S.d7; if (!d?.espera || !d.dupla || !pfDe(d.dupla)) return;
     const c = d7Cfg(d.dupla), o = c.d7;
-    if (o && o.dupla === uid && !o.espera && o.ini && o.ini >= d.convidou) { d.ini = o.ini; delete d.espera; save(); setTimeout(() => toast(`🤝 ${(G.perfis[d.dupla]?.nome || "").split(" ")[0]} aceitou! O desafio de vocês começou.`), 300); }
-    else if (c.d7Recusa?.[uid] === d.convidou) { const nome = (G.perfis[d.dupla]?.nome || "").split(" ")[0]; S.d7 = null; save(); setTimeout(() => toast(`${nome} não pode agora. Chame outra pessoa ou comece sozinho.`, 4000), 300); }
+    if (o && o.dupla === uid && !o.espera && o.ini && o.ini >= d.convidou) { d.ini = o.ini; delete d.espera; save(); setTimeout(() => toast(`🤝 ${(pfDe(d.dupla)?.nome || "").split(" ")[0]} aceitou! O desafio de vocês começou.`), 300); }
+    else if (c.d7Recusa?.[uid] === d.convidou) { const nome = (pfDe(d.dupla)?.nome || "").split(" ")[0]; S.d7 = null; save(); setTimeout(() => toast(`${nome} não pode agora. Chame outra pessoa ou comece sozinho.`, 4000), 300); }
   }
   // Dupla: o progresso da outra pessoa vem do que ela sincronizou (perfis.config.d7)
   function d7Dupla() {
@@ -6388,29 +6400,37 @@
   function d7Contexto() {
     const e = d7Estado(), D = D7.recruta, du = d7Dupla();
     if (!e) return `${D.nome} (${D.sub}): ainda não começou. Dá para sugerir quando a pessoa quiser algo curto e sem equipamento, sozinha ou em dupla com alguém do grupo.`;
-    if (S.d7.espera) return `${D.nome}: esperando ${(G.perfis[S.d7.dupla]?.nome || "a dupla").split(" ")[0]} aceitar o convite.`;
+    if (S.d7.espera) return `${D.nome}: esperando ${(pfDe(S.d7.dupla)?.nome || "a dupla").split(" ")[0]} aceitar o convite.`;
     if (e.fim) return `${D.nome}: concluído em ${ddmm(S.d7.fim)}, título ${D.titulo}.`;
-    return `${D.nome}: dia ${e.dia} de 7 (${e.fase.nome})${du ? `, em dupla com ${(G.perfis[du.id]?.nome || "").split(" ")[0]} (${du.n}/7)` : ""}${e.hojeOk ? ", o de hoje já foi feito" : `; missões de hoje: ${e.fase.itens.map((x) => x[2]).join(", ")}`}.`;
+    return `${D.nome}: dia ${e.dia} de 7 (${e.fase.nome})${du ? `, em dupla com ${(pfDe(du.id)?.nome || "").split(" ")[0]} (${du.n}/7)` : ""}${e.hojeOk ? ", o de hoje já foi feito" : `; missões de hoje: ${e.fase.itens.map((x) => x[2]).join(", ")}`}.`;
   }
-  const d7Chips = (attr) => `<div class="chips">${G.membros.filter((id) => id !== uid).map((id) => `<button class="chip" ${attr}="${id}">${avatar(G.perfis[id], 22)} ${d7Nome(id)}</button>`).join("")}</div>`;
+  // Chips de quem dá para chamar, separados por grupo quando a pessoa tem mais de um (cada um aparece uma vez)
+  const d7Chips = (attr) => {
+    const chip = (id) => `<button class="chip" ${attr}="${id}">${avatar(pfDe(id), 22)} ${d7Nome(id)}</button>`;
+    const gs = G.grupos || [];
+    if (gs.length < 2) return `<div class="chips">${d7Ids().map(chip).join("")}</div>`;
+    const vistos = new Set();
+    return gs.map((g) => { const ids = (G.todosMembros || []).filter((m) => m.grupo_id === g.id && m.usuario_id !== uid && !vistos.has(m.usuario_id)).map((m) => (vistos.add(m.usuario_id), m.usuario_id));
+      return ids.length ? `<p class="d7-grupo">${esc(g.nome)}</p><div class="chips">${ids.map(chip).join("")}</div>` : ""; }).join("");
+  };
   telas.recruta = () => {
     setToolbar(null);
     if (uid && (!G.grupos || Date.now() - G.carregadoEm > 30000)) carregarGrupos(true);
     d7SyncDupla();
-    const D = D7.recruta, e = d7Estado(), du = d7Dupla(), temGrupo = uid && G.membros?.length > 1, convites = d7Convites();
+    const D = D7.recruta, e = d7Estado(), du = d7Dupla(), temGrupo = uid && d7Ids().length > 0, convites = d7Convites();
     const capa = `<div class="d7-capa"><img src="${cartaClasse("recruta")}" alt=""><div><span class="qz-kicker">Missão especial</span><h1 class="fc-h1">${esc(D.nome)}</h1><p class="d7-sub">${esc(D.sub)}</p></div></div>`;
     const ativo = e && !S.d7.espera;
     const trilhaFases = `<ol class="d7-fases">${D.fases.map((f) => `<li class="${ativo && f.dias.includes(e.dia) && !e.fim ? "on" : ativo && (e.fim || f.dias[f.dias.length - 1] < e.dia || (f.dias.includes(e.dia) && e.hojeOk && e.dia === f.dias[f.dias.length - 1])) ? "ok" : ""}"><b>Dias ${f.dias[0]}–${f.dias[f.dias.length - 1]}</b><span>${f.chefe ? D.chefe.ic : ""} ${esc(f.nome)}</span><small>+${f.xp} XP/dia</small></li>`).join("")}</ol>`;
     const conviteHtml = convites.map((id) => `<div class="d7-dupla d7-convite"><span class="qz-kicker">Convite para dupla</span>
-      <div class="d7-cv-top">${avatar(G.perfis[id], 44)}<p><b>${d7Nome(id)}</b> te chamou para o ${esc(D.nome)}. Vocês começam juntos hoje e quem completar os 7 dias primeiro vence.</p></div>
+      <div class="d7-cv-top">${avatar(pfDe(id), 44)}<p><b>${d7Nome(id)}</b> te chamou para o ${esc(D.nome)}. Vocês começam juntos hoje e quem completar os 7 dias primeiro vence.</p></div>
       ${d7Ocupado() ? `<p class="note small">Termine o seu desafio atual para aceitar.</p>` : `<div class="row2"><button class="btn btn-blue" data-d7-aceitar="${id}">Aceitar ⚔️</button><button class="btn btn-outline" data-d7-recusar="${id}">Agora não</button></div>`}</div>`).join("");
     const volta = `<header class="fc-head"><a href="#/home" class="qz-voltar">← voltar</a></header>`;
     if (!e) return `<section class="screen quiz d7-tela">${volta}${capa}${conviteHtml}${trilhaFases}
       <p class="d7-txt">Uma missão por dia, sem equipamento. Fechou as missões do dia, o próximo abre amanhã. Nos dias 6 e 7 você enfrenta o <b>${esc(D.chefe.nome)}</b>. Completou os 7 dias: <b>+${D.bonus} XP</b> e o título <b>${esc(D.titulo)}</b>.</p>
       <button class="btn btn-blue fc-btn grande" data-d7-comecar>Começar sozinho 🎯</button>
-      ${temGrupo ? `<div class="d7-dupla"><span class="qz-kicker">Ou desafie alguém do grupo</span><p class="note small">A pessoa recebe o convite no app (e no Telegram ou notificação, se tiver ligado). Vocês largam juntos no dia em que ela aceitar.</p>${d7Chips("data-d7-convidar")}</div>` : uid ? "" : `<p class="note small">Entre com uma conta e participe de um grupo para desafiar um amigo.</p>`}</section>`;
+      ${temGrupo ? `<div class="d7-dupla"><span class="qz-kicker">Ou desafie alguém ${(G.grupos || []).length > 1 ? "dos seus grupos" : "do grupo"}</span><p class="note small">A pessoa recebe o convite no app (e no Telegram ou notificação, se tiver ligado). Vocês largam juntos no dia em que ela aceitar.</p>${d7Chips("data-d7-convidar")}</div>` : uid ? "" : `<p class="note small">Entre com uma conta e participe de um grupo para desafiar um amigo.</p>`}</section>`;
     if (S.d7.espera) return `<section class="screen quiz d7-tela">${volta}${capa}${trilhaFases}
-      <div class="d7-dupla d7-espera"><span class="qz-kicker">Convite enviado</span><div class="d7-cv-top">${avatar(G.perfis[S.d7.dupla], 44)}<p>Esperando <b>${d7Nome(S.d7.dupla)}</b> aceitar. Vocês começam juntos no dia do aceite.</p></div>
+      <div class="d7-dupla d7-espera"><span class="qz-kicker">Convite enviado</span><div class="d7-cv-top">${avatar(pfDe(S.d7.dupla), 44)}<p>Esperando <b>${d7Nome(S.d7.dupla)}</b> aceitar. Vocês começam juntos no dia do aceite.</p></div>
         <button class="lnk-btn" data-d7-cancelar>Cancelar convite</button></div></section>`;
     const f = e.fase, reg = e.reg, hp = f.chefe ? (e.fim ? 0 : S.d7.dias[5]?.em ? 50 : 100) : null;
     const itens = f.itens.map(([k, ic, nome, num]) => { const ok = num ? reg.max > 0 : !!reg.ok?.[k], trava = e.hojeOk || e.fim;
@@ -6442,14 +6462,14 @@
     const D = D7.recruta, du = d7Dupla();
     if (du) d7Avisar(du.id, e.dia === 7 ? (du.venc === "eu" ? "venceu" : "dia") : e.dia === 6 ? "reta" : "dia", e.dia);
     if (e.dia === 7) {
-      autoPost(`d7fim:${d.ini}`, du?.venc === "eu" ? `🏆 Completei o ${D.nome} antes da minha dupla, ${(G.perfis[du.id]?.nome || "").split(" ")[0]}! Agora sou ${D.titulo}.` : `🎖️ Completei o ${D.nome}: 7 dias sem academia! Agora sou ${D.titulo}.`);
+      autoPost(`d7fim:${d.ini}`, du?.venc === "eu" ? `🏆 Completei o ${D.nome} antes da minha dupla, ${(pfDe(du.id)?.nome || "").split(" ")[0]}! Agora sou ${D.titulo}.` : `🎖️ Completei o ${D.nome}: 7 dias sem academia! Agora sou ${D.titulo}.`);
       setTimeout(() => dlgGami(`<div class="gami-crest ch-crest">🎖️</div><p class="gami-k">${esc(D.chefe.nome)} derrotado</p><h2>${esc(D.titulo)}</h2><p class="note">Você completou os 7 dias do ${esc(D.nome)}.${du?.venc === "eu" ? ` E chegou antes de ${d7Nome(du.id)}! 🏆` : ""}</p>`), 1500);
     } else if (e.dia === 6) setTimeout(() => toast(`${D.chefe.ic} ${D.chefe.nome} perdeu metade da vida! Amanhã é o golpe final.`), 1600);
   }
   const d7Novo = (extra = {}) => ({ k: "recruta", ini: hojeKey, dias: [], dupla: null, fim: null, ...extra });
   document.addEventListener("click", (ev) => {
     const t = ev.target, b = (sel) => t.closest(sel);
-    const nome = (id) => (G.perfis[id]?.nome || "").split(" ")[0];
+    const nome = (id) => (pfDe(id)?.nome || "").split(" ")[0];
     if (b("[data-d7-comecar]") || b("[data-d7-novo]")) { S.d7 = d7Novo(); save(); render(); scrollTo(0, 0); return; }
     const cv = b("[data-d7-convidar]");
     if (cv) { const id = cv.dataset.d7Convidar; S.d7 = d7Novo({ ini: null, dupla: id, espera: true, convidou: hojeKey }); save(); if (location.hash !== "#/recruta") location.hash = "#/recruta"; else render(); scrollTo(0, 0);
