@@ -3319,10 +3319,12 @@
   ];
   const NIVEL_MAX = 50;
   const xpPara = (n) => 40 * n * (n - 1); // XP total para chegar ao nível n
+  // Ficha de atleta: 60 XP (não sobe de nível antes do primeiro treino); quem fez a ficha antes de 26/11/2026 mantém os 105
+  const xpFicha = () => (S.ficha ? (S.ficha.criada && S.ficha.criada < "2026-11-26" ? XP.fichaAntiga : XP.ficha) : 0);
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50, pesagem: 15, fimVideo: 50, fimTodos: 500 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 60, fichaAntiga: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50, pesagem: 15, fimVideo: 50, fimTodos: 500 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3512,7 +3514,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + (S.ficha ? XP.ficha : 0) + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
   const meuNivel = () => nivelDe(meuXp());
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
@@ -3657,7 +3659,7 @@
     const ganho = n.xp - antes.xp;
     if (ganho > 0) xpToast(ganho, n, det);
     if (n.nivel > antes.nivel) setTimeout(() => modalNivel(n, n.ci > antes.ci, novas.length > 0), 1400);
-    else if (novas.length) { // trocou de estilo: abriu outra coleção
+    else if (novas.length && feitas(linhasLocais()).length) { // trocou de estilo: abriu outra coleção (antes do 1º treino, a carta entra em silêncio)
       setTimeout(() => modalCartasNovas(novas), 1400);
       const E = ESTILOS[novas[0][0]];
       autoPost(`colecao:${novas[0][0]}`, `🃏 Virei ${E.nome} ${E.ic} e ganhei ${novas.length === 1 ? "uma carta nova" : `${novas.length} cartas novas`} no álbum!`);
@@ -7023,7 +7025,7 @@
      FOR (séries de força), AGI (core e treinos metabólicos: WODs e vídeos), RES (cardio), DIS (constância).
      As respostas também preenchem a entrevista do Coach (Hipertrofia, Calistenia 21 dias, Corrida).
      ========================================================== */
-  const QZ_XP = 15;
+  const QZ_XP = 10; // 6 perguntas valem XP: a ficha inteira (60) fica abaixo do nível 2 (80), que vem do primeiro treino
   const QUIZ = [
     { k: "sexo", kicker: "Seu personagem", q: "Pra começar, você é:", sub: "Define a arte do seu personagem. Ele evolui de Recruta a Imortal conforme você treina.", semXp: true, grade: true, op: [["m", `<img src="assets/classes/avatar/recruta-m.webp" alt="">`, "Homem"], ["f", `<img src="assets/classes/avatar/recruta-f.webp" alt="">`, "Mulher"]] },
     { k: "objetivo", kicker: "Objetivo", q: "O que você quer conquistar?", op: [["massa", "💪", "Ganhar massa muscular"], ["gordura", "🔥", "Perder gordura"], ["forca", "🏋️", "Ganhar força"], ["saude", "❤️", "Condicionamento e saúde"], ["correr", "🏃", "Correr mais e melhor"]] },
@@ -7222,7 +7224,7 @@
     return { attrs, media, rank: rankDe(media), w, real };
   }
   function novaFicha() {
-    S.ficha = { base: fichaBase(S.quiz), criada: hojeKey, metaIni: hojeKey };
+    S.ficha = { base: fichaBase(S.quiz), criada: S.ficha?.criada || hojeKey, metaIni: hojeKey }; // refazer o quiz não muda a data da primeira ficha (o XP dela)
     novaMeta();
   }
   function novaMeta() {
@@ -7323,7 +7325,7 @@
       <div class="fc-wrap">
         <p class="qz-kicker gold">${nova ? "[ Coach ] · análise concluída" : "Ficha de atleta"}</p>
         ${nova ? `<h1 class="fc-h1">${esc(primeiroNome())}, sua ficha de atleta está pronta</h1>` : ""}
-        ${nova ? `<p class="fc-ganho">⚡ +${XP.ficha} XP pela ficha</p>` : ""}
+        ${nova ? `<p class="fc-ganho">⚡ +${xpFicha()} XP pela ficha</p>` : ""}
         ${nova ? mestreHtml() : ""}
         <div class="fc-card">
           <div class="fc-top">
