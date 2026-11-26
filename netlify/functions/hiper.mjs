@@ -12,6 +12,7 @@ import { ROTEIRO_FORTALECIMENTO, CALENDARIO_CALISTENICO } from "../lib/ref-calis
 import "../../public/academia.js";
 import "../../public/calistenia21.js";
 import "../../public/corrida.js";
+import "../../public/inventario.js";
 
 const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -31,6 +32,18 @@ const RUN_CAT = (() => {
   const ids = new Set([...run, ...cal].map((e) => e.id));
   return [...run, ...cal, ...ac.filter((e) => !ids.has(e.id))];
 })();
+
+// De qual catálogo veio cada exercício (o mesmo equip quer dizer coisas diferentes: "barra" na academia é a barra olímpica)
+const ORIGEM = new Map([["ac", globalThis.FITAI_ACADEMIA], ["cal", globalThis.FITAI_CAL21], ["run", globalThis.FITAI_CORRIDA]].flatMap(([o, cat]) => (cat || []).map((e) => [e, o])));
+const INV = globalThis.FITAI_INVENTARIO;
+const ITENS_OK = new Set((INV?.ITENS || []).map((i) => i.id));
+// Arsenal da pessoa: o catálogo enviado ao Sensei só tem o que ela consegue fazer (sem inventário = catálogo inteiro)
+function catalogoDoArsenal(cat, inv) {
+  if (!Array.isArray(inv) || !INV) return cat;
+  const tem = inv.filter((x) => ITENS_OK.has(x));
+  const ok = cat.filter((e) => INV.pode(e, ORIGEM.get(e), tem));
+  return ok.length >= 8 ? ok : cat.filter((e) => !INV.exige(e, ORIGEM.get(e)));
+}
 
 const PROGRAMAS = {
   run: {
@@ -179,7 +192,7 @@ function limparPlano(p, P) {
 }
 
 const ROTULOS = { pace: "Ritmo/tempo em 5 km", forca: "Onde treina força", objetivo: "Objetivo", experiencia: "Experiência", nivel: "Nível", equipamento: "Equipamento", dias: "Dias por semana", diasSemana: "Dias preferidos",
-  tempo: "Tempo por treino", local: "Onde treina", foco: "Prioridade", sexo: "Sexo", idade: "Idade", peso: "Peso (kg)", altura: "Altura (cm)", limitacoes: "Limitações/dores", extra: "Outras informações", etapa: "Etapa da trilha" };
+  tempo: "Tempo por treino", local: "Onde treina", foco: "Prioridade", sexo: "Sexo", idade: "Idade", peso: "Peso (kg)", altura: "Altura (cm)", limitacoes: "Limitações/dores", extra: "Outras informações", etapa: "Etapa da trilha", arsenal: "Arsenal (equipamentos que tem; o catálogo abaixo já só tem o que dá para fazer com eles)" };
 const linhaPerfil = (p = {}) => Object.entries(ROTULOS).filter(([k]) => p[k] !== undefined && p[k] !== "").map(([k, r]) =>
   `${r}: ${k === "diasSemana" ? (Array.isArray(p[k]) && p[k].length ? p[k].map((d) => DIAS[d] || "").join(", ") : "sem preferência") : txt(p[k], 400)}`).join("\n");
 
@@ -198,8 +211,14 @@ export default async (req, context) => {
 
   let c;
   try { c = await req.json(); } catch { return json(400, { erro: "json" }); }
-  const P = PROGRAMAS[c.programa] || PROGRAMAS.hiper;
+  let P = PROGRAMAS[c.programa] || PROGRAMAS.hiper;
   const acao = c.acao === "revisao" ? "revisao" : "plano";
+  const arsenal = Array.isArray(c.inventario) ? c.inventario.filter((x) => ITENS_OK.has(x)) : null;
+  const cat = catalogoDoArsenal(P.cat, arsenal);
+  if (arsenal) {
+    c.perfil = { ...(c.perfil || {}), arsenal: arsenal.length ? INV.ITENS.filter((i) => arsenal.includes(i.id) && i.eq).map((i) => i.nome).join(", ") || "nenhum equipamento" : "nenhum equipamento (só peso do corpo)" };
+    P = { ...P, cat, ci: indice(cat) };
+  }
   const catalogo = P.cat.map((e) => `${e.id} | ${e.nome} | ${e.grupo} | ${e.equip}${e.med === "s" ? " | tempo" : ""}`).join("\n");
   const partes = [`<perfil>\n${linhaPerfil(c.perfil)}\n</perfil>`, `<catalogo>\nid | nome | grupo | equipamento\n${catalogo}\n</catalogo>`];
   if (acao === "revisao") {

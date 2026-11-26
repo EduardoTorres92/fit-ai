@@ -433,6 +433,7 @@
   // Menu: um botão só (abre a Circular Navigation) + o Coach AI ao lado
   const MENU_ITENS = () => [
     { name: "Início", icon: "house", href: "#/home", tab: "home" },
+    { name: "Vilarejo", icon: "map", href: "#/vilarejo", tab: "vilarejo" },
     { name: "Treinos", icon: "calendar-days", href: `#/${principal()}`, tab: "plano" },
     { name: "CrossFit", icon: "dumbbell", href: "#/cf", tab: "cf" },
     { name: "Nutrição", icon: "apple", href: "#/nutricao", tab: "nutricao" },
@@ -1170,7 +1171,7 @@
   async function iaApi(corpo) {
     const token = await tokenSB();
     try {
-      const r = await fetch("/api/hiper", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(corpo) });
+      const r = await fetch("/api/hiper", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(Array.isArray(S.inventario) ? { ...corpo, inventario: S.inventario } : corpo) });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.plano) return d;
       toast(d.erro === "limite" ? "Você chegou ao limite do Coach por hoje. Tente amanhã. 💪" : d.erro === "ocupado" ? "O Coach está com muita gente agora. Tente de novo em 1 minuto." : "Não consegui falar com o Coach agora. Tente de novo.", 4500);
@@ -3050,7 +3051,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -5157,6 +5158,7 @@
       for (const p of VKEYS) if (perfil.config[p] !== undefined && !Object.keys(S[p].logs).length) S[p].inicio = perfil.config[p];
       if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
       if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
+      if (Array.isArray(perfil.config.inventario) && !Array.isArray(S.inventario)) S.inventario = perfil.config.inventario.filter((x) => typeof x === "string").slice(0, 30);
       if (perfil.config.nutri && !S.nutri) S.nutri = perfil.config.nutri;
       if (perfil.config.graduado && !S.graduadoMax30) S.graduadoMax30 = perfil.config.graduado;
       if (perfil.config.formaturas && typeof perfil.config.formaturas === "object") S.formaturas = { ...perfil.config.formaturas, ...(S.formaturas || {}) };
@@ -7024,6 +7026,8 @@
     { k: "objetivo", kicker: "Objetivo", q: "O que você quer conquistar?", op: [["massa", "💪", "Ganhar massa muscular"], ["gordura", "🔥", "Perder gordura"], ["forca", "🏋️", "Ganhar força"], ["saude", "❤️", "Condicionamento e saúde"], ["correr", "🏃", "Correr mais e melhor"]] },
     { k: "nivel", kicker: "Condicionamento", q: "Como está o seu condicionamento hoje?", op: NIVEIS.map(([v, t], i) => [v, ["🌱", "⚡", "🦾"][i], v, t]) },
     { k: "local", kicker: "Campo de treino", q: "Onde você vai treinar?", op: [["casa", "🏠", "Em casa, sem equipamento"], ["barra", "🤸", "Em casa, com barra fixa"], ["halteres", "🏋️", "Em casa, com halteres"], ["academia", "🏢", "Na academia"], ["box", "⏱️", "Num box de CrossFit"], ["rua", "🌳", "Ao ar livre, correndo"]] },
+    { k: "arsenal", kicker: "Seu arsenal", q: "O que você tem para treinar?", sub: "Pode marcar mais de um. O Sensei monta os treinos só com o que você tem, e dá para mudar depois na Guilda do Vilarejo.", semXp: true, multi: true,
+      op: [...(window.FITAI_INVENTARIO?.ITENS || []).filter((i) => i.eq && !i.semLoja).map((i) => [i.id, window.FITAI_INVENTARIO.icone(i.id, "qz-inv"), i.curto]), ["nada", "🙌", "Nada disso, só o corpo"]] },
     { k: "dias", kicker: "Frequência", q: "Quantos dias por semana dá para treinar?", op: ["2", "3", "4", "5", "6"].map((n) => [n, "📅", `${n} dias por semana`]) },
     { k: "tempo", kicker: "Tempo", q: "Quanto tempo você tem por treino?", op: [["20", "⏱️", "Até 20 min"], ["30", "⏱️", "30 min"], ["45", "⏱️", "45 min"], ["60", "⏱️", "1 hora ou mais"]] },
     { k: "obst", kicker: "Seus inimigos", q: "O que mais atrapalha o seu treino?", sub: "Pode marcar mais de um.", multi: true, op: [["tempo", "⏳", "Falta de tempo"], ["ritmo", "📉", "Começo e paro"], ["saber", "🤔", "Não sei o que fazer"], ["chato", "😴", "Enjoo do treino"], ["dor", "🩹", "Dor ou lesão"], ["nada", "✅", "Nada, só quero evoluir"]] },
@@ -7048,6 +7052,7 @@
       { k: "trilha", kicker: "Escolha seu caminho", q: "Quem vai te treinar?", sub: `Cada mestre conduz um caminho. Pelas suas respostas, ${TRILHAS[sug].nome} combina com você. Dá para trocar depois no Perfil, sem perder o XP.`, semXp: true, mestres: true, sug,
         op: Object.entries(TRILHAS).sort(([a], [b]) => (b === sug) - (a === sug)).map(([k, x]) => [k, x.ic, x.nome, x.desc, k === sug]) }];
     if (r.trilha && r.trilha !== "cross") { const L = Q("local"), ok = LOCAL_DA_TRILHA[r.trilha]; ps.push(ok ? { ...L, op: L.op.filter(([v]) => ok.includes(v)) } : L); }
+    if (r.trilha && r.trilha !== "cross" && r.local && r.local !== "academia" && r.local !== "box") ps.push(Q("arsenal"));
     ps.push(Q("dias"), Q("tempo"), Q("obst"));
     if (r.trilha === "hibrido" && IA.c21) ps.push({ k: "forca", kicker: "Dias de força", q: "Nos dias de força, você prefere…", semXp: true,
       op: [["hiper", "🏋️", "Academia"], ["c21", "🤸", "Calistenia"]] });
@@ -7060,7 +7065,9 @@
   let QZ = null;
   function quizRender() {
     const box = $("#quiz"); if (!box || !QZ) return;
-    const ps = quizPassos(QZ.modo, QZ.r), p = ps[QZ.i], sel = QZ.r[p.k];
+    const ps = quizPassos(QZ.modo, QZ.r), p = ps[QZ.i];
+    if (p.k === "arsenal" && QZ.r.arsenal === undefined) QZ.r.arsenal = [...(INV_DO_LOCAL[QZ.r.local] || [])];
+    const sel = QZ.r[p.k];
     const xp = QUIZ.filter((x) => !x.semXp && qzRespondida(QZ.r[x.k])).length * QZ_XP;
     const on = (v) => (p.multi ? (sel || []).includes(v) : sel === v);
     box.innerHTML = `<div class="qz-top">
@@ -7153,6 +7160,11 @@
       const at = etapaAtual();
       escolherPrograma(at.prog);
       if (at.prog === "plano") S.inicio = keyOf(addDays(mondayOf(hoje), -((Number(r.semana) || 1) - 1) * 7));
+    }
+    if (Array.isArray(r.arsenal) || r.local === "academia") { // o arsenal do quiz entra no inventário (os itens de suporte ficam)
+      const base = (r.arsenal || []).filter((x) => x !== "nada"); if (r.local === "academia") base.push("passe");
+      const suporte = Array.isArray(S.inventario) ? S.inventario.filter((id) => !INV.ITENS.find((i) => i.id === id)?.eq) : [];
+      S.inventario = [...new Set([...base, ...suporte])];
     }
     preencherCoach(S.quiz);
     novaFicha();
@@ -7345,6 +7357,87 @@
           : `<button type="button" class="fc-refazer" data-ficha-refazer>Refazer o quiz</button>`}
       </div>`;
   }
+  /* ==========================================================
+     Vilarejo (aba): o mapa com atalhos para os prédios. Guilda = herói e Arsenal (inventário), Mercado = itens com
+     link de afiliado, Taverna = grupos, Arena = desafios, Dojo = técnica, Praça = álbum de cartas.
+     O inventário (S.inventario) vai no config do perfil e o Sensei só usa exercícios que dá para fazer com ele.
+     ========================================================== */
+  const INV = window.FITAI_INVENTARIO || { ITENS: [], CATS: [], icone: () => "", liberados: () => 0 };
+  const INV_DO_LOCAL = { barra: ["barra"], halteres: ["halteres"], academia: ["passe"] };
+  // Sem inventário salvo, parte do "onde você treina" do quiz (quem já usava o app não perde nada)
+  const inventario = () => (Array.isArray(S.inventario) ? S.inventario : INV_DO_LOCAL[S.quiz?.local] || []);
+  const invTem = (id) => inventario().includes(id);
+  function invTrocar(id) {
+    const a = inventario().filter((x) => x !== id);
+    S.inventario = invTem(id) ? a : [...a, id];
+    save();
+  }
+  const VILA = [
+    { id: "guilda", nome: "Guilda do Aventureiro", sub: "Seu herói e o arsenal", href: "#/arsenal", x: 27, y: 12.5, w: 47, h: 19 },
+    { id: "dojo", nome: "Dojo", sub: "Técnica e execução", href: "#/dojo", x: 2, y: 26, w: 33, h: 22 },
+    { id: "arena", nome: "Arena", sub: "Desafio do Recruta", href: "#/recruta", x: 66, y: 26.5, w: 34, h: 22 },
+    { id: "praca", nome: "Praça", sub: "Álbum de cartas", href: "#/album", x: 37, y: 36, w: 27, h: 26 },
+    { id: "mercado", nome: "Mercado", sub: "Equipamentos", href: "#/mercado", x: 0.5, y: 59, w: 37, h: 20 },
+    { id: "taverna", nome: "Taverna", sub: "Grupos e ranking", href: "#/grupo", x: 66, y: 53, w: 34, h: 24 },
+  ];
+  telas.vilarejo = () => {
+    setToolbar("vilarejo");
+    return `<section class="screen has-toolbar vila">
+      <header class="vl-top"><h1>Vilarejo</h1><p>Toque num prédio para entrar</p></header>
+      <div class="vl-mapa"><img src="assets/vilarejo.webp" alt="Vilarejo com Guilda do Aventureiro, Dojo, Arena, Praça, Mercado e Taverna">
+        ${VILA.map((p) => `<a class="vl-hot" href="${p.href}" aria-label="${esc(p.nome)}: ${esc(p.sub)}" style="left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%"><i></i></a>`).join("")}</div>
+      <nav class="vl-lista" aria-label="Prédios do vilarejo">${VILA.map((p) => `<a href="${p.href}"><b>${esc(p.nome)}</b><span>${esc(p.sub)}</span></a>`).join("")}</nav>
+    </section>`;
+  };
+  const vlTopo = (titulo, sub) => `<header class="vl-top com-voltar"><a class="vl-voltar" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a><div><h1>${esc(titulo)}</h1><p>${esc(sub)}</p></div></header>`;
+  telas.arsenal = () => {
+    setToolbar("vilarejo");
+    const lib = new Set();
+    for (const id of inventario()) for (const o of ["ac", "cal", "run"]) for (const e of { ac: window.FITAI_ACADEMIA, cal: window.FITAI_CAL21, run: window.FITAI_CORRIDA }[o] || []) { const r = INV.exige(e, o); if (r && r.includes(id)) lib.add(e.id); }
+    const grupo = (t, l) => `<h2 class="vl-h2">${t}</h2><div class="inv-slots">${l.map((i) => `<button type="button" class="inv-slot${invTem(i.id) ? " on" : ""}" data-inv="${i.id}" aria-label="${esc(i.nome)}${invTem(i.id) ? ", você tem" : ""}">${INV.icone(i.id)}<small>${esc(i.curto)}</small></button>`).join("")}</div>`;
+    return `<section class="screen has-toolbar vila">
+      ${vlTopo("Guilda", "Seu arsenal: toque para marcar o que você tem")}
+      <a class="vl-heroi" href="#/perfil"><span>🛡️</span><div><b>Ver meu herói</b><small>Carta, classe, conquistas e recordes</small></div><span>›</span></a>
+      <div class="vl-stat"><b>${lib.size}</b><span>exercícios com equipamento liberados pelo seu arsenal. O Sensei monta os treinos só com o que você tem.</span></div>
+      <div class="vl-pad">${grupo("Equipamentos que mudam o treino", INV.ITENS.filter((i) => i.eq))}${grupo("Itens de suporte", INV.ITENS.filter((i) => !i.eq))}</div>
+      <p class="vl-nota">Mudou o arsenal? No próximo plano ou revisão do Sensei os treinos já vêm ajustados.</p>
+    </section>`;
+  };
+  let mercCat = "armas";
+  telas.mercado = () => {
+    setToolbar("vilarejo");
+    const lista = INV.ITENS.filter((i) => i.cat === mercCat);
+    return `<section class="screen has-toolbar vila">
+      ${vlTopo("Mercado", "Equipamentos para o seu arsenal")}
+      <div class="vl-fala">${INV.icone("merc", "vl-av")}<div><b>Mercador</b><p>Bem-vindo, aventureiro! Cada arma nova libera exercícios novos com o Sensei.</p></div></div>
+      <div class="mc-cats">${INV.CATS.map((c) => `<button type="button" class="mc-cat" data-mc-cat="${c.id}" aria-pressed="${c.id === mercCat}">${INV.icone(c.ic, "mc-ic")}${esc(c.nome)}</button>`).join("")}</div>
+      <div class="mc-lista">${lista.map((i) => { const n = INV.liberados(i.id);
+        return `<div class="mc-item"><div class="mc-img">${INV.icone(i.id)}</div><div><h3>${esc(i.nome)}</h3><p>${esc(i.txt)}${n ? ` <b>+${n} exercícios.</b>` : ""}</p><div class="mc-acoes">${
+          invTem(i.id) ? `<span class="mc-tem">✓ Já está no seu arsenal</span>`
+          : i.semLoja ? `<a class="mc-tag" href="#/arsenal">Treina em academia? Marque na Guilda</a>`
+          : `<button type="button" class="mc-btn" data-mc-oferta="${i.id}">Ver oferta</button><span class="mc-tag">link de afiliado</span>`}</div></div></div>`; }).join("")}</div>
+      <p class="vl-nota">Os links das ofertas são de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
+    </section>`;
+  };
+  document.addEventListener("click", (e) => {
+    const s = e.target.closest?.("[data-inv]");
+    if (s) {
+      const it = INV.ITENS.find((x) => x.id === s.dataset.inv); if (!it) return;
+      const tinha = invTem(it.id); invTrocar(it.id); render();
+      toast(tinha ? `${it.curto} saiu do arsenal.` : it.eq ? `${it.curto} no arsenal! O Sensei vai usar nos próximos treinos.` : `${it.curto} no arsenal!`);
+      return;
+    }
+    const c = e.target.closest?.("[data-mc-cat]");
+    if (c) { mercCat = c.dataset.mcCat; render(); return; }
+    const o = e.target.closest?.("[data-mc-oferta]");
+    if (o) {
+      const it = INV.ITENS.find((x) => x.id === o.dataset.mcOferta);
+      evento("mercado", { item: it?.id || "", link: !!it?.link });
+      if (it?.link) window.open(it.link, "_blank", "noopener");
+      else toast("Oferta chegando em breve no Mercado.");
+    }
+  });
+
   telas.ficha = (p1) => {
     setToolbar(null);
     if (!S.ficha || p1 === "quiz") return `<section class="screen quiz" id="quiz"></section>`;

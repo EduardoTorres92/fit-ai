@@ -1874,3 +1874,60 @@ button.alb-it:active { transform: scale(0.96); }
 .acamp .ac-sprite { margin-top: -14px; height: 200px; }
 .acamp .ac-sprite img { max-height: 206px; }
 @media (max-width: 380px) { .acamp .ac-k { letter-spacing: .08em; } .acamp .ac-k span { font-size: 11px; } .acamp .ac-prox .ac-k { letter-spacing: .1em; } }
+
+/* ---------- Vilarejo, Guilda (Arsenal) e Mercado: sempre no visual RPG noturno, nos dois temas ---------- */
+.screen.vila { background: #1a1322; color: #f6eee0; }
+.vila h1, .vila h2, .vila h3, .vila .mc-cat, .vila .mc-btn, .vila .vl-lista b, .vila .vl-fala b, .vila .vl-stat b { font-family: "Pixelify Sans", "Inter Tight", sans-serif; font-weight: 700; }
+.vl-top { padding: 18px 16px 12px; }
+.vl-top.com-voltar { display: flex; gap: 12px; align-items: center; }
+.vl-top h1 { margin: 0; font-size: 30px; line-height: 1.05; }
+.vl-top p { margin: 3px 0 0; color: #c9b8a6; font-size: 14px; }
+.vl-voltar { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 10px; border: 2px solid #7a4b2a; background: #5a341f; color: #f1e2c3; font: 700 22px "Pixelify Sans", sans-serif; text-decoration: none; }
+.vl-mapa { position: relative; aspect-ratio: 853 / 1280; border-block: 3px solid #5a341f; }
+.vl-mapa img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.vl-hot { position: absolute; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.vl-hot:active, .vl-hot:focus-visible { outline: 3px solid #e8b04a; background: rgba(232, 176, 74, .14); }
+.vl-hot i { position: absolute; left: 50%; top: -4px; width: 14px; height: 14px; transform: translateX(-50%); background: #e8b04a; border: 3px solid #3a2414; animation: vl-bob 1.6s ease-in-out infinite; }
+@keyframes vl-bob { 50% { transform: translate(-50%, -6px); } }
+@media (prefers-reduced-motion: reduce) { .vl-hot i { animation: none; } }
+.vl-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 14px 16px 4px; }
+.vl-lista a { padding: 10px 12px; border-radius: 10px; background: #5a341f; border: 2px solid #7a4b2a; color: #f1e2c3; text-decoration: none; }
+.vl-lista b { display: block; font-size: 15px; }
+.vl-lista span { display: block; font-size: 12px; color: #e6cfae; }
+.vl-heroi { margin: 0 16px; display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 10px; background: #5a341f; border: 2px solid #7a4b2a; color: #f1e2c3; text-decoration: none; }
+.vl-heroi > span:first-child { font-size: 24px; }
+.vl-heroi div { flex: 1; }
+.vl-heroi b { display: block; font: 700 16px "Pixelify Sans", sans-serif; }
+.vl-heroi small { color: #e6cfae; font-size: 13px; }
+.vl-stat { margin: 10px 16px 0; display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 10px; background: #251a30; border: 2px solid #3c2c48; }
+.vl-stat b { font-size: 30px; line-height: 1; color: #e8b04a; }
+.vl-stat span { font-size: 14px; color: #c9b8a6; }
+.vl-pad { padding: 0 16px; }
+.vl-h2 { font-size: 19px; margin: 22px 0 10px; }
+.vl-nota { padding: 14px 16px 0; margin: 0; font-size: 13px; color: #a8968a; }
+.inv-slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.inv-slot { position: relative; aspect-ratio: 1; display: grid; place-items: center; padding: 0; border-radius: 8px; background: #2e2238; border: 2px solid #3c2c48; cursor: pointer; }
+.inv-slot .inv-svg { width: 56%; height: 56%; filter: grayscale(1) brightness(.45); opacity: .6; }
+.inv-slot.on { background: #3b2a1c; border-color: #e8b04a; box-shadow: inset 0 0 0 2px #6b4a22; }
+.inv-slot.on .inv-svg { filter: none; opacity: 1; }
+.inv-slot small { position: absolute; left: 0; right: 0; bottom: 4px; font-size: 10.5px; line-height: 1.1; color: #a8968a; text-align: center; }
+.inv-slot.on small { color: #f1e2c3; }
+.vl-fala { margin: 0 16px; display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 10px; background: #120d18; border: 3px solid #7a4b2a; }
+.vl-fala .vl-av { width: 44px; height: 44px; flex: none; }
+.vl-fala b { color: #e8b04a; font-size: 13px; }
+.vl-fala p { margin: 2px 0 0; font-size: 15px; }
+.mc-cats { display: flex; gap: 8px; padding: 14px 16px 0; overflow-x: auto; scrollbar-width: none; }
+.mc-cat { flex: none; display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px; border-radius: 8px; border: 2px solid #7a4b2a; background: #251a30; color: #f1e2c3; font-size: 15px; cursor: pointer; }
+.mc-cat[aria-pressed="true"] { background: #5a341f; border-color: #e8b04a; color: #fff; }
+.mc-ic { width: 20px; height: 20px; }
+.mc-lista { display: grid; gap: 10px; padding: 10px 16px 0; }
+.mc-item { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; padding: 10px; border-radius: 10px; background: #f1e2c3; color: #2b1d14; border: 3px solid #5a341f; }
+.mc-img { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 8px; background: #d9c39c; border: 2px solid #b8986a; }
+.mc-img .inv-svg { width: 44px; height: 44px; }
+.mc-item h3 { margin: 0; font-size: 17px; }
+.mc-item p { margin: 2px 0 8px; font-size: 14px; line-height: 1.35; color: #5b4530; }
+.mc-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mc-btn { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #3a2414; background: #e8b04a; color: #2b1d14; font-size: 15px; cursor: pointer; }
+.mc-tag { font-size: 12px; color: #7a5f45; border: 1px dashed #a88a62; border-radius: 6px; padding: 2px 6px; text-decoration: none; }
+.mc-tem { font: 700 14px "Pixelify Sans", sans-serif; color: #2f7a35; }
+.qz-ic .qz-inv { width: 26px; height: 26px; display: block; }
