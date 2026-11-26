@@ -587,7 +587,7 @@
       <div class="sets">
         ${sets.map((s, i) => `<button class="set" data-del="${i}" title="Toque para remover" aria-label="Série ${i + 1}: ${s}${u}. Toque para remover">${s}${u}</button>`).join("")}
         <form class="add-set" data-add="${e.id}">
-          <input type="number" inputmode="numeric" min="1" max="999" value="${sug}" aria-label="${tiro ? "Tempo em segundos do tiro" : e.un === "reps" ? "Repetições da série" : "Valor da série"} ${sets.length + 1} de ${esc(e.nome)}">
+          <input type="number" inputmode="numeric" min="1" max="900" value="${sug}" aria-label="${tiro ? "Tempo em segundos do tiro" : e.un === "reps" ? "Repetições da série" : "Valor da série"} ${sets.length + 1} de ${esc(e.nome)}">
           <button type="submit" class="btn btn-blue">${tiro ? "+ Tiro" : "+ Série"}</button>
         </form>
       </div>
@@ -1384,7 +1384,7 @@
       <div class="sets">
         ${sets.map((s, i) => `<button class="set" data-ia-del="${i}" title="Toque para remover" aria-label="${nome} ${i + 1}: ${esc(fmtSet(s, un))}. Toque para remover">${esc(fmtSet(s, un))}</button>`).join("")}
         <form class="add-set hx-add" data-ia-add="${ex.id}" data-pk="${pk}">
-          ${carga ? `<input name="kg" type="number" inputmode="decimal" step="0.5" min="0" max="999" value="${kgSug}" placeholder="kg" aria-label="Carga em kg (deixe vazio se for sem peso)"><span class="hx-x">${un === "s" ? "kg ·" : "×"}</span>` : ""}
+          ${carga ? `<input name="kg" type="number" inputmode="decimal" step="0.5" min="0" max="400" value="${kgSug}" placeholder="kg" aria-label="Carga em kg (deixe vazio se for sem peso)"><span class="hx-x">${un === "s" ? "kg ·" : "×"}</span>` : ""}
           <input name="r" type="number" inputmode="numeric" min="1" max="999" value="${rSug}" placeholder="${un === "s" ? "seg" : un === "min" ? "min" : "reps"}" aria-label="${un === "reps" ? "Repetições" : un === "s" ? "Segundos" : "Minutos"}">
           ${un === "s" ? `<span class="hx-x">s</span>` : ""}
           <button type="submit" class="btn btn-blue">${un === "min" ? "+ min" : `+ ${nome}`}</button></form></div>
@@ -3016,7 +3016,12 @@
     sincronizando = true;
     try {
       const chave = (r) => `${uid}|${r.data}|${r.programa}`;
-      const linhas = linhasLocais().filter((r) => enviados[chave(r)] !== JSON.stringify(r));
+      // O banco só aceita treino de até 7 dias atrás (trava do XP): o que for mais antigo fica só neste aparelho, sem travar o resto do envio
+      const desde7 = keyOf(addDays(hoje, -7));
+      // Mesmos limites do banco nas séries (≤ 900 reps/segundos, ≤ 300 reps, ≤ 400 kg): uma linha fora disso seria recusada e travaria o lote
+      const serieOk = (x) => (typeof x === "number" ? x >= 0 && x <= 900 : !x || typeof x !== "object" || (!(x.r > 300 || x.r < 0) && !(x.kg > 400 || x.kg < 0)));
+      const linhaOk = (r) => Object.values(r.detalhes?.sets || {}).every((s) => !Array.isArray(s) || s.every(serieOk));
+      const linhas = linhasLocais().filter((r) => r.data >= desde7 && linhaOk(r) && enviados[chave(r)] !== JSON.stringify(r));
       if (linhas.length) {
         const agora = new Date().toISOString();
         const { error } = await sb.from("treinos").upsert(linhas.map((r) => ({ ...r, usuario_id: uid, atualizado_em: agora })));
@@ -3362,7 +3367,7 @@
         if (p) p.textContent = kmv > 0 && t > 0 && f.tipo.value !== "bike" ? `Ritmo ${ritmo(t, kmv * 1000)}/km · +${xpAtiv({ tipo: f.tipo.value, km: kmv, tempo: t })} XP` : `+${xpAtiv({ tipo: f.tipo.value, km: kmv, tempo: t })} XP`; });
       dl.addEventListener("submit", (e) => {
         e.preventDefault();
-        const f = e.target, dia = /^\d{4}-\d{2}-\d{2}$/.test(f.data.value) && f.data.value <= hojeKey ? f.data.value : hojeKey;
+        const f = e.target, dia = /^\d{4}-\d{2}-\d{2}$/.test(f.data.value) && f.data.value <= hojeKey && f.data.value >= keyOf(addDays(hoje, -7)) ? f.data.value : hojeKey;
         const it = ativLimpa({ ...JSON.parse(f.dataset.extra || "{}"), tipo: f.tipo.value, km: Number(String(f.km.value).replace(",", ".")), tempo: segAtiv(f.tempo.value), elev: f.elev.value, fc: f.fc.value });
         if (!it) { toast("Preencha a distância ou o tempo."); return; }
         const l = S.corrida.logs[dia] || { itens: [] };
@@ -3371,7 +3376,7 @@
       });
     }
     const extra = { ...(a.app ? { app: a.app } : {}), ...(a.titulo ? { titulo: a.titulo } : {}), ...(a.kcal ? { kcal: a.kcal } : {}) };
-    const dia = a.data && a.data <= hojeKey && a.data >= keyOf(addDays(hoje, -30)) ? a.data : hojeKey;
+    const dia = a.data && a.data <= hojeKey && a.data >= keyOf(addDays(hoje, -7)) ? a.data : hojeKey;
     dl.innerHTML = `<form class="ativ-box" data-extra='${esc(JSON.stringify(extra))}'>
       <h2>${a.km || a.tempo ? "Confira os números" : "Registrar atividade"}</h2>
       ${a.app ? `<p class="note small">Lido do print${a.app ? ` (${esc(a.app)})` : ""}. Ajuste se algo saiu errado.</p>` : ""}
@@ -3379,7 +3384,7 @@
       <div class="ativ-grid">
         <label class="field"><span class="field-lbl">Distância (km)</span><input name="km" inputmode="decimal" value="${a.km ? String(a.km).replace(".", ",") : ""}" placeholder="5,0"></label>
         <label class="field"><span class="field-lbl">Tempo (h:mm:ss)</span><input name="tempo" inputmode="numeric" value="${a.tempo ? hmsDe(a.tempo) : ""}" placeholder="30:00"></label>
-        <label class="field"><span class="field-lbl">Data</span><input name="data" type="date" value="${dia}" max="${hojeKey}"></label>
+        <label class="field"><span class="field-lbl">Data</span><input name="data" type="date" value="${dia}" min="${keyOf(addDays(hoje, -7))}" max="${hojeKey}"></label>
         <label class="field"><span class="field-lbl">Elevação (m)</span><input name="elev" inputmode="numeric" value="${a.elev || ""}" placeholder="opcional"></label>
         <label class="field"><span class="field-lbl">FC média</span><input name="fc" inputmode="numeric" value="${a.fc || ""}" placeholder="opcional"></label>
       </div>
@@ -3418,19 +3423,32 @@
     return xp;
   }
   // Recordes nas linhas (em ordem de data): Max Out, carga na academia/calistenia do Coach e repetições no Treino da Fera
+  // Travas contra XP fácil: Max Out só vale até a duração do vídeo; nos outros, o salto tem que ser plausível
+  // (até +50% ou +5 reps / +15 s / +10 kg, o que for maior) e cada exercício rende recorde no máximo 1 vez por semana.
+  // Um salto fora disso (erro de digitação ou trapaça) não vira recorde nem sobe a marca.
+  const recordePlausivel = (ant, v, folga) => v <= Math.max(ant * 1.5, ant + folga);
   function xpRecordes(rows) {
     let xp = 0;
     const best = {};
-    maxOuts(rows).sort((a, b) => a.k.localeCompare(b.k)).forEach((m) => { if (best[m.v] && m.s > best[m.v]) xp += XP.recorde; best[m.v] = Math.max(best[m.v] || 0, m.s); });
-    const melhor = {};
+    maxOuts(rows).sort((a, b) => a.k.localeCompare(b.k)).forEach((m) => {
+      const lim = INSV[m.v]?.min ? INSV[m.v].min * 60 : 3600; if (m.s > lim) return;
+      if (best[m.v] && m.s > best[m.v]) xp += XP.recorde; best[m.v] = Math.max(best[m.v] || 0, m.s); });
+    const melhor = {}, semanaRec = {};
     for (const r of [...rows].sort((a, b) => a.data.localeCompare(b.data))) {
       if (!IA[r.programa] && r.programa !== "calistenia") continue;
       let ganho = 0;
+      const sem = keyOf(mondayOf(parseKey(r.data)));
       for (const [id, s] of Object.entries(r.detalhes?.sets || {})) {
         if (!Array.isArray(s) || !s.length || (r.programa === "calistenia" && EX_META[id]?.un === "tiro")) continue;
-        const v = Math.max(...s.map((x) => (typeof x === "number" ? x : x?.kg || 0))), ch = `${r.programa}|${id}`;
-        if (v > 0 && melhor[ch] && v > melhor[ch]) ganho += XP.recorde;
-        if (v > 0) melhor[ch] = Math.max(melhor[ch] || 0, v);
+        const kg = s.some((x) => typeof x !== "number"), v = Math.max(...s.map((x) => (typeof x === "number" ? x : x?.kg || 0))), ch = `${r.programa}|${id}`;
+        if (!(v > 0)) continue;
+        const ant = melhor[ch];
+        if (ant) {
+          const un = r.programa === "calistenia" ? EX_META[id]?.un : exDe(r.programa, id)?.un;
+          if (!recordePlausivel(ant, v, kg ? 10 : un === "s" ? 15 : 5)) continue;
+          if (v > ant && semanaRec[ch] !== sem) { ganho += XP.recorde; semanaRec[ch] = sem; }
+        }
+        melhor[ch] = Math.max(ant || 0, v);
       }
       xp += Math.min(XP.recordeMax, ganho);
     }
@@ -3441,7 +3459,8 @@
     const porDia = {};
     rows.forEach((r) => (porDia[r.data] = porDia[r.data] || []).push(xpLinha(r)));
     let xp = 0;
-    for (const lista of Object.values(porDia)) lista.sort((a, b) => b - a).forEach((v, i) => (xp += i ? Math.round(v / 2) : v)); // 2º treino no mesmo dia vale metade
+    for (const lista of Object.values(porDia)) lista.sort((a, b) => b - a).slice(0, 2).forEach((v, i) => (xp += i ? Math.round(v / 2) : v)); // 2º treino no mesmo dia vale metade; do 3º em diante não rende XP
+    meta = Math.min(7, Math.max(2, Math.round(Number(meta)) || 6)); // a meta vem do perfil de cada um: trava entre 2 e 7 treinos
     xp += xpRecordes(rows);
     // Meta da semana batida (dias com treino concluído de segunda a domingo) e semanas seguidas batendo a meta
     const sem = {};
@@ -6338,16 +6357,23 @@
       ] },
   };
   const d7Fase = (n, D = D7.recruta) => D.fases.find((f) => f.dias.includes(n));
+  const d7Teto = (D) => D.fases.reduce((t, f) => t + f.xp * f.dias.length, D.bonus);
   const d7Feitos = (d) => (d?.dias || []).filter((x) => x?.em).length;
   // XP de uma pessoa no desafio desde uma data (c = { d7, d7Feito }, o meu ou o sincronizado de outra pessoa)
   function d7XpDesde(c, desde = "0000") {
     const d = c?.d7, f = c?.d7Feito, D = D7[d?.k || f?.k || "recruta"];
-    if (f && !(d && d.ini === f.ini)) return desde === "0000" ? f.xp || 0 : 0; // refazendo depois da primeira: o XP é só o da primeira
-    if (!d || !D) return 0;
-    let xp = 0;
-    d.dias.forEach((x, i) => { if (x?.em && x.em >= desde) xp += d7Fase(i + 1, D).xp; });
-    if (d.fim && d.fim >= desde) xp += D.bonus;
-    return xp;
+    const teto = D ? d7Teto(D) : 0;
+    if (f && !(d && d.ini === f.ini)) return desde === "0000" ? Math.min(teto, Number(f.xp) || 0) : 0; // refazendo depois da primeira: o XP é só o da primeira
+    if (!d || !D || !Array.isArray(d.dias)) return 0;
+    // Cada dia fechado precisa de data própria, em sequência e a partir do início (um dia por dia, como no app)
+    let xp = 0, ok = 0, ult = String(d.ini || "0000");
+    for (let i = 0; i < Math.min(7, d.dias.length); i++) {
+      const em = d.dias[i]?.em; if (!em) break;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(em) || em < ult || (i && em === ult)) break;
+      ult = em; ok++; if (em >= desde) xp += d7Fase(i + 1, D).xp;
+    }
+    if (d.fim && d.fim >= desde && ok === 7) xp += D.bonus;
+    return Math.min(teto, xp);
   }
   const d7Xp = () => d7XpDesde({ d7: S.d7, d7Feito: S.d7Feito });
   // Dia que está valendo: o fechado hoje (para mostrar "volte amanhã") ou o próximo
