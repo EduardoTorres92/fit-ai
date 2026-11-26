@@ -3318,7 +3318,10 @@
     ["mestre-de-armas", "Mestre de Armas", "ouro"], ["tita", "Titã", "ouro"], ["lenda", "Lenda", "diamante"], ["imortal", "Imortal", "diamante"],
   ];
   const NIVEL_MAX = 50;
-  const xpPara = (n) => 40 * n * (n - 1); // XP total para chegar ao nível n
+  // XP total para chegar ao nível n. O nível 2 pede 300 XP (a ficha + uns 3 dias de treino com as missões);
+  // depois, os mesmos intervalos de antes. Quem já tinha chegado a um nível pela curva antiga não cai (piso).
+  const xpPara = (n) => (n <= 1 ? 0 : 40 * n * (n - 1) + 220);
+  const xpParaAntigo = (n) => 40 * n * (n - 1);
   // Ficha de atleta: 60 XP (não sobe de nível antes do primeiro treino); quem fez a ficha antes de 26/11/2026 mantém os 105
   const xpFicha = () => (S.ficha ? (S.ficha.criada && S.ficha.criada < "2026-11-26" ? XP.fichaAntiga : XP.ficha) : 0);
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
@@ -3507,15 +3510,21 @@
     xp += desafios * XP.desafio;
     return xp;
   }
-  function nivelDe(xp) {
+  function nivelDe(xp, piso = 1) {
     let n = 1; while (n < NIVEL_MAX && xp >= xpPara(n + 1)) n++;
+    n = Math.min(NIVEL_MAX, Math.max(n, Math.round(Number(piso)) || 1));
     const ci = Math.min(CLASSES.length - 1, Math.floor((n - 1) / 5)), [slug, nome, metal] = CLASSES[ci];
     const ini = xpPara(n), fim = n < NIVEL_MAX ? xpPara(n + 1) : ini;
-    return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.round(((xp - ini) / (fim - ini)) * 100) : 100 };
+    return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.max(0, Math.min(100, Math.round(((xp - ini) / (fim - ini)) * 100))) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
     + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
-  const meuNivel = () => nivelDe(meuXp());
+  // Piso: o nível que a pessoa já tinha antes da curva nova (calculado uma vez pela curva antiga) ou o que a conta já mostrava
+  function nivelPiso(xp) {
+    if (S.nivelPiso == null) { let n = 1; if (S.ficha) while (n < NIVEL_MAX && xp >= xpParaAntigo(n + 1)) n++; S.nivelPiso = n; }
+    return S.nivelPiso;
+  }
+  const meuNivel = () => { const xp = meuXp(); return nivelDe(xp, nivelPiso(xp)); };
   const classeImg = (slug) => `assets/classes/${slug}.svg`;
   const molduraImg = (metal) => `assets/classes/moldura-${metal}.svg`;
   // Artes das classes (cartas desenhadas pelo Eduardo): versão masculina ou feminina pelo sexo informado, ou pela escolha no Perfil
@@ -4229,7 +4238,7 @@
   const membroG = (id) => { const c = membroCfg(id); return id === uid ? sexoArte() : c.arte === "f" || (c.arte !== "m" && c.quiz?.sexo === "f") ? "f" : "m"; };
   function membroTitulo(id) { const f = membroCfg(id).d7Feito; return f && D7[f.k] ? `<span class="pf-titulo">🎖️ ${esc(D7[f.k].titulo)}</span>` : ""; }
   function cartaMembroHtml(id, rows) {
-    const c = membroCfg(id), n = nivelDe(Number(c.xp) || 0), est = estiloDe(rows), e = est.slug, E = e && ESTILOS[e], g = membroG(id);
+    const c = membroCfg(id), n = nivelDe(Number(c.xp) || 0, Number(c.nivel_xp) || 1), est = estiloDe(rows), e = est.slug, E = e && ESTILOS[e], g = membroG(id);
     const img = e && NIVEIS_ARTE.has(e) ? cartaDe(e, n.slug, g) : `assets/classes/cartas/${n.slug}-${g}.webp`;
     return `<div class="mb-carta"><img src="${img}" alt="Carta ${esc(n.classe)}${E ? ` ${esc(E.nome)}` : ""}" loading="lazy">
       <div class="mb-info"><span class="qz-kicker">Classe e estilo</span><b>${esc(n.classe)}${E ? ` · ${E.ic} ${esc(E.nome)}` : ""}</b>
@@ -5172,6 +5181,7 @@
       if (perfil.config.forca && !S.forca) S.forca = perfil.config.forca;
       if (perfil.config.quiz && !S.quiz) S.quiz = perfil.config.quiz;
       if (perfil.config.ficha && !S.ficha) S.ficha = perfil.config.ficha;
+      if (Number(perfil.config.nivel_xp) > (S.nivelPiso || 1)) S.nivelPiso = Math.min(NIVEL_MAX, Math.round(Number(perfil.config.nivel_xp))); // nível que a conta já tinha
       if (perfil.config.arte && !S.arte) S.arte = perfil.config.arte;
       if (perfil.config.d7 && (!S.d7 || (perfil.config.d7.ini || "") > (S.d7.ini || ""))) S.d7 = perfil.config.d7; // desafio de 7 dias (outro aparelho)
       if (perfil.config.d7Feito && !S.d7Feito) S.d7Feito = perfil.config.d7Feito;
