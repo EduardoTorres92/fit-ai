@@ -436,7 +436,7 @@
     { name: "Treinos", icon: "calendar-days", href: `#/${principal()}`, tab: "plano" },
     { name: "CrossFit", icon: "dumbbell", href: "#/cf", tab: "cf" },
     { name: "Nutrição", icon: "apple", href: "#/nutricao", tab: "nutricao" },
-    { name: "Coach AI", icon: "sparkles", href: "#/coach", tab: "coach" },
+    { name: "Sensei", icon: "sparkles", href: "#/coach", tab: "coach" },
     { name: "Dojo", icon: "landmark", href: "#/dojo", tab: "dojo" },
     { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
     { name: "Grupo", icon: "users", href: "#/grupo", tab: "grupo" },
@@ -5590,7 +5590,7 @@
 
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
-  const CHIPS_PADRAO = ["Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
+  const CHIPS_PADRAO = ["Anotar meu treino", "Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
   const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Nutrição", "Minha evolução", "Evolução por foto"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
@@ -5598,13 +5598,35 @@
   function trocarPapel(papel) {
     chatLogs[chatPapel] = chatLog; chatPapel = papel; chatLog = chatLogs[papel];
     const nutri = papel === "nutri";
-    $("#chat-nome").textContent = nutri ? "Nutri AI" : "Coach AI";
-    $(".chat-sheet").setAttribute("aria-label", nutri ? "Nutri AI" : "Coach AI");
-    $(".chat-head .coach-avatar img").src = A(nutri ? "nutri-active.svg" : "sparkles-blue.svg");
+    senseiCabecalho();
     chipsEl.innerHTML = "";
     if (!nutri && iaChat) setTimeout(() => iaPergunta(iaChat, 0), 0); // volta para a entrevista que estava aberta
   }
   let busy = false;
+  // Cabeçalho do chat: a Nutri AI ou o Sensei do estilo (nome e carta do mestre)
+  function senseiCabecalho() {
+    const nutri = chatPapel === "nutri", s = nutri ? null : senseiDe(), nome = nutri ? "Nutri AI" : `Sensei ${s.nome}`;
+    $("#chat-nome").textContent = nome;
+    $(".chat-sheet").setAttribute("aria-label", nome);
+    const av = $(".chat-head .coach-avatar"), img = av.querySelector("img");
+    av.classList.toggle("sensei", !nutri);
+    img.src = nutri ? A("nutri-active.svg") : s.carta; img.alt = nutri ? "" : `Carta de ${s.nome}`;
+  }
+  // Registros que o Sensei anotou pela conversa (mesmo formato do bot do Telegram)
+  function senseiAplicar(regs) {
+    const feitos = [];
+    for (const x of regs) {
+      try {
+        if (x.tipo === "agua" && x.ml > 0) { aguaAdd(Math.min(2000, x.ml)); feitos.push(`💧 ${x.ml} ml de água`); }
+        else if (x.tipo === "feito" && tgMarcar(x.data)) feitos.push(`✅ treino de ${ddmm(x.data)} concluído`);
+        else if ((x.tipo === "series" || x.tipo === "max") && tgRegistrar(x)) feitos.push(x.tipo === "max" ? `⏱️ Max Out de ${x.nome} em ${mmss(x.seg)}` : `💪 ${x.nome}: ${x.valores.map((v, i) => (x.kg?.[i] > 0 ? `${fmtKg(x.kg[i])} kg × ${v}` : v)).join(", ")}`);
+      } catch (e) { console.error("sensei registro", e); }
+    }
+    if (!feitos.length) return "";
+    save(); conferirXp(false, "Anotado pelo Sensei");
+    if (!/^#\/(home|perfil)?$/.test(location.hash)) setTimeout(render, 300);
+    return `<p class="sensei-reg">Anotado no app:<br>${feitos.map(esc).join("<br>")}</p>`;
+  }
 
   // Texto solto (com <b>, <br>…) vai dentro de um <p>: a bolha é flex em coluna e quebraria a frase em pedaços
   const bubbleHTML = (m) => `<div class="msg${m.me ? " me" : ""}"><div class="bubble">${/^\s*<(p|ul|ol|div|h\d)\b/i.test(m.html) ? m.html : `<p>${m.html}</p>`}</div></div>`;
@@ -5626,7 +5648,7 @@
     box.classList.toggle("wrap", box === chipsEl && !!iaChat); // na entrevista as opções quebram linha (todas à vista)
   }
   function openChat(pergunta, papel = "coach") {
-    if (papel !== chatPapel) trocarPapel(papel);
+    if (papel !== chatPapel) trocarPapel(papel); else senseiCabecalho();
     layer.hidden = false;
     layer.classList.remove("closing");
     if (!chatLog.length) chatLog.push({ html: chatPapel === "nutri"
@@ -6031,13 +6053,15 @@
       evento("coach", { papel: chatPapel === "nutri" ? "nutri" : "coach" });
       r = await fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(chatPapel === "nutri" ? { papel: "nutri", mensagens, programa: nutriBase(), contexto: nutriContexto() }
-          : { mensagens, programa: programaTexto(), contexto: contextoTexto(!!token && souDono) }) });
+          : { mensagens, programa: programaTexto(), contexto: contextoTexto(!!token && souDono), hoje: hojeKey,
+            sensei: (() => { const s = senseiDe(); return { estilo: s.e, genero: s.g }; })(),
+            agenda: [...Array(8)].map((_, i) => { try { return tgDia(addDays(hoje, -i)); } catch { return null; } }).filter(Boolean).map(({ data, titulo, descanso, ex }) => ({ data, titulo, descanso, ex })) }) });
     } catch { stop(); return false; }
     if (!r.ok || !r.body) {
       stop();
       const e = await r.json().catch(() => ({}));
       iaOff = true;
-      toast(e.erro === "limite" ? "Você chegou ao limite de perguntas de hoje. Seguimos com respostas prontas. 💪" : "Coach AI offline. Usando respostas prontas.");
+      toast(e.erro === "limite" ? "Você chegou ao limite de perguntas de hoje. Seguimos com respostas prontas. 💪" : "Sensei offline. Usando respostas prontas.");
       return false;
     }
     stop();
@@ -6046,13 +6070,21 @@
     msgsEl.insertAdjacentHTML("beforeend", bubbleHTML(m));
     const bolha = msgsEl.lastElementChild.querySelector(".bubble");
     const leitor = r.body.getReader(), dec = new TextDecoder();
+    let bruto = "";
     for (;;) {
       const { value, done } = await leitor.read();
       if (done) break;
-      m.txt += dec.decode(value, { stream: true });
+      bruto += dec.decode(value, { stream: true });
+      m.txt = bruto.split("\u001eREG")[0];
       m.html = md(m.txt);
       bolha.innerHTML = m.html;
       msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+    const iReg = bruto.indexOf("\u001eREG");
+    if (iReg >= 0) {
+      let regs = []; try { regs = JSON.parse(bruto.slice(iReg + 4)); } catch {}
+      const extra = Array.isArray(regs) ? senseiAplicar(regs) : "";
+      if (extra) { m.html = md(m.txt) + extra; bolha.innerHTML = m.html; msgsEl.scrollTop = msgsEl.scrollHeight; }
     }
     if (!m.txt.trim()) { m.txt = "Não consegui responder agora. Tente de novo."; m.html = md(m.txt); bolha.innerHTML = m.html; }
     return true;
