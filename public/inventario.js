@@ -31,7 +31,7 @@
     { id: "coqueteleira", img: "assets/itens/coqueteleira.webp", nome: "Coqueteleira", curto: "Coqueteleira", cat: "pocoes", eq: false, txt: "Para o whey e a água do treino.", link: "https://meli.la/277gXaZ" },
     { id: "balanca", img: "assets/itens/balanca.webp", nome: "Balança de bioimpedância", curto: "Balança", cat: "artefatos", eq: false, txt: "Peso e gordura corporal para a pesagem da semana e a Evolução.", link: "https://meli.la/32eFKtq" },
     { id: "fita", img: "assets/itens/fita.webp", nome: "Fita métrica corporal", curto: "Fita métrica", cat: "artefatos", eq: false, txt: "Medidas de cintura, braço e coxa para acompanhar a Evolução.", link: "https://meli.la/2C3KMRB" },
-    { id: "cinta", img: "assets/itens/cinta.webp", nome: "Cinta cardíaca", curto: "Cinta", cat: "artefatos", eq: false, txt: "Frequência cardíaca precisa na corrida e no Insanity.", link: "" },
+    { id: "cinta", img: "assets/itens/cinta.webp", nome: "Cinta cardíaca", curto: "Cinta", cat: "artefatos", eq: false, txt: "Frequência cardíaca precisa na corrida e no Insanity.", link: "https://meli.la/1oCkeeJ" },
     { id: "rolo", img: "assets/itens/rolo.webp", nome: "Rolo de liberação", curto: "Rolo", cat: "artefatos", eq: false, txt: "Recuperação muscular depois do treino.", link: "https://meli.la/2meaLHK" },
     { id: "fone", img: "assets/itens/fone.webp", nome: "Fone esportivo", curto: "Fone", cat: "artefatos", eq: false, txt: "Música na corrida e nos treinos em vídeo.", link: "https://meli.la/1MZgCsJ" },
   ];
