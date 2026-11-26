@@ -1,57 +1,64 @@
-# FIT.AI — app de treino de calistenia com Coach AI
+# FIT.AI · seu treino vira aventura
 
-App web mobile para seguir um programa de calistenia, registrar as repetições de cada série e acompanhar a evolução semana a semana, com um **Coach AI** (Claude, da Anthropic) que responde dúvidas de treino em tempo real.
+![FIT.AI: o mestre Kenji em pixel art na página de entrada](docs/capa.jpg)
 
-**▶ Ver ao vivo:** https://fitai-eduardo.netlify.app (entre como visitante)
+App de treino em formato de **RPG em pixel art**, com um **Coach de IA** (Claude, da Anthropic). Você escolhe seu mestre, ganha XP a cada série e evolui de **Recruta a Imortal**. O Coach monta o treino de Insanity, academia, calistenia, corrida, cross ou híbrido e acompanha cada repetição.
 
-| Login | Início | Plano | Evolução | Perfil | Coach AI |
-|---|---|---|---|---|---|
-| ![](docs/1-login.png) | ![](docs/2-inicio.png) | ![](docs/3-plano.png) | ![](docs/4-evolucao.png) | ![](docs/5-perfil.png) | ![](docs/6-coach.png) |
+**▶ Ver ao vivo:** https://fitai.eduardotorres-dev.com.br
 
-## O que ele faz
+| Login | Início | Perfil | Treino | Desafio do Recruta | Álbum de cartas | Grupo |
+|---|---|---|---|---|---|---|
+| ![](docs/telas/login.webp) | ![](docs/telas/home.webp) | ![](docs/telas/perfil.webp) | ![](docs/telas/treino.webp) | ![](docs/telas/recruta.webp) | ![](docs/telas/album.webp) | ![](docs/telas/grupo.webp) |
 
-- **Plano de treino de 4 semanas** com treino do dia, treino de emergência de 15 min e ciclo que recomeça.
-- **Registro por série**: anota as repetições e o app sugere a meta da próxima semana (progressão gradual).
-- **Evolução**: sequência de dias, mapa de consistência, treinos feitos e taxa de conclusão.
-- **Coach AI com IA de verdade**: respostas em streaming, usando o histórico do próprio usuário como contexto.
-- **Integração com Strava**: mostra corridas e tiros de 200 m e gera um resumo do treino para postar.
-- **Login com e-mail e senha** (hash scrypt + token assinado) ou modo visitante.
+## O jogo
+
+- **Seis mestres, seis estilos.** O app olha o que você treina de verdade e te dá um estilo, cada um com seu mestre e sua mestra:
+  - 🥷 **Ninja** (Kenji e Yuna): vídeos do Insanity.
+  - 🥋 **Monge** (Tenzin e Mei): calistenia.
+  - 🛡️ **Gladiador** (Tito e Lívia): academia.
+  - 🏹 **Batedor** (Zion e Kaya): corrida.
+  - 🪓 **Berserker** (Bjorn e Freya): cross.
+  - ⚔️ **Ronin** (Takeshi e Ayame): quem mistura várias modalidades.
+- **50 níveis e 10 classes.** A cada 5 níveis o personagem troca de classe, de Recruta a Imortal, e ganha uma carta nova para o álbum. São 60 cartas, nas versões masculina e feminina, e o personagem aparece animado no topo do app.
+- **XP a cada série.** O XP aparece na hora em que você anota a série. Também valem treino concluído, recordes, meta de água, semana batida, pesagem semanal e conquistas.
+- **Missões do dia:** treino, água, abdômen e desafio da semana, com bônus para quem cumpre todas.
+- **Desafio do Recruta:** 7 dias sem academia, em três fases (Despertar, Dungeon e chefe final). Dá para fazer sozinho ou em dupla, com convite e avisos.
+- **Ficha de atleta:** quiz de entrada com rank e os atributos FOR, AGI, RES e DIS, que passam a ser calculados pelos treinos reais.
+- **Conquistas:** dezenas de selos, do primeiro treino à maratona, passando por Hyrox, subida e treinos do Insanity feitos "até o fim", sem Max Out.
+
+## O Coach de IA
+
+- Monta a ficha numa conversa rápida no chat e revisa o plano toda semana.
+- Lê o **print da corrida** (Strava, Garmin, relógio, esteira) e a **foto do quadro do box** de CrossFit.
+- Sugere a carga de cada exercício pela última vez e mostra o recorde e a carga máxima estimada (1RM).
+- Conhece o seu contexto: nível, missões, pesagens e o que falta para a próxima classe.
+- Também atende pelo **bot do Telegram**.
+
+## Comunidade
+
+- **Grupos com código de convite:** ranking de XP da semana, meta coletiva e desafio da semana. O Coach monta esse desafio a partir de um reel.
+- **Mural do grupo:** fotos, reações e comentários. Recordes, conquistas e classes novas viram post sozinhos (dá para desligar).
+- **Perfil dos amigos:** carta, álbum, conquistas e recordes.
 
 ## Como foi feito
 
-- **Design**: interface criada no Figma e implementada fiel ao layout, pensada para celular.
-- **Front-end**: HTML, CSS e JavaScript puro, sem framework e sem build — leve e rápido.
-- **Back-end**: Netlify Functions (Node.js)
-  - `/api/coach` conversa com a API do Claude; a chave fica só no servidor, nunca no navegador.
-  - `/api/auth` cuida das contas, guardadas no Netlify Blobs.
-- **Custos sob controle**: visitantes usam um modelo menor, só sobre treino, com limite de perguntas por dia (por visitante e geral).
-
-## Comunidade (Supabase)
-
-Contas, treinos, grupos e conquistas ficam no Supabase (projeto `fitai`). O app continua funcionando offline: grava no aparelho e sincroniza quando há conexão.
-
-- **Login**: e-mail e senha ou Google (Supabase Auth). Visitante continua possível, só no aparelho.
-- **Grupos com código de convite**: ranking por treinos, tempo, sequência e Max Out; meta semanal do grupo; conquistas do grupo; feed de atividade.
-- **Minha evolução**: KPIs do mês, treinos e minutos por semana, Max Out por vídeo e medalhas pessoais.
-- **Segurança**: RLS em todas as tabelas; cada pessoa só vê os treinos de quem divide grupo com ela. Foto de perfil no bucket `fotos` (só a própria pasta).
-
-## Hospedar fora da Netlify (Hostinger ou qualquer Node.js)
-
-`server.mjs` entrega a pasta `public/` e as rotas `/api/auth` e `/api/coach` com as mesmas funções da Netlify. Contas e limites do Coach ficam em arquivos JSON em `DADOS_DIR` (padrão `~/fitai-dados`, fora da pasta do app).
-
-```bash
-npm install
-ANTHROPIC_API_KEY=... ALLOWED_EMAIL=voce@exemplo.com npm start   # porta em PORT, padrão 3000
-```
+- **Front-end:** HTML, CSS e JavaScript puro, sem framework e sem build. É um PWA leve, feito para celular.
+- **Artes:** pixel art própria: 120 cartas (6 estilos × 10 classes × 2 versões), personagens animados em WebP, mestres e cenários.
+- **Back-end:** Node.js (`server.mjs`) servindo `public/` e as rotas de `netlify/functions`:
+  - `coach`, `corrida`, `wod`, `evolucao`, `desafio`, `dupla`, `hiper`, `agua`, `telegram`, `auth` e `videos`.
+  - A chave da Anthropic fica só no servidor, nunca no navegador.
+- **Dados:** Supabase (Auth com Google ou e-mail, Postgres com RLS em todas as tabelas, Storage para fotos). O app grava no aparelho e sincroniza quando há conexão.
+- **Custos sob controle:** limite diário de perguntas ao Coach por pessoa e geral.
+- **Hospedagem:** Hostinger (Node.js), com deploy automático a cada push na branch `deploy-hostinger`.
 
 ## Rodar no seu computador
 
 ```bash
 npm install
-cp .env.example .env   # preencha a chave da Anthropic
-npx netlify-cli dev --port 5173 --dir public --functions netlify/functions
+cp .env.example .env   # preencha ANTHROPIC_API_KEY e ALLOWED_EMAIL
+npm start              # porta em PORT, padrão 3000
 ```
 
 ---
 
-Feito por **Eduardo Torres** — crio sites e apps para negócios. Quer um projeto assim? Me chame no LinkedIn.
+Feito por **Eduardo Torres**: crio sites, apps e automações com IA. Veja mais em [eduardotorres-dev.com.br](https://eduardotorres-dev.com.br).

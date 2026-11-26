@@ -3,376 +3,191 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>FIT.AI · Seu coach de treino com IA</title>
-  <meta name="description" content="Um coach de IA que monta o seu treino de academia, calistenia, corrida ou cross, acompanha cada série e transforma a sua constância em XP, níveis e conquistas.">
-  <meta name="theme-color" content="#070707">
+  <title>FIT.AI · Seu treino vira aventura</title>
+  <meta name="description" content="Escolha seu mestre, ganhe XP a cada série e evolua de Recruta a Imortal. Um coach de IA monta o seu treino de Insanity, academia, calistenia, corrida, cross ou híbrido.">
+  <meta name="theme-color" content="#0b0a1f">
+  <meta property="og:title" content="FIT.AI · Seu treino vira aventura">
+  <meta property="og:description" content="Escolha seu mestre, ganhe XP a cada série e evolua de Recruta a Imortal, com um coach de IA.">
+  <meta property="og:image" content="https://fitai.eduardotorres-dev.com.br/assets/login-hero.jpg">
   <link rel="icon" href="./assets/icone-64.png" type="image/png">
   <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
-  <!-- Links antigos e retornos de login (/#/..., ?code=, #access_token=) seguem para o app em /app -->
+  <!-- Links antigos e retornos de login (/#/..., ?code=, #access_token=) seguem para o app em /app; quem já entrou vai direto (?lp mostra a página) -->
   <script>if(/^#\/|access_token|error_description/.test(location.hash)||/[?&](code|error)=/.test(location.search))location.replace("/app"+location.search+location.hash);else try{if(!/[?&]lp\b/.test(location.search)&&/"logado":true/.test(localStorage.getItem("fitai-state-v1")||""))location.replace("/app")}catch(e){}</script>
-  <!-- Primeira pintura: a cor de fundo do tema e o estilo crítico do hero vêm aqui, antes da folha do site (que vem em
-       <link> e segura a pintura até chegar; nunca pelo JS). ?tema=osso|brasa|cobalto|mono troca a paleta.
-       Os textos que entram por marco só se escondem com o JS no ar (classe .js): se ele não subir em 4 s, a trava
-       cai e a página aparece inteira. -->
-  <script>
-    (function () {
-      var d = document.documentElement;
-      var FUNDOS = { carvao: '#070707', mono: '#070707', osso: '#e9e6df', brasa: '#f01810', cobalto: '#1b3bff' };
-      var tema = new URLSearchParams(location.search).get('tema');
-      if (!FUNDOS[tema]) tema = 'carvao';
-      d.dataset.tema = tema;
-      d.style.backgroundColor = FUNDOS[tema];
-      document.querySelector('meta[name="theme-color"]').content = FUNDOS[tema];
-      d.classList.add('js');
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) d.classList.add('reduzido');
-      setTimeout(function () { if (!window.__kiloViva) { d.classList.remove('js'); d.classList.add('sem-peca'); } }, 4000);
-    })();
-  </script>
-  <style>html{color:#f2f0ea;background:#070707}body{margin:0}.js .marco,.js .sobe{opacity:0}</style>
-  <!-- sem JavaScript: um anel desenhado no lugar do "O" que a peça 3D ocuparia -->
-  <noscript><style>.vaga--o,.vaga--rodape{border-radius:50%;box-shadow:inset 0 0 0 .24em}</style></noscript>
-  <script type="module" crossorigin src="./lp/index-Bnb6GbLX.js"></script>
-  <link rel="stylesheet" crossorigin href="./lp/index-B-A_9NYo.css">
-  <link rel="stylesheet" href="./lp-classes.css">
+  <link rel="preload" href="./lp-rpg/pixelify-sans-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./lp-rpg/rpg.css">
 </head>
 <body>
-  <a class="pular" href="#sobre">Pular para o conteúdo</a>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
 
-  <header class="barra">
-  <a class="barra__marca" href="#topo" aria-label="FIT.AI, voltar ao início">
-    <span aria-hidden="true">Fit</span><svg class="barra__o barra__ponto" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" fill="currentColor"/></svg><span aria-hidden="true">AI</span>
-  </a>
-  <nav class="barra__links" aria-label="Seções">
-    <a href="#modalidades" data-secao="modalidades">Como funciona</a>
-    <a href="#estrutura" data-secao="estrutura">Trilhas</a>
-    <a href="#planos" data-secao="planos">O app</a>
-    <a href="#horarios" data-secao="horarios">Sua semana</a>
-    <a href="#duvidas" data-secao="duvidas">Dúvidas</a>
-  </nav>
-  <a class="barra__cta" href="/app">Abrir o app</a>
-</header>
+  <header class="topo" data-topo>
+    <a class="marca" href="#inicio" aria-label="FIT.AI, início"><img src="./assets/icone-64.png" alt="" width="32" height="32"><span>FIT.AI</span></a>
+    <nav class="menu" aria-label="Seções">
+      <a href="#jornada">Como funciona</a><a href="#mestres">Mestres</a><a href="#evolucao">Classes</a><a href="#trilhas">Trilhas</a><a href="#duvidas">Dúvidas</a>
+    </nav>
+    <a class="btn btn--ouro btn--p" href="./app">Jogar agora</a>
+  </header>
 
-
-  <main>
-    <section class="hero" id="topo">
-  <div class="hero__palco">
-    <h1 class="hero__titulo">
-      <span class="mascara"><span class="sobe hero__l1" style="--i:0"><span>Mais</span> <span>um</span></span></span>
-      <span class="mascara"><span class="sobe" style="--i:1">Trein<span class="vaga vaga--o" data-vaga="hero" data-forma="anilha" data-pose="-10 20 0"><span class="so-leitor">o</span></span></span></span>
-    </h1>
-    <div class="hero__pe">
-      <p class="hero__texto marco" style="--i:4">Um coach de IA que monta o seu treino de academia, calistenia, corrida ou cross, acompanha cada série e transforma a sua constância em XP, níveis e conquistas.</p>
-      <div class="hero__acoes marco" style="--i:5">
-        <a class="botao botao--cheio" href="/app">Começar agora<svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>
-        <a class="botao botao--linha" href="#modalidades">Ver como funciona</a>
-      </div>
-    </div>
-  </div>
-  <ul class="hero__fatos marco" style="--i:6">
-    <li>No celular e no computador <b>sem instalar nada</b></li>
-    <li>Coach de IA <b>a qualquer hora</b></li>
-  </ul>
-</section>
-
-
-    <section class="manifesto secao" id="sobre">
-  <div class="miolo">
-    <h2 class="manifesto__texto" data-acende>
-      <span class="vaga vaga--capitular" data-vaga="manifesto" data-forma="anilha" data-pose="-24 -34 10" data-voo="0.05 0.84"></span>O FIT.AI nasceu de um caderno de treino. Hoje ele tem um coach que conversa com você, monta a ficha, lê o quadro do box e o print da sua corrida, e conta cada série. Ninguém precisa de motivação todo dia: precisa só de mais um treino.
-    </h2>
-  </div>
-</section>
-
-
-    <section class="mod" id="modalidades" data-cena aria-labelledby="mod-titulo">
-  <div class="mod__palco" data-palco>
-    <div class="mod__quadro" data-passo-atual="0">
-      <h2 class="rotulo mod__rotulo" id="mod-titulo">Como funciona</h2>
-
-      <div class="mod__faixa" aria-hidden="true">
-        <div class="mod__nums">
-          <span class="mod__giga is-ativo"><span>01</span></span>
-          <span class="mod__giga"><span>02</span></span>
-          <span class="mod__giga"><span>03</span></span>
-        </div>
-        <div class="mod__nomes">
-          <span class="mod__giga is-ativo"><span>Coach</span></span>
-          <span class="mod__giga"><span>XP</span></span>
-          <span class="mod__giga"><span>Grupo</span></span>
-        </div>
-      </div>
-
-      <!-- a peça pousa aqui e troca de forma a cada modalidade (uma forma por passo, na ordem) -->
-      <span class="vaga vaga--mod" data-vaga="modalidades" data-formas="halter kettlebell saco" data-preso></span>
-
-      <div class="mod__baixo">
-        <div class="mod__textos">
-          <article class="mod__passo is-ativo">
-            <h3>Um treinador de IA no bolso</h3>
-            <p>O Coach faz uma entrevista rápida (objetivo, nível, dias, onde você treina) e monta o plano. Depois acompanha cada série, compara com o treino anterior e revisa a ficha toda semana.</p>
-          </article>
-          <article class="mod__passo">
-            <h3>Constância que vira nível</h3>
-            <p>Cada treino, recorde, meta de água e semana batida vale XP. Você sobe de nível, troca de classe (de Recruta a Imortal) e se forma em cada etapa da trilha.</p>
-          </article>
-          <article class="mod__passo">
-            <h3>Treinar junto, mesmo longe</h3>
-            <p>Monte um grupo com os amigos, veja quem treinou hoje e dispute o ranking de XP. Cole o link de um reel e o Coach transforma o vídeo no desafio da semana.</p>
-          </article>
-        </div>
-        <div class="mod__listas">
-          <ul class="mod__lista is-ativo">
-            <li style="--i:0">Ficha montada no chat</li>
-            <li style="--i:1">Animação dos exercícios</li>
-            <li style="--i:2">Foto do quadro do box vira WOD</li>
-            <li style="--i:3">Print da corrida vira treino</li>
-            <li style="--i:4">Revisão semanal do plano</li>
-          </ul>
-          <ul class="mod__lista">
-            <li style="--i:0">50 níveis e 10 classes</li>
-            <li style="--i:1">46 conquistas</li>
-            <li style="--i:2">Formatura por etapa</li>
-            <li style="--i:3">Recordes e Max Out</li>
-            <li style="--i:4">Meta da semana</li>
-          </ul>
-          <ul class="mod__lista">
-            <li style="--i:0">Ranking de XP</li>
-            <li style="--i:1">Desafio da semana</li>
-            <li style="--i:2">Feed com fotos</li>
-            <li style="--i:3">Bot no Telegram</li>
-            <li style="--i:4">Convite por link</li>
-          </ul>
-        </div>
-        <div class="mod__nav">
-          <button class="mod__ir" type="button" data-ir="-1" aria-label="Anterior" disabled>
-            <svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8H3M7 3.5 2.5 8 7 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Anterior</span>
-          </button>
-          <button class="mod__ir" type="button" data-ir="1" aria-label="Próxima">
-            <span>Próxima</span><svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-    <section class="classes" id="classes" data-classes aria-labelledby="classes-titulo">
-  <div class="gc-shell" aria-roledescription="carrossel" aria-label="Classes do FIT.AI">
-    <div class="gc-atmosphere" aria-hidden="true"></div>
-    <header class="classes__cabeca">
-      <span class="rotulo">Classes</span>
-      <h2 class="classes__titulo" id="classes-titulo">Seu treino vira classe</h2>
-      <p class="classes__lead">O app olha o que você treinou e te dá a classe que combina com isso.</p>
-      <div class="classes__sexo" role="group" aria-label="Arte das cartas">
-        <button type="button" data-sexo="m" aria-pressed="true">Herói</button>
-        <button type="button" data-sexo="f" aria-pressed="false">Heroína</button>
-      </div>
-    </header>
-    <div class="gc-stage"><div class="gc-floor" aria-hidden="true"></div></div>
-    <div class="gc-bottom">
-      <div class="gc-active-info"><h2>Ninja</h2><p></p></div>
-      <div class="gc-dock" role="group" aria-label="Controles do carrossel">
-        <span class="gc-position" aria-hidden="true"><span>01</span><span>/</span><span>06</span></span>
-        <div class="gc-transport">
-          <button type="button" data-ant aria-label="Anterior"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
-          <button type="button" class="gc-play-toggle" aria-label="Tocar o carrossel" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path class="toca" d="M6 4l14 8-14 8z"/><path class="pausa" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
-          <button type="button" data-prox aria-label="Próximo"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
-        </div>
-      </div>
-      <p class="gc-hint">Arraste para explorar ou use ← → para navegar</p>
-    </div>
-    <p class="gc-sr-only" aria-live="polite" aria-atomic="true"></p>
-    <dialog class="gc-dialog" aria-labelledby="classes-carta-titulo">
-      <div class="gc-dialog-panel">
-        <div class="gc-dialog-bar"><span><i></i> Carta da classe</span><button type="button" data-fechar>✕ Fechar</button></div>
-        <div class="gc-carta">
-          <img alt="">
-          <div class="gc-dialog-caption">
-            <h2 id="classes-carta-titulo"></h2>
-            <p data-liga></p>
-            <p data-desc></p>
-            <div class="gc-regra"><b>Como virar</b><p data-regra></p></div>
-            <a class="gc-external" href="./app">Descobrir a minha classe →</a>
+  <main id="conteudo">
+    <!-- HERO -->
+    <section class="hero" id="inicio">
+      <div class="hero__cena" aria-hidden="true"></div>
+      <div class="hero__miolo">
+        <div class="hero__txt">
+          <p class="kicker">[ SISTEMA ] · Treino RPG com Coach de IA</p>
+          <h1 class="pixel">Seu treino<br>vira <em>aventura</em>.</h1>
+          <p class="hero__sub">Escolha seu mestre, ganhe XP a cada série e evolua de <b>Recruta</b> a <b>Imortal</b>. Um coach de IA monta o seu treino e acompanha cada repetição.</p>
+          <div class="hero__ctas">
+            <a class="btn btn--ouro" href="./app">▶ Começar a jornada</a>
+            <a class="btn btn--vidro" href="#jornada">Ver como funciona</a>
           </div>
+          <ul class="hero__selos"><li>Grátis</li><li>Sem instalar</li><li>Celular e computador</li></ul>
+        </div>
+        <figure class="hero__heroi" aria-label="Personagem do FIT.AI">
+          <div class="palco"><img class="sprite" data-hero-sprite src="./assets/estilos/sprites/ninja-m-recruta.webp" alt="Kenji, o mestre Ninja, em pixel art animado" width="376" height="716"></div>
+          <figcaption class="hero__quem"><span class="pixel" data-hero-nome>Kenji</span><small data-hero-estilo>Ninja · Recruta</small></figcaption>
+        </figure>
+      </div>
+      <div class="hud" aria-hidden="true"><span>LV 1</span><span class="hud__barra"><i></i></span><span>+2 XP por série</span></div>
+    </section>
+
+    <!-- MANIFESTO -->
+    <section class="faixa">
+      <p>Ninguém precisa de motivação todo dia. Precisa só de <b>mais um treino</b>. O FIT.AI transforma cada um deles em XP, cartas e conquistas.</p>
+    </section>
+
+    <!-- JORNADA -->
+    <section class="secao" id="jornada">
+      <header class="secao__cab"><p class="kicker">Como funciona</p><h2 class="pixel">A jornada em 3 fases</h2></header>
+      <ol class="fases">
+        <li class="fase">
+          <span class="fase__n pixel">01</span>
+          <img class="fase__tela" src="./lp-rpg/telas/perfil.webp" alt="Tela do perfil com a carta do personagem" loading="lazy" width="540" height="1169">
+          <div><h3>Crie seu herói</h3><p>Um quiz rápido define seu objetivo e seu nível. No fim, você recebe a <b>ficha de atleta</b> (força, agilidade, resistência e disciplina) e conhece o <b>mestre</b> que vai te conduzir.</p></div>
+        </li>
+        <li class="fase">
+          <span class="fase__n pixel">02</span>
+          <img class="fase__tela" src="./lp-rpg/telas/treino.webp" alt="Tela de treino do dia com o personagem" loading="lazy" width="540" height="1169">
+          <div><h3>Treine e ganhe XP</h3><p>O <b>Coach de IA</b> monta o treino no chat e acompanha cada série. Cada série anotada vale XP na hora. As <b>missões do dia</b> renovam à meia-noite.</p></div>
+        </li>
+        <li class="fase">
+          <span class="fase__n pixel">03</span>
+          <img class="fase__tela" src="./lp-rpg/telas/album.webp" alt="Álbum de cartas com as classes conquistadas" loading="lazy" width="540" height="1169">
+          <div><h3>Evolua de classe</h3><p>A cada 5 níveis seu personagem troca de classe e ganha uma <b>carta nova</b> para o álbum. São 10 classes e 60 cartas para colecionar.</p></div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- MESTRES -->
+    <section class="secao secao--noite" id="mestres">
+      <header class="secao__cab"><p class="kicker">Escolha seu caminho</p><h2 class="pixel">Seis mestres, seis estilos</h2>
+        <p>O app olha o que você realmente treina e te dá o estilo que combina com isso. Cada estilo tem seu mestre e sua mestra.</p>
+        <div class="seletor" role="group" aria-label="Versão das cartas"><button type="button" data-sexo="m" aria-pressed="true">Mestres</button><button type="button" data-sexo="f" aria-pressed="false">Mestras</button></div>
+      </header>
+      <ul class="mestres" data-mestres></ul>
+    </section>
+
+    <!-- EVOLUÇÃO -->
+    <section class="secao" id="evolucao">
+      <header class="secao__cab"><p class="kicker">De Recruta a Imortal</p><h2 class="pixel">Veja seu personagem evoluir</h2>
+        <p>Escolha um estilo e passe pelas 10 classes. É o mesmo personagem que aparece animado no topo do seu app.</p></header>
+      <div class="evo" data-evo>
+        <div class="evo__palco"><div class="palco palco--claro"><img class="sprite" data-evo-sprite alt="" width="376" height="716"></div><img class="evo__carta" data-evo-carta alt="" width="600" height="900" loading="lazy"></div>
+        <div class="evo__ctrl">
+          <div class="chips" data-evo-estilos></div>
+          <p class="evo__classe"><span class="pixel" data-evo-nome>Recruta</span><small data-evo-nivel>Níveis 1 a 5</small></p>
+          <input class="evo__range" type="range" min="0" max="9" value="0" step="1" data-evo-range aria-label="Classe">
+          <div class="evo__marcas" aria-hidden="true"><span>Recruta</span><span>Imortal</span></div>
+          <ul class="numeros"><li><b class="pixel">50</b><small>níveis</small></li><li><b class="pixel">10</b><small>classes</small></li><li><b class="pixel">60</b><small>cartas</small></li></ul>
         </div>
       </div>
-    </dialog>
-  </div>
-</section>
+    </section>
 
-
-    <section class="estrutura secao" id="estrutura">
-  <div class="miolo">
-    <header class="secao__cabeca estrutura__cabeca">
-      <h2 class="titulo"><span class="mascara"><span class="sobe">Seis trilhas,</span></span><span class="mascara"><span class="sobe" style="--i:1">um XP só</span></span></h2>
-      <span class="vaga vaga--estrutura" data-vaga="estrutura" data-forma="bola"></span>
-    </header>
-    <div class="estrutura__fotos">
-      <figure class="foto marco" style="--i:0">
-        <div class="foto__quadro"><img src="./fotos/corrida.webp" alt="Zion, o Batedor, correndo numa trilha ao entardecer" width="900" height="1125" loading="lazy" decoding="async"></div>
-        <figcaption>Corrida e híbrido</figcaption>
-      </figure>
-      <figure class="foto foto--alta marco" style="--i:1">
-        <div class="foto__quadro"><img src="./fotos/academia.webp" alt="Lívia, a Gladiadora, no fim de um levantamento terra" width="900" height="1200" loading="lazy" decoding="async"></div>
-        <figcaption>Academia</figcaption>
-      </figure>
-      <figure class="foto marco" style="--i:2">
-        <div class="foto__quadro"><img src="./fotos/calistenia.webp" alt="Mei, a Monge, na barra fixa diante das montanhas" width="900" height="1125" loading="lazy" decoding="async"></div>
-        <figcaption>Calistenia</figcaption>
-      </figure>
-    </div>
-    <dl class="estrutura__numeros">
-      <div class="marco" style="--i:0"><dt>6</dt><dd>trilhas: Insanos, Academia, Calistenia, Cross, Híbridos e Corrida</dd></div>
-      <div class="marco" style="--i:1"><dt>187</dt><dd>exercícios que o Coach usa para montar o seu plano</dd></div>
-      <div class="marco" style="--i:2"><dt>100+</dt><dd>animações de execução, muitas com o certo e o errado</dd></div>
-      <div class="marco" style="--i:3"><dt>46</dt><dd>conquistas, da primeira série à meia maratona</dd></div>
-    </dl>
-  </div>
-</section>
-
-
-    <section class="telas secao" id="planos">
-  <div class="miolo">
-    <header class="secao__cabeca telas__cabeca">
-      <h2 class="titulo"><span class="mascara"><span class="sobe">Por dentro</span></span><span class="mascara"><span class="sobe" style="--i:1">do app</span></span></h2>
-      <p class="secao__sub marco" style="--i:2">Telas de verdade do FIT.AI no celular. Por enquanto, é tudo gratuito.</p>
-      <span class="vaga vaga--telas" data-vaga="telas" data-forma="kettlebell" data-pose="10 -24 0"></span>
-    </header>
-    <div class="telas__trilho">
-      <figure class="tela marco" style="--i:0">
-        <div class="tela__moldura"><img src="./telas/coach.webp" alt="Chat do Coach AI respondendo quanto falta para o próximo nível" width="600" height="1298" loading="lazy" decoding="async"></div>
-        <figcaption><b>Coach AI</b><span>Responde com os seus números: XP, cargas e o treino de hoje.</span></figcaption>
-      </figure>
-      <figure class="tela marco" style="--i:1">
-        <div class="tela__moldura"><img src="./telas/nivel.webp" alt="Card de nível com a classe Guerreiro e a etapa da trilha" width="600" height="1298" loading="lazy" decoding="async"></div>
-        <figcaption><b>Nível e trilha</b><span>Nível, classe e a etapa da trilha, com formatura.</span></figcaption>
-      </figure>
-      <figure class="tela marco" style="--i:2">
-        <div class="tela__moldura"><img src="./telas/treino.webp" alt="Exercício de agachamento com a animação de execução certa" width="600" height="1298" loading="lazy" decoding="async"></div>
-        <figcaption><b>Treino com animação</b><span>Cada série anotada, com a execução certa e a errada.</span></figcaption>
-      </figure>
-      <figure class="tela marco" style="--i:3">
-        <div class="tela__moldura"><img src="./telas/conquistas.webp" alt="Grade de conquistas ganhas e em andamento" width="600" height="1298" loading="lazy" decoding="async"></div>
-        <figcaption><b>Conquistas</b><span>46 medalhas, do primeiro treino à meia maratona.</span></figcaption>
-      </figure>
-      <figure class="tela marco" style="--i:4">
-        <div class="tela__moldura"><img src="./telas/grupo.webp" alt="Ranking da semana do grupo com os níveis de cada pessoa" width="600" height="1298" loading="lazy" decoding="async"></div>
-        <figcaption><b>Grupo</b><span>Ranking da semana e meta coletiva com os amigos.</span></figcaption>
-      </figure>
-      <figure class="tela marco" style="--i:5">
-        <div class="tela__moldura"><img src="./telas/home.webp" alt="Tela inicial com o treino de hoje e o envio do print da corrida" width="600" height="1298" loading="lazy" decoding="async"></div>
-        <figcaption><b>Início</b><span>O treino do dia e o print da corrida a um toque.</span></figcaption>
-      </figure>
-    </div>
-  </div>
-</section>
-
-
-    <section class="horarios secao" id="horarios">
-  <div class="miolo horarios__miolo">
-    <header class="secao__cabeca horarios__cabeca">
-      <h2 class="titulo"><span class="mascara"><span class="sobe">A sua semana,</span></span><span class="mascara"><span class="sobe" style="--i:1">montada no chat</span></span></h2>
-      <p class="secao__sub marco" style="--i:2">Um exemplo de semana do programa Corrida e Híbrido: o Coach mistura corrida e força nos dias que você escolheu e ajusta tudo pela sua evolução.</p>
-      <span class="vaga vaga--horarios" data-vaga="horarios" data-forma="cronometro"></span>
-    </header>
-    <div class="grade marco" style="--i:2">
-      <div class="grade__dias" role="tablist" aria-label="Dia da semana">
-        <button class="grade__dia" type="button" role="tab" data-dia="seg">Seg</button>
-        <button class="grade__dia" type="button" role="tab" data-dia="ter">Ter</button>
-        <button class="grade__dia" type="button" role="tab" data-dia="qua">Qua</button>
-        <button class="grade__dia" type="button" role="tab" data-dia="qui">Qui</button>
-        <button class="grade__dia" type="button" role="tab" data-dia="sex">Sex</button>
-        <button class="grade__dia" type="button" role="tab" data-dia="sab">Sáb</button>
+    <!-- MISSÕES -->
+    <section class="secao secao--noite" id="missoes">
+      <header class="secao__cab"><p class="kicker">Todo dia tem quest</p><h2 class="pixel">Missões, desafios e duplas</h2></header>
+      <div class="quests">
+        <article class="quest"><span class="quest__ic">📜</span><h3>Missões do dia</h3><p>Treino do dia, água, abdômen e o desafio da semana. Cumpra todas e ganhe bônus de XP.</p></article>
+        <article class="quest quest--destaque"><img src="./lp-rpg/telas/recruta.webp" alt="Tela do Desafio do Recruta" loading="lazy" width="540" height="1169"><div><span class="quest__ic">🪖</span><h3>Desafio do Recruta</h3><p>7 dias, sem academia: Despertar, Dungeon e o chefe final, o <b>Sargento de Ferro</b>. Quem completa ganha o título de Recruta Forjado.</p></div></article>
+        <article class="quest"><span class="quest__ic">🤝</span><h3>Desafio em dupla</h3><p>Convide alguém do grupo, encarem os 7 dias juntos e acompanhem o progresso um do outro.</p></article>
+        <article class="quest"><span class="quest__ic">🏆</span><h3>Ranking da semana</h3><p>No grupo de amigos, quem fizer mais XP de segunda a domingo fica no topo. Zera toda segunda.</p></article>
+        <article class="quest"><span class="quest__ic">🏅</span><h3>Conquistas</h3><p>Do primeiro treino à maratona, de 100 m de subida ao Hyrox: cada marco acende um selo, vale XP e aparece sozinho no mural do grupo.</p></article>
       </div>
-      <ol class="grade__aulas" role="tabpanel" aria-live="polite"></ol>
-    </div>
-  </div>
-</section>
+    </section>
 
+    <!-- TRILHAS -->
+    <section class="secao" id="trilhas">
+      <header class="secao__cab"><p class="kicker">Seis trilhas, um XP só</p><h2 class="pixel">Treine do seu jeito</h2>
+        <p>Dá para trocar de trilha quando quiser, sem perder o XP.</p></header>
+      <ul class="trilhas">
+        <li class="trilha"><img src="./assets/cards/cardio-2.jpg" alt="Kenji, o mestre Ninja, num polichinelo ao pôr do sol" loading="lazy" width="1200" height="675"><div><span class="tag">🥷 Ninja</span><h3>Insanos</h3><p>MAX:30 e depois o Insanity. Vídeos em casa, Max Out a cada treino.</p></div></li>
+        <li class="trilha"><img src="./assets/cards/academia-peito.jpg" alt="Tito, o mestre Gladiador, no supino" loading="lazy" width="1200" height="675"><div><span class="tag">🛡️ Gladiador</span><h3>Academia</h3><p>O Coach monta a ficha, sugere a carga de cada dia e mostra o 1RM estimado.</p></div></li>
+        <li class="trilha"><img src="./assets/cards/calistenia-barra.jpg" alt="Mei, a mestra Monge, na barra fixa" loading="lazy" width="1200" height="675"><div><span class="tag">🥋 Monge</span><h3>Calistenia</h3><p>21 dias no seu nível e depois o Treino da Fera, com barra e paralelas.</p></div></li>
+        <li class="trilha"><img src="./assets/cards/cross-1.jpg" alt="Freya, a mestra Berserker, no kettlebell swing" loading="lazy" width="1200" height="675"><div><span class="tag">🪓 Berserker</span><h3>Cross</h3><p>Tire uma foto do quadro do box e o WOD vira treino, com cronômetro e PRs.</p></div></li>
+        <li class="trilha"><img src="./assets/cards/corrida-1.jpg" alt="Kaya, a mestra Batedora, correndo na trilha" loading="lazy" width="1200" height="675"><div><span class="tag">🏹 Batedor</span><h3>Corrida</h3><p>Mande o print do Strava ou do relógio: distância, ritmo e subida viram XP.</p></div></li>
+        <li class="trilha"><img src="./assets/cards/hibrido-1.jpg" alt="Ayame, a mestra Ronin, na encruzilhada" loading="lazy" width="1200" height="675"><div><span class="tag">⚔️ Ronin</span><h3>Híbridos</h3><p>Corrida, força e vídeos combinados. Hyrox e corrida com obstáculos contam.</p></div></li>
+      </ul>
+    </section>
 
-    <section class="duvidas secao" id="duvidas">
-  <div class="miolo duvidas__miolo">
-    <header class="secao__cabeca duvidas__cabeca">
-      <h2 class="titulo"><span class="mascara"><span class="sobe">Antes</span></span><span class="mascara"><span class="sobe" style="--i:1">de começar</span></span></h2>
-      <span class="vaga vaga--duvidas" data-vaga="duvidas" data-forma="halter" data-pose="8 -22 -30"></span>
-    </header>
-    <div class="duvidas__lista">
-      <details class="duvida marco" style="--i:0" open>
-        <summary><span>Quanto custa?</span><i aria-hidden="true"></i></summary>
-        <div class="duvida__corpo"><p>Por enquanto, nada: o FIT.AI é gratuito. Crie a sua conta e comece pela trilha que quiser.</p></div>
-      </details>
-      <details class="duvida marco" style="--i:1">
-        <summary><span>Preciso instalar alguma coisa?</span><i aria-hidden="true"></i></summary>
-        <div class="duvida__corpo"><p>Não. O FIT.AI abre no navegador do celular ou do computador. Você entra com o Google ou com e-mail e senha, e os treinos ficam salvos na sua conta, em qualquer aparelho.</p></div>
-      </details>
-      <details class="duvida marco" style="--i:2">
-        <summary><span>Como o Coach monta o meu treino?</span><i aria-hidden="true"></i></summary>
-        <div class="duvida__corpo"><p>Ele faz uma entrevista curta no chat (objetivo, nível, dias, tempo, onde você treina e se tem alguma dor) e monta o plano com exercícios do catálogo, cada um com dica de execução. Toda semana ele revisa com base no que você registrou.</p></div>
-      </details>
-      <details class="duvida marco" style="--i:3">
-        <summary><span>Funciona com o Strava ou com o meu relógio?</span><i aria-hidden="true"></i></summary>
-        <div class="duvida__corpo"><p>Mande o print da corrida, da pedalada ou da caminhada (Strava, Garmin, Nike Run, relógio ou esteira). A IA lê distância, tempo e ritmo, você confere e a atividade vira treino e XP.</p></div>
-      </details>
-      <details class="duvida marco" style="--i:4">
-        <summary><span>Treino no box de CrossFit. Serve para mim?</span><i aria-hidden="true"></i></summary>
-        <div class="duvida__corpo"><p>Serve. Tire uma foto do quadro e o FIT.AI lança o WOD do dia, com cronômetro de For Time, AMRAP, EMOM e Tabata, resultado RX ou Scaled e os seus PRs.</p></div>
-      </details>
-      <details class="duvida marco" style="--i:5">
-        <summary><span>Quem vê os meus dados?</span><i aria-hidden="true"></i></summary>
-        <div class="duvida__corpo"><p>Os treinos aparecem para o seu grupo só se você entrar em um. As fotos de evolução corporal ficam só com você.</p></div>
-      </details>
-    </div>
-  </div>
-</section>
+    <!-- COACH -->
+    <section class="secao secao--noite coach" id="coach">
+      <div class="coach__txt">
+        <p class="kicker">O mestre de verdade</p><h2 class="pixel">Um Coach de IA no bolso</h2>
+        <p>Ele conversa com você, conhece os seus números e responde na hora: o treino de hoje, a carga certa, quanto falta para a próxima classe.</p>
+        <ul class="lista">
+          <li>Monta a ficha numa conversa rápida no chat</li>
+          <li>Lê o print da corrida e a foto do quadro do box</li>
+          <li>Sugere a carga de cada exercício pela sua última vez</li>
+          <li>Pesagem da semana com peso e medidas</li>
+          <li>Também atende no Telegram</li>
+        </ul>
+        <a class="btn btn--ouro" href="./app">Falar com o Coach</a>
+      </div>
+      <img class="coach__tela" src="./lp-rpg/telas/home.webp" alt="Tela inicial do FIT.AI com o personagem animado e o treino do dia" loading="lazy" width="540" height="1169">
+    </section>
 
+    <!-- TELAS -->
+    <section class="secao" id="telas">
+      <header class="secao__cab"><p class="kicker">Por dentro do app</p><h2 class="pixel">Telas de verdade</h2></header>
+      <div class="telas" tabindex="0" aria-label="Telas do app (role para o lado)">
+        <figure><img src="./lp-rpg/telas/home.webp" alt="Início" loading="lazy" width="540" height="1169"><figcaption>Início com o seu personagem</figcaption></figure>
+        <figure><img src="./lp-rpg/telas/perfil.webp" alt="Perfil" loading="lazy" width="540" height="1169"><figcaption>Sua carta e sua classe</figcaption></figure>
+        <figure><img src="./lp-rpg/telas/treino.webp" alt="Treino" loading="lazy" width="540" height="1169"><figcaption>Treino do dia</figcaption></figure>
+        <figure><img src="./lp-rpg/telas/recruta.webp" alt="Desafio do Recruta" loading="lazy" width="540" height="1169"><figcaption>Desafio do Recruta</figcaption></figure>
+        <figure><img src="./lp-rpg/telas/album.webp" alt="Álbum de cartas" loading="lazy" width="540" height="1169"><figcaption>Álbum de cartas</figcaption></figure>
+        <figure><img src="./lp-rpg/telas/grupo.webp" alt="Grupo" loading="lazy" width="540" height="1169"><figcaption>Ranking do grupo</figcaption></figure>
+      </div>
+    </section>
 
-    <section class="contato secao" id="contato" data-fecho>
-  <div class="miolo contato__miolo">
-    <header class="contato__cabeca">
-      <h2 class="titulo contato__titulo"><span class="mascara"><span class="sobe">O próximo treino</span></span><span class="mascara"><span class="sobe" style="--i:1">começa agora</span></span></h2>
-      <p class="secao__sub marco" style="--i:2">Abra o app, escolha a sua trilha e responda às perguntas do Coach. Em dois minutos o seu plano está pronto.</p>
-      <span class="vaga vaga--contato" data-vaga="contato" data-forma="anilha" data-pose="-12 24 0" data-voo="0.6 1"></span>
-    </header>
-    <div class="comecar marco" style="--i:2">
-      <ol class="comecar__passos">
-        <li><b>01</b><span>Entre com o Google ou com e-mail</span></li>
-        <li><b>02</b><span>Escolha a trilha: Insanos, Academia, Calistenia, Cross, Híbridos ou Corrida</span></li>
-        <li><b>03</b><span>Responda ao Coach e faça o primeiro treino</span></li>
-      </ol>
-      <a class="botao botao--cheio botao--largo" href="/app">Abrir o FIT.AI<svg class="seta" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>
-    </div>
-  </div>
-</section>
+    <!-- DÚVIDAS -->
+    <section class="secao secao--noite" id="duvidas">
+      <header class="secao__cab"><p class="kicker">Antes de começar</p><h2 class="pixel">Dúvidas</h2></header>
+      <div class="faq">
+        <details><summary>Quanto custa?</summary><p>Por enquanto, nada: o FIT.AI é gratuito. Crie a sua conta e comece pela trilha que quiser.</p></details>
+        <details><summary>Preciso instalar alguma coisa?</summary><p>Não. O FIT.AI abre no navegador do celular ou do computador. Você entra com o Google ou com e-mail e senha, e tudo fica salvo na sua conta.</p></details>
+        <details><summary>Como eu ganho XP?</summary><p>Cada série anotada, treino concluído, recorde, missão do dia, meta de água e semana batida vale XP. A cada 5 níveis o seu personagem troca de classe.</p></details>
+        <details><summary>Como o app escolhe meu estilo?</summary><p>Pelo que você treina de verdade. Quem vive dos vídeos vira Ninja; calistenia, Monge; academia, Gladiador; corrida, Batedor; cross, Berserker. Quem mistura várias modalidades vira Ronin.</p></details>
+        <details><summary>Funciona com o Strava ou com o meu relógio?</summary><p>Mande o print da corrida, da pedalada ou da caminhada. A IA lê distância, tempo, ritmo e subida, você confere e a atividade vira XP.</p></details>
+        <details><summary>Quem vê os meus dados?</summary><p>Seus treinos aparecem só para os grupos em que você entrar. Peso, medidas e fotos de evolução ficam só com você.</p></details>
+      </div>
+    </section>
 
+    <!-- CTA FINAL -->
+    <section class="final">
+      <div class="final__arte" aria-hidden="true"></div>
+      <div class="final__txt">
+        <p class="kicker">Player 1, pronto?</p>
+        <h2 class="pixel">Sua jornada começa<br>no nível 1</h2>
+        <ol class="passos"><li><b>01</b> Entre com o Google ou com e-mail</li><li><b>02</b> Responda ao quiz e conheça seu mestre</li><li><b>03</b> Faça o primeiro treino e ganhe XP</li></ol>
+        <a class="btn btn--ouro btn--g" href="./app">▶ Press start</a>
+      </div>
+    </section>
   </main>
 
   <footer class="rodape">
-  <div class="rodape__colunas">
-    <div>
-      <p class="rotulo">O app</p>
-      <p>Coach de IA, trilhas com formatura,<br>XP, conquistas e grupos</p>
-    </div>
-    <div>
-      <p class="rotulo">Trilhas</p>
-      <p>Insanos · Academia · Calistenia<br>Cross · Híbridos · Corrida</p>
-    </div>
-    <div>
-      <p class="rotulo">Comece</p>
-      <p><a class="rodape__elo" href="/app">Abrir o app</a><br><a class="rodape__elo" href="#planos">Telas do app</a></p>
-    </div>
-    <nav aria-label="Rodapé">
-      <p class="rotulo">Na página</p>
-      <p><a class="rodape__elo" href="#modalidades">Como funciona</a><br><a class="rodape__elo" href="#estrutura">Trilhas</a><br><a class="rodape__elo" href="#duvidas">Dúvidas</a></p>
-    </nav>
-  </div>
-  <p class="rodape__nome" aria-hidden="true"><span>Fit</span><span class="vaga vaga--rodape" data-vaga="rodape" data-forma="anilha" data-pose="-6 14 0"></span><span>AI</span></p>
-  <p class="rodape__direitos">© 2026 FIT.AI · Feito por Eduardo Torres</p>
-</footer>
-
-
-  <!-- a peça 3D: um canvas só, por cima da página inteira, sem roubar clique -->
-  <canvas class="peca" aria-hidden="true"></canvas>
-<script src="./lp-classes.js" defer></script>
+    <a class="marca" href="#inicio"><img src="./assets/icone-64.png" alt="" width="28" height="28"><span>FIT.AI</span></a>
+    <p>© 2026 FIT.AI · Feito por <a href="https://eduardotorres-dev.com.br" target="_blank" rel="noopener">Eduardo Torres</a></p>
+    <a href="./app">Abrir o app</a>
+  </footer>
+  <script src="./lp-rpg/rpg.js" defer></script>
 </body>
 </html>
