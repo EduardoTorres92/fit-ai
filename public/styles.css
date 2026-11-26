@@ -1772,3 +1772,18 @@ button.alb-it:active { transform: scale(0.96); }
 .avisos-card small { display: block; opacity: .75; font-size: 13px; }
 .avisos-card em { margin-left: auto; font-style: normal; font-weight: 700; color: #ffd23f; }
 .dupla-pop .lnk-btn { align-self: center; }
+
+/* Quiz de entrada: nome e a escolha do caminho (cartas dos mestres) */
+.qz-nome { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.qz-nome input { font: inherit; font-size: 18px; padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(110, 140, 255, .4); background: rgba(14, 24, 66, .72); color: #f4f6ff; }
+.qz-mg { grid-template-columns: 1fr 1fr; max-width: 260px; margin: 4px auto 14px; }
+.qz-mestres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.qz-mestre { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 8px 12px; border: 1px solid rgba(110, 140, 255, .28); border-radius: 18px; background: rgba(14, 24, 66, .72); color: #f4f6ff; font: inherit; text-align: center; cursor: pointer; transition: transform .15s, border-color .2s, box-shadow .2s; }
+.qz-mestre:active { transform: scale(.97); }
+.qz-mestre img { width: 100%; aspect-ratio: 5 / 7; object-fit: cover; border-radius: 12px; margin-bottom: 8px; }
+.qz-mestre b { font-size: 16px; }
+.qz-mestre .qz-m-est { font-size: 12px; opacity: .75; }
+.qz-mestre small { font-size: 12px; line-height: 1.35; opacity: .85; margin-top: 4px; }
+.qz-mestre.rec { border-color: #c9a23a; box-shadow: 0 0 22px rgba(255, 215, 106, .18); }
+.qz-mestre.on { border-color: #4fd2ff; box-shadow: 0 0 0 1px #4fd2ff inset, 0 0 22px rgba(79, 210, 255, .25); }
+.qz-mestre .qz-rec { top: -9px; left: 50%; right: auto; transform: translateX(-50%); white-space: nowrap; z-index: 1; }

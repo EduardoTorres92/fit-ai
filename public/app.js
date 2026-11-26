@@ -418,7 +418,7 @@
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const icon = (f, s = 14) => `<img src="${A(f)}" width="${s}" height="${s}" alt="">`;
   const check = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
-  const primeiroNome = () => (S.user && S.user.primeiro) || "Atleta";
+  const primeiroNome = () => S.apelido || (S.user && S.user.primeiro) || "Atleta";
   const nomeCompleto = () => (S.user && S.user.nome) || "Visitante";
   // Sem foto própria: o avatar da classe atual (Recruta no começo), no lugar da foto genérica
   const fotoPerfil = () => (S.user && S.user.foto) || S.fotoLocal || (() => { try { return avatarClasse(meuNivel().slug || "recruta"); } catch { return "assets/classes/avatar/recruta-m.webp"; } })();
@@ -7032,23 +7032,28 @@
     { k: "dias", kicker: "Frequência", q: "Quantos dias por semana dá para treinar?", op: ["2", "3", "4", "5", "6"].map((n) => [n, "📅", `${n} dias por semana`]) },
     { k: "tempo", kicker: "Tempo", q: "Quanto tempo você tem por treino?", op: [["20", "⏱️", "Até 20 min"], ["30", "⏱️", "30 min"], ["45", "⏱️", "45 min"], ["60", "⏱️", "1 hora ou mais"]] },
     { k: "obst", kicker: "Seus inimigos", q: "O que mais atrapalha o seu treino?", sub: "Pode marcar mais de um.", multi: true, op: [["tempo", "⏳", "Falta de tempo"], ["ritmo", "📉", "Começo e paro"], ["saber", "🤔", "Não sei o que fazer"], ["chato", "😴", "Enjoo do treino"], ["dor", "🩹", "Dor ou lesão"], ["nada", "✅", "Nada, só quero evoluir"]] },
-    { k: "estilo", kicker: "Estilo", q: "O que te faz voltar a treinar?", op: [["videos", "🎬", "Seguir vídeos guiados"], ["cargas", "📈", "Anotar séries e ver a evolução"], ["desafios", "🏆", "Bater tempo e vencer desafios"], ["amigos", "👥", "Treinar junto com os amigos"]] },
   ];
   const qzTxt = (k, v) => QUIZ.find((p) => p.k === k)?.op.find((o) => o[0] === v)?.[2] || v || "—";
   function trilhaSugerida(r) {
     const tem = (k) => !!TRILHAS[k];
     if (r.local === "box") return "cross";
     if ((r.objetivo === "correr" || r.local === "rua") && tem("corrida")) return "corrida";
-    if (r.local === "academia" || r.local === "halteres") return r.estilo === "videos" ? "hibrido" : "academia";
-    if (r.local === "barra") return r.estilo === "videos" ? "hibrido" : "calistenia";
-    return r.estilo === "cargas" ? "calistenia" : "insanos";
+    if (r.local === "academia" || r.local === "halteres" || r.objetivo === "massa") return "academia";
+    if (r.local === "barra" || r.objetivo === "forca") return "calistenia";
+    return "insanos";
   }
+  // Onde dá para treinar em cada caminho (o Cross é sempre no box)
+  const LOCAL_DA_TRILHA = { academia: ["academia", "halteres"], calistenia: ["casa", "barra", "rua"], insanos: ["casa", "rua", "academia"], corrida: ["rua", "casa", "barra", "halteres", "academia"], hibrido: ["casa", "barra", "halteres", "academia", "rua"] };
+  const MESTRE_TXT = { insanos: "HIIT e cardio em vídeo", calistenia: "Peso do corpo: força e habilidades", academia: "Hipertrofia na academia", corrida: "Corrida com fortalecimento", cross: "O WOD do seu box", hibrido: "Vídeos + força, do seu jeito" };
   function quizPassos(modo, r) {
-    const ps = [...QUIZ];
-    if (modo !== "onboarding") return ps;
-    const sug = trilhaSugerida(r);
-    ps.push({ k: "trilha", kicker: "Sua trilha", q: "Por onde você quer começar?", sub: `Pelas suas respostas, ${TRILHAS[sug].nome} combina com você. Dá para trocar depois no Perfil, sem perder o XP.`, semXp: true,
-      op: Object.entries(TRILHAS).sort(([a], [b]) => (b === sug) - (a === sug)).map(([k, x]) => [k, x.ic, x.nome, x.desc, k === sug]) });
+    if (modo !== "onboarding") return [...QUIZ];
+    // Entrada: nome e o básico → escolha do caminho (o mestre) → o resto, já do jeito do caminho escolhido
+    const Q = (k) => QUIZ.find((p) => p.k === k), sug = trilhaSugerida(r);
+    const ps = [{ k: "nome", kicker: "Seu nome de guerra", q: "Como você quer ser chamado?", sub: "É o nome que aparece no ranking e que o seu Sensei vai usar.", semXp: true, texto: true }, Q("sexo"), Q("objetivo"), Q("nivel"),
+      { k: "trilha", kicker: "Escolha seu caminho", q: "Quem vai te treinar?", sub: `Cada mestre conduz um caminho. Pelas suas respostas, ${TRILHAS[sug].nome} combina com você. Dá para trocar depois no Perfil, sem perder o XP.`, semXp: true, mestres: true, sug,
+        op: Object.entries(TRILHAS).sort(([a], [b]) => (b === sug) - (a === sug)).map(([k, x]) => [k, x.ic, x.nome, x.desc, k === sug]) }];
+    if (r.trilha && r.trilha !== "cross") { const L = Q("local"), ok = LOCAL_DA_TRILHA[r.trilha]; ps.push(ok ? { ...L, op: L.op.filter(([v]) => ok.includes(v)) } : L); }
+    ps.push(Q("dias"), Q("tempo"), Q("obst"));
     if (r.trilha === "hibrido" && IA.c21) ps.push({ k: "forca", kicker: "Dias de força", q: "Nos dias de força, você prefere…", semXp: true,
       op: [["hiper", "🏋️", "Academia"], ["c21", "🤸", "Calistenia"]] });
     if (r.trilha && TRILHAS[r.trilha] && etapaAtual(r.trilha).prog === "plano") ps.push({ k: "semana", kicker: "Treino da Fera", q: "Em qual semana do programa você está?", semXp: true,
@@ -7073,23 +7078,43 @@
         <h1 class="qz-q">${esc(p.q)}</h1>
         <p class="qz-meta">Pergunta ${QZ.i + 1} de ${ps.length}${p.semXp ? "" : ` · vale <b>+${QZ_XP} XP</b>`}</p>
         ${p.sub ? `<p class="qz-sub">${esc(p.sub)}</p>` : ""}
-        <div class="qz-ops${p.grade ? " grade" : ""}">${p.op.map(([v, ic, t, sub, rec]) => `<button type="button" class="qz-op${on(v) ? " on" : ""}${rec ? " rec" : ""}" data-qz="${esc(v)}">
-          <span class="qz-ic">${ic}</span><span class="qz-t"><b>${esc(t)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>${rec ? `<span class="qz-rec">Recomendada</span>` : ""}</button>`).join("")}</div>
+        ${p.texto ? `<form class="qz-nome" data-qz-nome><input name="nome" maxlength="30" autocomplete="nickname" value="${esc(sel || S.apelido || S.user?.primeiro || "")}" placeholder="Seu nome ou apelido"><button type="button" class="btn btn-blue qz-ok">Continuar</button></form>`
+        : p.mestres ? qzMestres(p, sel) : `<div class="qz-ops${p.grade ? " grade" : ""}">${p.op.map(([v, ic, t, sub, rec]) => `<button type="button" class="qz-op${on(v) ? " on" : ""}${rec ? " rec" : ""}" data-qz="${esc(v)}">
+          <span class="qz-ic">${ic}</span><span class="qz-t"><b>${esc(t)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>${rec ? `<span class="qz-rec">Recomendada</span>` : ""}</button>`).join("")}</div>`}
         ${p.multi ? `<button type="button" class="btn btn-blue qz-ok" data-qz-ok ${(sel || []).length ? "" : "disabled"}>Continuar</button>` : ""}
       </div>`;
     box.scrollTop = 0;
+  }
+  // "Escolha seu caminho": as cartas dos mestres (mestres ou mestras), cada uma com o seu caminho
+  function qzMestres(p, sel) {
+    const g = QZ.r.mestreG || (QZ.r.sexo === "f" ? "f" : "m");
+    return `<div class="seg qz-mg"><button type="button" class="${g === "m" ? "on" : ""}" data-qz-mg="m">Mestres</button><button type="button" class="${g === "f" ? "on" : ""}" data-qz-mg="f">Mestras</button></div>
+      <div class="qz-mestres">${p.op.map(([k]) => { const e = ESTILO_DA_TRILHA[k], E = ESTILOS[e], T = TRILHAS[k];
+        return `<button type="button" class="qz-mestre${sel === k ? " on" : ""}${k === p.sug ? " rec" : ""}" data-qz="${k}">
+          ${k === p.sug ? `<span class="qz-rec">Recomendado</span>` : ""}<img src="assets/estilos/${e}-${g}.webp" alt="Carta de ${esc(E.mestre[g])}" loading="lazy">
+          <b>${E.ic} ${esc(E.mestre[g])}</b><span class="qz-m-est">${g === "f" ? "Mestra" : "Mestre"} ${esc(E.nome)}</span><small>${T.ic} ${esc(T.nome)} · ${esc(MESTRE_TXT[k] || "")}</small></button>`; }).join("")}</div>`;
   }
   function startQuiz(modo) {
     const box = $("#quiz"); if (!box) return;
     evento("quiz_inicio", { modo });
     QZ = { modo, i: 0, r: modo === "onboarding" ? {} : Object.fromEntries(QUIZ.map((p) => [p.k, S.quiz?.[p.k]]).filter(([, v]) => v !== undefined)), ocupado: false };
     quizRender();
+    box.onsubmit = (e) => { if (e.target.closest("[data-qz-nome]")) { e.preventDefault(); box.querySelector("[data-qz-nome] .qz-ok")?.click(); } };
     box.onclick = (e) => {
       if (!QZ || QZ.ocupado) return;
       const ps = quizPassos(QZ.modo, QZ.r), p = ps[QZ.i];
       if (e.target.closest("[data-qz-voltar]")) {
         if (QZ.i > 0) { QZ.i--; quizRender(); } else location.hash = S.ficha ? "#/ficha" : "#/evolucao";
         return;
+      }
+      const mg = e.target.closest("[data-qz-mg]");
+      if (mg) { QZ.r.mestreG = mg.dataset.qzMg; quizRender(); return; }
+      if (p.texto) {
+        if (!e.target.closest("[data-qz-ok], .qz-ok")) return;
+        e.preventDefault();
+        const v = String(box.querySelector("[data-qz-nome] input")?.value || "").trim().replace(/\s+/g, " ").slice(0, 30);
+        if (!v) { toast("Digite um nome ou apelido."); return; }
+        QZ.r.nome = v; return quizAvancar(p);
       }
       if (e.target.closest("[data-qz-ok]")) return quizAvancar(p);
       const b = e.target.closest("[data-qz]"); if (!b) return;
@@ -7126,6 +7151,9 @@
     S.quiz = { ...Object.fromEntries(QUIZ.map((p) => [p.k, r[p.k]])), em: hojeKey };
     if (modo === "onboarding") {
       S.nivel = r.nivel; S.trilha = r.trilha;
+      S.mestreG = r.mestreG || (r.sexo === "f" ? "f" : "m");
+      if (r.trilha === "cross") S.quiz.local = "box";
+      if (r.nome) { S.apelido = r.nome; if (uid && sb) sb.from("perfis").update({ nome: r.nome }).eq("id", uid).then(({ error }) => { if (!error && S.user) { S.user.nome = r.nome; S.user.primeiro = r.nome.split(" ")[0]; save(); } }); }
       if (r.forca) S.forca = r.forca;
       const at = etapaAtual();
       escolherPrograma(at.prog);
@@ -7222,7 +7250,7 @@
   const DOJO_MOV = Object.fromEntries(DOJO.movimentos.map((m) => [m.id, m]));
   let dojoFiltro = "meu";
   function senseiDe() {
-    const e = estiloAtual().slug || ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], g = sexoArte();
+    const e = ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], g = S.mestreG === "f" || S.mestreG === "m" ? S.mestreG : sexoArte();
     return { e, E, g, nome: E.mestre[g], carta: `assets/estilos/${e}-${g}.webp` };
   }
   function dojoHome() {
@@ -7275,7 +7303,7 @@
     if (q) { const m = DOJO_MOV[q.dataset.djPerguntar]; if (m) openChat(`Sensei, quero acertar a técnica do ${m.nome}. Olhando o meu nível e os meus treinos, qual o ponto que devo cuidar mais e por qual variação começo?`); }
   });
   function mestreHtml() {
-    const e = estiloAtual().slug || ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], T = TRILHAS[trilha()], g = sexoArte(), nome = E.mestre[g];
+    const { e, E, g, nome } = senseiDe(), T = TRILHAS[trilha()];
     return `<div class="fc-mestre">
       <p class="qz-kicker">${g === "f" ? "Sua mestra" : "Seu mestre"}</p>
       <img class="fc-mestre-carta" src="assets/estilos/${e}-${g}.webp" alt="Carta de ${esc(nome)}, ${g === "f" ? "mestra" : "mestre"} ${esc(E.nome)}">
