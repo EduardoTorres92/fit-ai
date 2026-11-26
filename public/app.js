@@ -585,6 +585,7 @@
         ${rec ? `<span class="pill gray">${icon("zap.svg")}${tiro ? "Melhor" : "Máx"} ${rec}${u}</span>` : ""}
       </div>
       ${e.obs ? `<p class="ex-obs">${esc(e.obs)}</p>` : ""}
+      ${mercadoCta(equipDoEx(`${e.id} ${e.nome}`))}
       ${MUSC_EX[e.id] ? muscHtml(MUSC_EX[e.id][1], MUSC_EX[e.id][0], e.nome) : ""}
       ${editavel ? `
       <div class="sets">
@@ -1360,6 +1361,7 @@
       ${plan ? `<div class="hx-plan"><span><small>Recorde</small><b>${fmtKg(plan.rec)} kg</b></span><span><small>1RM estimado</small><b>${fmtKg(plan.rm)} kg</b></span>${meta?.kg ? `<span class="${meta.kg > maxKg(prev.sets) ? "sobe" : ""}"><small>Hoje</small><b>${fmtKg(meta.kg)} kg${meta.kg > maxKg(prev.sets) ? " ↑" : ""}</b></span>` : ""}</div>` : ""}
       ${meta && editavel ? `<p class="hx-meta">🎯 ${esc(meta.txt)}</p>` : ""}
       ${ex.obs ? `<p class="ex-obs">${esc(ex.obs)}</p>` : ""}
+      ${mercadoCta(equipDoEx(`${ex.id} ${c.nome}`, origemEx(pk, ex.id), c))}
       ${animDe(pk, ex.id) ? `<button class="hx-anim" data-ia-anim="${animDe(pk, ex.id)}" aria-label="Ver a animação de ${esc(c.nome)}">
         <img src="assets/anim/${animDe(pk, ex.id)}.jpg" alt="" loading="lazy"><span class="hx-anim-tag">${/^(cal-|corr-|mesa-flexora|cadeira-flexora|cadeira-adutora|panturrilha-sentado|esteira|bike|prancha|abdominal-infra)/.test(animDe(pk, ex.id)) ? "▶ Ver o movimento" : "▶ Certo × errado"}</span></button>` : ""}
       <div class="hx-video">${c.yt ? `<button class="btn btn-outline hx-play" data-ia-play="${ex.id}" data-pk="${pk}">▶ Ver como fazer</button>` : ""}
@@ -1400,7 +1402,7 @@
   function iaRefazerCard(pk, id) {
     const el = document.querySelector(`.ex.hx[data-pk="${pk}"][data-hx-ex="${CSS.escape(id)}"]`), l = iaLogHoje(pk), h = iaHoje(pk);
     const t = l ? iaSessao(pk, l.d, l.w ?? 0) : h ? iaSessao(pk, h.d, h.w) : null, ex = t?.exercicios.find((e) => e.id === id);
-    if (el && ex) el.outerHTML = iaExCard(pk, ex, true, t);
+    if (el && ex) { el.outerHTML = iaExCard(pk, ex, true, t); eqUmPorItem(); }
   }
   function iaGarantirLog(pk) {
     if (!S[pk].logs[hojeKey]) { const h = iaHoje(pk) || { d: hojeDia, w: Math.max(0, iaSemana(pk)) }; S[pk].logs[hojeKey] = { d: h.d, w: h.w, sets: {}, done: false }; }
@@ -1738,6 +1740,7 @@
         ${editavel && !l.done ? cfTimerHtml(i, p) : ""}
       </div>`).join("")}
       ${cfMuscHtml(w)}
+      ${mercadoCta(equipDoEx(w.partes.flatMap((p) => (p.movimentos || []).map((m) => m.nome)).join(" | ")), "Equipamento do WOD", 3)}
       ${w.obs ? `<p class="note">${esc(w.obs)}</p>` : ""}
       ${l.msg ? `<div class="note-box"><p>✨ ${esc(l.msg)}</p></div>` : ""}
     </div>`;
@@ -2709,7 +2712,7 @@
     const el = document.querySelector(`.ex[data-ex="${id}"]`);
     if (!el || !e) return;
     const foco = document.activeElement && el.contains(document.activeElement);
-    el.outerHTML = exCard(e, true);
+    el.outerHTML = exCard(e, true); eqUmPorItem();
     if (foco) document.querySelector(`.ex[data-ex="${id}"] input`)?.focus({ preventScroll: true });
   }
 
@@ -4972,6 +4975,7 @@
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
     app.innerHTML = telas[rota](p1, p2);
+    eqUmPorItem();
     if (rota === "onboarding") startQuiz("onboarding");
     if (rota === "ficha" && $("#quiz")) startQuiz("ficha");
     if (LIGAS_CHEFES && (rota === "home" || rota === "chefes")) setTimeout(chefesNovos, 700);
@@ -7372,6 +7376,31 @@
     S.inventario = invTem(id) ? a : [...a, id];
     save();
   }
+  /* Chamada para o Mercado dentro dos treinos: aparece no exercício que usa um equipamento que a pessoa ainda não
+     marcou no inventário. "Já tenho" marca no inventário; "Mercado" abre o Mercado no item. Com o Passe da Academia,
+     não oferece o que a academia já tem. */
+  const EQ_NOME = [[/kettlebell|\bkb\b|goblet squat/i, "kettlebell"], [/pular corda(?! imagin)|corda de pular|double.?under|single.?under|\bdus?\b|jump.?rope/i, "corda"], [/box.?jump|caixa|box.?step/i, "caixa"],
+    [/wall.?ball|slam|medicine/i, "slamball"], [/argola|\brings?\b/i, "argolas"], [/mini.?band/i, "miniband"], [/roda abdominal|ab.?wheel|rollout/i, "roda"],
+    [/colete|weighted vest/i, "colete"], [/halter|dumbbell/i, "halteres"],
+    [/barra fixa|\bbarra-|core.?barra|na barra|chin.?up|pull.?up|australiana|toes.?to.?bar|chest.?to.?bar|muscle.?up|knees.?to.?elbow|pendurad|hanging|\bdrop-|remada-(aberta|fechada|uma-mao)/i, "barra"],
+    [/paralela|mergulho|\bdips?\b|\bl-?sit/i, "paralelas"]];
+  const NA_ACADEMIA = new Set(["barra", "paralelas", "halteres", "kettlebell", "banco", "caixa", "slamball", "argolas", "corda", "roda", "miniband", "elasticos"]);
+  const origemEx = (pk, id) => pk === "hiper" ? "ac" : (window.FITAI_CORRIDA || []).some((e) => e.id === id) ? "run"
+    : pk === "c21" || (window.FITAI_CAL21 || []).some((e) => e.id === id) ? "cal" : "ac";
+  function equipDoEx(texto, origem, ex) {
+    const ids = new Set();
+    for (const [re, id] of EQ_NOME) if (re.test(texto)) ids.add(id); // o nome tem prioridade (wall ball → slam ball antes do halter)
+    if (ex && origem) for (const x of INV.exige(ex, origem) || []) if (x !== "passe") ids.add(x);
+    return [...ids];
+  }
+  function mercadoCta(ids, titulo = "Precisa de", max = 2) {
+    const passe = invTem("passe");
+    const its = ids.map((id) => INV.ITENS.find((i) => i.id === id)).filter((i) => i && i.link && !invTem(i.id) && !(passe && NA_ACADEMIA.has(i.id))).slice(0, max);
+    if (!its.length) return "";
+    return `<div class="eq-cta">${its.map((i) => `<div class="eq-item" data-eq-item="${i.id}">${i.img ? `<img src="${i.img}" alt="" loading="lazy">` : INV.icone(i.id, "eq-ic")}
+      <span class="eq-txt"><small>${esc(titulo)}</small><b>${esc(i.curto)}</b></span>
+      <button type="button" class="eq-tenho" data-eq-tenho="${i.id}">Já tenho</button><button type="button" class="eq-ver" data-eq-ver="${i.id}">Mercado ›</button></div>`).join("")}</div>`;
+  }
   const VILA = [
     { id: "guilda", nome: "Guilda do Aventureiro", sub: "Seu herói e o arsenal", href: "#/arsenal", x: 27, y: 12.5, w: 47, h: 19 },
     { id: "dojo", nome: "Dojo", sub: "Técnica e execução", href: "#/dojo", x: 2, y: 26, w: 33, h: 22 },
@@ -7447,7 +7476,28 @@
       <p class="mk-nota">Links de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
     </section>`;
   };
+  // Na mesma tela, cada equipamento aparece só no primeiro exercício que o usa (sem repetir a chamada em todo card)
+  function eqUmPorItem() {
+    const vistos = new Set();
+    document.querySelectorAll("#app [data-eq-item]").forEach((el) => {
+      if (!vistos.has(el.dataset.eqItem)) { vistos.add(el.dataset.eqItem); return; }
+      const box = el.parentElement; el.remove(); if (box && !box.children.length) box.remove();
+    });
+  }
   document.addEventListener("click", (e) => {
+    const eqv = e.target.closest?.("[data-eq-ver]");
+    if (eqv) {
+      const it = INV.ITENS.find((x) => x.id === eqv.dataset.eqVer); if (!it) return;
+      mercCat = it.cat; mkSel = it.id; evento("mercado_treino", { item: it.id }); location.hash = "#/mercado"; return;
+    }
+    const eqt = e.target.closest?.("[data-eq-tenho]");
+    if (eqt) {
+      const it = INV.ITENS.find((x) => x.id === eqt.dataset.eqTenho); if (!it) return;
+      if (!invTem(it.id)) invTrocar(it.id);
+      document.querySelectorAll(`[data-eq-item="${it.id}"]`).forEach((el) => { const box = el.parentElement; el.remove(); if (box && !box.children.length) box.remove(); });
+      toast(it.eq ? `${it.curto} no arsenal! O Sensei vai usar nos próximos treinos.` : `${it.curto} no arsenal!`);
+      return;
+    }
     const s = e.target.closest?.("[data-inv]");
     if (s) {
       const it = INV.ITENS.find((x) => x.id === s.dataset.inv); if (!it) return;

@@ -2017,3 +2017,16 @@ button.alb-it:active { transform: scale(0.96); }
   .lj-det h2 { font-size: 18px; }
   .lj-det p { font-size: 14px; }
 }
+
+/* Chamada para o Mercado dentro do treino (exercício que usa equipamento que a pessoa não tem) */
+.eq-cta { display: flex; flex-direction: column; gap: 6px; }
+.eq-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 14px; background: var(--secondary); border: 1px dashed color-mix(in srgb, var(--muted) 35%, transparent); }
+.eq-item img, .eq-item .eq-ic { width: 40px; height: 40px; flex: none; border-radius: 10px; object-fit: cover; background: #fff; }
+.eq-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.eq-txt small { font-size: 11px; color: var(--muted); }
+.eq-txt b { font-size: 13px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-tenho, .eq-ver { flex: none; min-height: 36px; padding: 0 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+.eq-tenho { color: var(--muted); }
+.eq-ver { background: var(--blue); color: #fff; }
+@media (hover: hover) { .eq-tenho:hover { color: var(--fg); } .eq-ver:hover { filter: brightness(1.1); } }
+.cf-wod .eq-cta { margin-top: 12px; }
