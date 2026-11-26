@@ -1865,3 +1865,12 @@ button.alb-it:active { transform: scale(0.96); }
 .acamp .ac-det > .pz-card, .acamp .ac-det > div { margin: 0 12px 12px; }
 .acamp .ac-pad { margin: 12px 18px 0; }
 .acamp .ac-pz { padding: 0 14px 14px; }
+/* Personagem maior no topo da home: ocupa a altura do bloco do nível, pode avançar um pouco sobre a coluna do texto */
+.acamp .ac-hero { grid-template-columns: minmax(0, 1fr) 150px 64px; }
+.acamp .ac-sprite { height: 212px; margin-top: -40px; overflow: visible; }
+.acamp .ac-sprite img { max-height: 224px; max-width: 190px; }
+@media (max-width: 360px) { .acamp .ac-hero { grid-template-columns: minmax(0, 1fr) 124px 60px; } .acamp .ac-sprite { height: 190px; } .acamp .ac-sprite img { max-height: 196px; max-width: 160px; } }
+.acamp .ac-chips { z-index: 2 !important; }
+.acamp .ac-sprite { margin-top: -14px; height: 200px; }
+.acamp .ac-sprite img { max-height: 206px; }
+@media (max-width: 380px) { .acamp .ac-k { letter-spacing: .08em; } .acamp .ac-k span { font-size: 11px; } .acamp .ac-prox .ac-k { letter-spacing: .1em; } }
