@@ -25,7 +25,7 @@ alter table public.eventos enable row level security;
 drop policy if exists "eventos: gravo os meus" on public.eventos;
 create policy "eventos: gravo os meus" on public.eventos for insert to authenticated
   with check (usuario_id = (select auth.uid()));
-revoke all on public.eventos from anon;
+revoke all on public.eventos from anon, authenticated;
 grant insert on public.eventos to authenticated;
 
 create table if not exists public.perfil_privado (
@@ -40,7 +40,7 @@ drop policy if exists "privado: só eu edito" on public.perfil_privado;
 create policy "privado: só eu leio" on public.perfil_privado for select to authenticated using (id = (select auth.uid()));
 create policy "privado: só eu gravo" on public.perfil_privado for insert to authenticated with check (id = (select auth.uid()));
 create policy "privado: só eu edito" on public.perfil_privado for update to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
-revoke all on public.perfil_privado from anon;
+revoke all on public.perfil_privado from anon, authenticated;
 grant select, insert, update on public.perfil_privado to authenticated;
 insert into public.perfil_privado (id, dados)
   select id, jsonb_strip_nulls(jsonb_build_object('perfil', config->'perfil', 'medidas', config->'medidas', 'nutri', config->'nutri'))
