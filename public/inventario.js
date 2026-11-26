@@ -6,11 +6,11 @@
    Usado pelo app (public/app.js) e pelo servidor (netlify/functions/hiper.mjs). */
 (function () {
   const ITENS = [
-    { id: "barra", nome: "Barra fixa de porta", curto: "Barra fixa", cat: "armas", eq: true, txt: "Libera barra, australiana na barra e os treinos de costas da calistenia.", link: "" },
+    { id: "barra", img: "assets/itens/barra.webp", nome: "Barra fixa de porta", curto: "Barra fixa", cat: "armas", eq: true, txt: "Libera barra, australiana na barra e os treinos de costas da calistenia.", link: "" },
     { id: "paralelas", nome: "Paralelas (parallettes)", curto: "Paralelas", cat: "armas", eq: true, txt: "Libera mergulho, L-sit e os dias de habilidade.", link: "" },
-    { id: "halteres", nome: "Halteres", curto: "Halteres", cat: "armas", eq: true, txt: "Treino de academia em casa: supino, remada, búlgaro e rosca.", link: "" },
+    { id: "halteres", img: "assets/itens/halteres.webp", nome: "Halteres", curto: "Halteres", cat: "armas", eq: true, txt: "Treino de academia em casa: supino, remada, búlgaro e rosca.", link: "" },
     { id: "kettlebell", nome: "Kettlebell", curto: "Kettlebell", cat: "armas", eq: true, txt: "Vale nos exercícios com carga da corrida e do híbrido (farmer walk, wall ball, afundo). Exercícios próprios chegando.", link: "" },
-    { id: "elasticos", nome: "Kit de elásticos", curto: "Elásticos", cat: "armas", eq: true, txt: "Ajuda a completar a barra e substitui puxadas. Exercícios próprios chegando.", link: "" },
+    { id: "elasticos", img: "assets/itens/elasticos.webp", nome: "Kit de elásticos", curto: "Elásticos", cat: "armas", eq: true, txt: "Ajuda a completar a barra e substitui puxadas. Exercícios próprios chegando.", link: "" },
     { id: "corda", nome: "Corda de pular", curto: "Corda", cat: "armas", eq: true, txt: "Cardio de bolso e desafios de corda do grupo.", link: "" },
     { id: "banco", nome: "Banco de treino", curto: "Banco", cat: "armas", eq: true, txt: "Apoio para supino, búlgaro e remada serrote.", link: "" },
     { id: "passe", nome: "Passe da Academia", curto: "Academia", cat: "artefatos", eq: true, txt: "Você treina numa academia: libera barra olímpica, máquinas, polias, halteres, barra fixa e paralelas.", semLoja: true },
@@ -73,9 +73,9 @@
     creatina: ["...........", "...kkkkk...", "...klllk...", "..kkkkkkk..", "..kwwwwwk..", "..kwlllwk..", "..kwwwwwk..", "..kwwwwwk..", "..kwwwwwk..", "..kkkkkkk..", "..........."],
     merc: ["...nnnnn...", "..nnnnnnn..", "nnnnnnnnnnn", "..skssks...", "..ssssss...", "..shhhhs...", "..llllll...", ".lllyylll..", ".slllllls..", "..llllll...", "..kk..kk..."],
   };
-  function icone(id, cls = "inv-svg") {
+  function icone(id, cls = "inv-svg", soArte = false) {
     const it = ITENS.find((x) => x.id === id);
-    if (it?.img) return `<img class="${cls}" src="${it.img}" alt="" loading="lazy">`;
+    if (it?.img && !soArte) return `<img class="${cls}" src="${it.img}" alt="" loading="lazy">`;
     const a = ART[id]; if (!a) return "";
     let r = "";
     a.forEach((row, y) => [...row].forEach((c, x) => { if (c !== ".") r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${PAL[c]}"/>`; }));

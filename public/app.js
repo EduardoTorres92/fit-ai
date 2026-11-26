@@ -7390,33 +7390,52 @@
     </section>`;
   };
   const vlTopo = (titulo, sub) => `<header class="vl-top com-voltar"><a class="vl-voltar" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a><div><h1>${esc(titulo)}</h1><p>${esc(sub)}</p></div></header>`;
+  // Quantos exercícios do catálogo cada item (ou o arsenal todo) libera
+  const invLiberados = (ids) => {
+    const lib = new Set(), tot = new Set();
+    for (const o of ["ac", "cal", "run"]) for (const e of { ac: window.FITAI_ACADEMIA, cal: window.FITAI_CAL21, run: window.FITAI_CORRIDA }[o] || []) {
+      const r = INV.exige(e, o); if (!r) continue; tot.add(e.id); if (r.some((x) => ids.includes(x))) lib.add(e.id);
+    }
+    return { lib: lib.size, tot: tot.size };
+  };
   telas.arsenal = () => {
     setToolbar("vilarejo");
-    const lib = new Set();
-    for (const id of inventario()) for (const o of ["ac", "cal", "run"]) for (const e of { ac: window.FITAI_ACADEMIA, cal: window.FITAI_CAL21, run: window.FITAI_CORRIDA }[o] || []) { const r = INV.exige(e, o); if (r && r.includes(id)) lib.add(e.id); }
-    const grupo = (t, l) => `<h2 class="vl-h2">${t}</h2><div class="inv-slots">${l.map((i) => `<button type="button" class="inv-slot${invTem(i.id) ? " on" : ""}" data-inv="${i.id}" aria-label="${esc(i.nome)}${invTem(i.id) ? ", você tem" : ""}">${INV.icone(i.id)}<small>${esc(i.curto)}</small></button>`).join("")}</div>`;
-    return `<section class="screen has-toolbar vila">
-      ${vlTopo("Guilda", "Seu arsenal: toque para marcar o que você tem")}
-      <a class="vl-heroi" href="#/perfil"><span>🛡️</span><div><b>Ver meu herói</b><small>Carta, classe, conquistas e recordes</small></div><span>›</span></a>
-      <div class="vl-stat"><b>${lib.size}</b><span>exercícios com equipamento liberados pelo seu arsenal. O Sensei monta os treinos só com o que você tem.</span></div>
-      <div class="vl-pad">${grupo("Equipamentos que mudam o treino", INV.ITENS.filter((i) => i.eq))}${grupo("Itens de suporte", INV.ITENS.filter((i) => !i.eq))}</div>
-      <p class="vl-nota">Mudou o arsenal? No próximo plano ou revisão do Sensei os treinos já vêm ajustados.</p>
+    const n = meuNivel(), { lib, tot } = invLiberados(inventario()), pct = tot ? Math.round((lib / tot) * 100) : 0;
+    const eq = INV.ITENS.filter((i) => i.eq), sup = INV.ITENS.filter((i) => !i.eq);
+    const slot = (i) => { const on = invTem(i.id), q = i.eq ? INV.liberados(i.id) : 0;
+      return `<button type="button" class="gd-slot${on ? " on" : ""}" data-inv="${i.id}" aria-pressed="${on}" aria-label="${esc(i.nome)}${on ? ", no seu arsenal" : ""}">
+        <span class="gd-ic">${INV.icone(i.id)}</span><b>${esc(i.curto)}</b>
+        <small>${on ? "✓ No arsenal" : q ? `+${q} exercícios` : "Toque se tiver"}</small></button>`; };
+    const tem = (l) => l.filter((i) => invTem(i.id)).length;
+    return `<section class="screen has-toolbar vila gd">
+      ${vlTopo("Guilda", "Seu herói e o seu arsenal")}
+      <a class="gd-card gd-heroi" href="#/perfil"><img src="${cartaClasse(n.slug)}" alt=""><div><span class="gd-k">Seu herói</span><b>${esc(primeiroNome())}</b><small>Nível ${n.nivel} · ${esc(n.classe)}</small><span class="gd-mais">Carta, conquistas e recordes</span></div><span class="gd-seta" aria-hidden="true">›</span></a>
+      <div class="gd-card gd-poder"><div class="gd-poder-top"><span class="gd-k">Poder do arsenal</span><span class="gd-poder-n"><b>${lib}</b> / ${tot}</span></div>
+        <span class="gd-bar"><i style="width:${pct}%"></i></span>
+        <p>exercícios com equipamento liberados. O Sensei monta os treinos só com o que você tem.</p></div>
+      <div class="gd-sec"><h2>Equipamentos</h2><span>${tem(eq)} de ${eq.length} · mudam o treino</span></div>
+      <div class="gd-grade">${eq.map(slot).join("")}</div>
+      <div class="gd-sec"><h2>Suporte</h2><span>${tem(sup)} de ${sup.length} · não mudam o treino</span></div>
+      <div class="gd-grade">${sup.map(slot).join("")}</div>
+      <a class="gd-merc" href="#/mercado"><span>🛒</span><div><b>Falta alguma arma?</b><small>Veja os equipamentos no Mercado</small></div><span aria-hidden="true">›</span></a>
     </section>`;
   };
   let mercCat = "armas";
   telas.mercado = () => {
     setToolbar("vilarejo");
     const lista = INV.ITENS.filter((i) => i.cat === mercCat);
-    return `<section class="screen has-toolbar vila">
+    const item = (i) => { const q = i.eq ? INV.liberados(i.id) : 0, on = invTem(i.id);
+      return `<article class="mk-item${on ? " on" : ""}"><span class="mk-ic">${INV.icone(i.id)}</span>
+        <div class="mk-txt"><h3>${esc(i.nome)}</h3><p>${esc(i.txt)}</p>${q ? `<span class="mk-lib">⚡ +${q} exercícios</span>` : ""}</div>
+        <div class="mk-acao">${on ? `<span class="mk-tem">✓ Já é seu</span>`
+          : i.semLoja ? `<a class="mk-btn sec" href="#/arsenal">Marcar</a>`
+          : `<button type="button" class="mk-btn${i.link ? "" : " sec"}" data-mc-oferta="${i.id}">${i.link ? "Ver oferta" : "Em breve"}</button>`}</div></article>`; };
+    return `<section class="screen has-toolbar vila mk">
       ${vlTopo("Mercado", "Equipamentos para o seu arsenal")}
-      <div class="vl-fala">${INV.icone("merc", "vl-av")}<div><b>Mercador</b><p>Bem-vindo, aventureiro! Cada arma nova libera exercícios novos com o Sensei.</p></div></div>
-      <div class="mc-cats">${INV.CATS.map((c) => `<button type="button" class="mc-cat" data-mc-cat="${c.id}" aria-pressed="${c.id === mercCat}">${INV.icone(c.ic, "mc-ic")}${esc(c.nome)}</button>`).join("")}</div>
-      <div class="mc-lista">${lista.map((i) => { const n = INV.liberados(i.id);
-        return `<div class="mc-item"><div class="mc-img">${INV.icone(i.id)}</div><div><h3>${esc(i.nome)}</h3><p>${esc(i.txt)}${n ? ` <b>+${n} exercícios.</b>` : ""}</p><div class="mc-acoes">${
-          invTem(i.id) ? `<span class="mc-tem">✓ Já está no seu arsenal</span>`
-          : i.semLoja ? `<a class="mc-tag" href="#/arsenal">Treina em academia? Marque na Guilda</a>`
-          : `<button type="button" class="mc-btn" data-mc-oferta="${i.id}">Ver oferta</button><span class="mc-tag">link de afiliado</span>`}</div></div></div>`; }).join("")}</div>
-      <p class="vl-nota">Os links das ofertas são de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
+      <div class="gd-card mk-fala">${INV.icone("merc", "mk-av")}<div><span class="gd-k">Mercador</span><p>Bem-vindo, aventureiro! Cada arma nova libera exercícios novos com o Sensei.</p></div></div>
+      <div class="mk-cats" role="tablist">${INV.CATS.map((c) => `<button type="button" class="mk-cat" role="tab" data-mc-cat="${c.id}" aria-pressed="${c.id === mercCat}">${INV.icone(c.ic, "mk-cat-ic", true)}<span>${esc(c.nome)}</span></button>`).join("")}</div>
+      <div class="mk-lista">${lista.map(item).join("")}</div>
+      <p class="mk-nota">Links de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
     </section>`;
   };
   document.addEventListener("click", (e) => {
