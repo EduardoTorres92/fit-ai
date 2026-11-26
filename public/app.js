@@ -222,7 +222,8 @@
   // Ligas (insígnias por modalidade) e chefes ficam escondidos por enquanto. O XP já ganho com eles continua valendo
   // (ninguém perde nível); para trazer de volta, é só ligar aqui.
   const LIGAS_CHEFES = false;
-  function save() { CACHE_CHEFES = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
+  let excluindo = false; // conta sendo excluída: nada mais é gravado neste aparelho
+  function save() { if (excluindo) return; CACHE_CHEFES = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
   const semanasDesde = (d) => Math.floor(diffDays(parseKey(S.inicio), d) / 7);
   const semanaDe = (d) => { const n = semanasDesde(d); return n < 0 ? -1 : n % PROGRAMA.length; };
@@ -871,6 +872,7 @@
             <input type="file" id="arquivo" accept="application/json,.json" hidden>
           </div>
           <button class="btn logout" id="sair">${uid ? "Sair da conta" : "Sair do modo visitante"}${icon("log-out.svg", 16)}</button>
+          <div class="conta-legal"><a href="/privacidade" target="_blank" rel="noopener">Privacidade e seus dados</a>${uid ? `<button type="button" class="btn-excluir" id="excluir-conta">Excluir minha conta</button>` : ""}</div>
         </div></section>`;
     },
   };
@@ -3045,11 +3047,18 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, nutri: S.nutri || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), pesagemPulada: S.pesagemPulada || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
       }
+      // Peso, altura, idade, medidas e dados da nutrição: tabela só da pessoa (o config do perfil os amigos do grupo leem)
+      const priv = { perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), nutri: S.nutri || null };
+      if (enviados[`${uid}|priv`] !== JSON.stringify(priv)) {
+        const { error } = await sb.from("perfil_privado").upsert({ id: uid, dados: priv, atualizado_em: new Date().toISOString() });
+        if (!error) { enviados[`${uid}|priv`] = JSON.stringify(priv); guardarEnviados(); }
+      }
+      eventosEnviar();
       tgSincronizar();
     } catch {} finally {
       sincronizando = false;
@@ -4963,6 +4972,75 @@
   const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
   let uid = null; // id do usuário logado no Supabase (null = visitante)
   const tokenSB = async () => (sb ? (await sb.auth.getSession()).data.session?.access_token || null : null);
+  /* ---------- Excluir a conta: servidor (Telegram e lembretes), fotos guardadas e, por fim, os dados no Supabase ---------- */
+  function excluirConta() {
+    if (!uid || !sb) return;
+    let dl = document.getElementById("exc-dlg");
+    if (!dl) { dl = document.createElement("dialog"); dl.id = "exc-dlg"; dl.className = "exc-dlg"; document.body.appendChild(dl); }
+    dl.innerHTML = `<form class="exc-box" method="dialog">
+      <h2>Excluir sua conta?</h2>
+      <p class="note">Isso não tem volta. Vamos apagar:</p>
+      <ul><li>treinos, recordes, XP, cartas e conquistas</li><li>peso, medidas e fotos de evolução</li><li>posts, comentários e reações nos grupos</li><li>a conexão com o bot do Telegram e os lembretes de água</li></ul>
+      <p class="note small">Grupo que você criou passa para o membro mais antigo. Se você está sozinho nele, o grupo some. Quer guardar seus treinos antes? Use “Exportar backup”.</p>
+      <label class="field"><span class="field-lbl">Para confirmar, digite EXCLUIR</span><input name="conf" autocomplete="off" autocapitalize="characters"></label>
+      <div class="exc-acoes"><button type="button" class="btn btn-outline" data-exc-cancelar>Cancelar</button><button type="button" class="btn btn-perigo" data-exc-ok disabled>Excluir para sempre</button></div>
+    </form>`;
+    const ok = dl.querySelector("[data-exc-ok]");
+    dl.querySelector("input").addEventListener("input", (e) => { ok.disabled = e.target.value.trim().toUpperCase() !== "EXCLUIR"; });
+    dl.querySelector("[data-exc-cancelar]").addEventListener("click", () => dl.close());
+    ok.addEventListener("click", async () => {
+      ok.disabled = true; ok.textContent = "Excluindo…";
+      try {
+        const token = await tokenSB();
+        await fetch("/api/conta", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ acao: "excluir" }) }).catch(() => {});
+        // Fotos: perfil e evolução ficam na pasta da pessoa; as dos posts, em cada grupo
+        const tirar = async (bucket, pasta) => { const { data } = await sb.storage.from(bucket).list(pasta, { limit: 1000 }); const nomes = (data || []).filter((f) => f.id).map((f) => `${pasta}/${f.name}`); if (nomes.length) await sb.storage.from(bucket).remove(nomes); };
+        await tirar("fotos", uid).catch(() => {}); await tirar("evolucao", uid).catch(() => {});
+        const { data: gs } = await sb.from("membros").select("grupo_id").eq("usuario_id", uid);
+        for (const g of gs || []) await tirar("posts", `${g.grupo_id}/${uid}`).catch(() => {});
+        const { error } = await sb.rpc("excluir_minha_conta");
+        if (error) throw error;
+        excluindo = true; clearTimeout(syncTimer);
+        await sb.auth.signOut().catch(() => {});
+        try { Object.keys(localStorage).filter((k) => k.startsWith("fitai")).forEach((k) => localStorage.removeItem(k)); } catch {}
+        location.replace("/?conta=excluida");
+      } catch (e) {
+        console.error("excluir conta", e); ok.disabled = false; ok.textContent = "Excluir para sempre";
+        toast("Não consegui excluir agora. Tente de novo em instantes.", 5000);
+      }
+    });
+    dl.showModal();
+  }
+  /* ---------- Métricas de uso (tabela eventos): marcos para medir ativação e retenção, sem conteúdo pessoal ----------
+     Fica numa fila neste aparelho (o quiz de entrada vem antes do login) e sobe quando houver conta. */
+  const EV_KEY = "fitai-eventos";
+  function evento(nome, dados = null) {
+    try {
+      const fila = JSON.parse(localStorage.getItem(EV_KEY) || "[]");
+      if (["abriu", "quiz_inicio", "quiz_fim", "recruta_dia"].includes(nome) && fila.some((e) => e.nome === nome && e.dia === hojeKey)) return;
+      if (nome === "abriu" && S.abriuEm === hojeKey) return;
+      if (nome === "abriu") S.abriuEm = hojeKey;
+      fila.push({ nome, dia: hojeKey, ...(dados ? { dados } : {}) });
+      localStorage.setItem(EV_KEY, JSON.stringify(fila.slice(-200)));
+    } catch {}
+    if (uid) setTimeout(eventosEnviar, 2000);
+  }
+  let evEnviando = false;
+  async function eventosEnviar() {
+    if (!uid || !sb || evEnviando) return;
+    evEnviando = true;
+    try {
+      const lim = keyOf(addDays(hoje, -30));
+      let fila = []; try { fila = JSON.parse(localStorage.getItem(EV_KEY) || "[]"); } catch {}
+      const resto = [];
+      for (const e of fila) {
+        if (e.dia < lim) continue; // velho demais para o banco: descarta
+        const { error } = await sb.from("eventos").insert({ nome: e.nome, dia: e.dia, dados: e.dados || null });
+        if (error && error.code !== "23505") resto.push(e); // 23505 = já anotado hoje
+      }
+      localStorage.setItem(EV_KEY, JSON.stringify(resto));
+    } catch {} finally { evEnviando = false; }
+  }
 
   let loginModo = null; // null | "entrar" | "cadastro"
   function telaLoginEmail() {
@@ -5042,11 +5120,15 @@
     if (S.contaId && S.contaId !== u.id) { S.logs = {}; VKEYS.forEach((p) => (S[p] = vazioVP())); S.conquistas = {}; S.onboarded = false; S.dono = false; S.graduadoMax30 = null; S.formaturas = {}; S.trilha = null; S.forca = null; S.desafiosN = 0; xpAntes = null; G.grupos = null; }
     S.contaId = u.id;
     uid = u.id;
+    evento("abriu");
     // Aparelho com notificação ligada: liga ao id da conta, para receber avisos da dupla
     if (S.aguaLembrete?.push && S.pushUid !== uid && pushOk()) setTimeout(async () => { try { const sub = await aguaAssinatura(false), tk = await tokenSB();
       if (sub && tk) { await fetch("/api/agua", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tk}` }, body: JSON.stringify({ acao: "conta", endpoint: sub.endpoint }) }); S.pushUid = uid; save(); } } catch {} }, 3000);
-    let perfil = null;
+    let perfil = null, priv = null;
     try { perfil = (await sb.from("perfis").select("nome, foto_url, config").eq("id", uid).maybeSingle()).data; } catch {}
+    try { priv = (await sb.from("perfil_privado").select("dados").eq("id", uid).maybeSingle()).data?.dados || null; } catch {}
+    if (perfil?.config && priv) perfil.config = { ...perfil.config, ...Object.fromEntries(Object.entries(priv).filter(([, v]) => v)) };
+    else if (priv) perfil = { ...(perfil || {}), config: priv };
     // Sem peso no aparelho e nem na conta: usa o último peso das fotos de evolução
     setTimeout(() => { if (!S.perfil.peso && uid) sb.from("evolucao").select("peso, data").eq("usuario_id", uid).order("data", { ascending: false }).limit(10).then(({ data }) => { const v = (data || []).find((x) => Number(x.peso) > 0)?.peso; if (v && !S.perfil.peso) { S.perfil.peso = String(Number(v)); save(); if (location.hash.startsWith("#/perfil")) render(); } }, () => {}); }, 2000);
     const meta = u.user_metadata || {};
@@ -5394,6 +5476,7 @@
       if (!confirm(`Sair do grupo ${g.nome}?${g.dono === uid ? " Você criou este grupo; ele continua para os outros." : ""}`)) return;
       sb.from("membros").delete().eq("grupo_id", g.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui sair do grupo."); else { G.sel = null; carregarGrupos(true); toast("Você saiu do grupo."); } });
     } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = cartaoMaxOut(); }
+    else if (t.id === "excluir-conta") excluirConta();
     else if (t.id === "sair") { if (sb && uid) sb.auth.signOut(); uid = null; S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
     else if (t.id === "iniciar") t.textContent = toggleTimer();
     else if (t.hasAttribute("data-ins-carregar")) { t.disabled = true; carregarVideos(true, t.closest(".ex.ins")?.dataset.ins).then((ok) => { if (ok) toast("Vídeos carregados ✓ Toque em Assistir."); else t.disabled = false; }); }
@@ -5942,6 +6025,7 @@
     const stop = typing(msgsEl);
     let r;
     try {
+      evento("coach", { papel: chatPapel === "nutri" ? "nutri" : "coach" });
       r = await fetch("/api/coach", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(chatPapel === "nutri" ? { papel: "nutri", mensagens, programa: nutriBase(), contexto: nutriContexto() }
           : { mensagens, programa: programaTexto(), contexto: contextoTexto(!!token && souDono) }) });
@@ -6482,7 +6566,7 @@
     const e = d7Estado(), d = S.d7, f = e.fase, reg = d.dias[e.dia - 1] || {};
     const pronto = f.itens.every(([k, , , num]) => (num ? reg.max > 0 : reg.ok?.[k]));
     if (!pronto) return;
-    reg.em = hojeKey; d.dias[e.dia - 1] = reg;
+    reg.em = hojeKey; d.dias[e.dia - 1] = reg; evento("recruta_dia", { dia: e.dia });
     if (e.dia === 7) { d.fim = hojeKey; if (!S.d7Feito) S.d7Feito = { k: d.k, ini: d.ini, fim: hojeKey, xp: d7XpDesde({ d7: d }) }; }
     save(); conferirXp(false, `${D7.recruta.nome} · dia ${e.dia}`);
     const D = D7.recruta, du = d7Dupla();
@@ -6769,7 +6853,7 @@
     const ms = missoesDe(hojeKey), n = ms.filter((m) => m.ok).length;
     S.missoes = S.missoes || {}; S.missoesTot = S.missoesTot || {};
     if (ms.length > 3) S.missoesTot[hojeKey] = ms.length;
-    if (n > (S.missoes[hojeKey] || 0)) S.missoes[hojeKey] = n; else return false;
+    if (n > (S.missoes[hojeKey] || 0)) { evento("missao", { n, de: ms.length }); S.missoes[hojeKey] = n; } else return false;
     const lim = keyOf(addDays(hoje, -30));
     for (const k of Object.keys(S.missoes)) if (k < lim) { S.missoesXpAnt = (S.missoesXpAnt || 0) + xpMissoesN(S.missoes[k], S.missoesTot?.[k]); delete S.missoes[k]; if (S.missoesTot) delete S.missoesTot[k]; }
     return true;
@@ -6916,6 +7000,7 @@
   }
   function startQuiz(modo) {
     const box = $("#quiz"); if (!box) return;
+    evento("quiz_inicio", { modo });
     QZ = { modo, i: 0, r: modo === "onboarding" ? {} : Object.fromEntries(QUIZ.map((p) => [p.k, S.quiz?.[p.k]]).filter(([, v]) => v !== undefined)), ocupado: false };
     quizRender();
     box.onclick = (e) => {
@@ -6956,6 +7041,7 @@
   }
   function quizFim() {
     const r = QZ.r, modo = QZ.modo;
+    evento("quiz_fim", { modo });
     S.quiz = { ...Object.fromEntries(QUIZ.map((p) => [p.k, r[p.k]])), em: hojeKey };
     if (modo === "onboarding") {
       S.nivel = r.nivel; S.trilha = r.trilha;

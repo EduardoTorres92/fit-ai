@@ -106,6 +106,13 @@ export async function marcarUid(endpoint, uid) {
   if (r && uid && r.uid !== uid) { r.uid = uid; salvar(); }
   return { ok: !!r };
 }
+// Conta excluída: some com os lembretes de água de todos os aparelhos dessa pessoa
+export async function apagarUid(uid) {
+  const lista = await todas(); let n = 0;
+  for (const [id, r] of Object.entries(lista)) if (uid && r.uid === uid) { delete lista[id]; n++; }
+  if (n) salvar();
+  return n;
+}
 // Notificação para todos os aparelhos de uma pessoa (pelo id do app); link abre o app nessa tela
 export async function avisarUid(uid, titulo, corpo, link = "") {
   await chavesVapid();

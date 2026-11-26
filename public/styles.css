@@ -321,6 +321,21 @@ a.wcard:active, button.wcard:active { transform: scale(0.98); }
 @keyframes blink { 0%, 80%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
 
 .chat-foot { flex: none; display: flex; flex-direction: column; gap: 12px; }
+.chat-aviso { margin: -4px 4px 0; font-size: 11px; line-height: 1.35; color: var(--muted, #8a8f98); text-align: center; }
+.chat-aviso a { color: inherit; text-decoration: underline; }
+.conta-legal { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 4px; }
+.conta-legal a { font-size: 13px; color: var(--muted, #8a8f98); }
+.btn-excluir { background: none; border: 0; color: var(--muted, #8a8f98); font-size: 13px; text-decoration: underline; padding: 6px; cursor: pointer; }
+.exc-dlg { border: 0; border-radius: 16px; padding: 0; max-width: 380px; width: calc(100% - 32px); margin: auto; inset: 0; max-height: calc(100% - 32px); overflow: auto; background: var(--card, #fff); color: inherit; }
+.exc-dlg::backdrop { background: rgba(0,0,0,.55); }
+.exc-box { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.exc-box h2 { font-size: 18px; margin: 0; color: var(--danger, #e5484d); }
+.exc-box ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.45; }
+.exc-box input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border, #ccc); background: transparent; color: inherit; }
+.exc-acoes { display: flex; gap: 8px; }
+.exc-acoes .btn { flex: 1; padding-inline: 10px; font-size: 15px; white-space: nowrap; }
+.btn-perigo { background: var(--danger, #e5484d); color: #fff; border: 0; }
+.btn-perigo:disabled { opacity: .45; }
 .chips { display: flex; gap: 10px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
 .chips:empty { display: none; }
 .chips::-webkit-scrollbar { display: none; }

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Privacidade e seus dados · FIT.AI</title>
+  <meta name="description" content="O que o FIT.AI guarda, quem vê, como a IA usa seus dados e como excluir sua conta.">
+  <meta name="theme-color" content="#0b0a1f">
+  <link rel="icon" href="./assets/icone-64.png" type="image/png">
+  <link rel="stylesheet" href="./lp-rpg/rpg.css">
+  <style>
+    .priv { max-width: 720px; margin: 0 auto; padding: 96px clamp(18px, 5vw, 32px) 64px; }
+    .priv h1 { margin: 0 0 8px; font: 700 clamp(30px, 6vw, 44px)/1.1 "Pixelify", "Silk", monospace; }
+    .priv .sub { margin: 0 0 28px; color: var(--mudo); }
+    .priv h2 { margin: 36px 0 10px; font: 700 15px/1.3 "Silk", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--ouro); }
+    .priv p, .priv li { color: var(--tinta); }
+    .priv ul { padding-left: 20px; margin: 8px 0; }
+    .priv li { margin: 4px 0; }
+    .priv .quadro { margin: 14px 0; padding: 16px 18px; border: 2px solid var(--borda); background: rgba(255,255,255,.03); }
+    .priv .quadro b { color: var(--verde); }
+    .priv .alerta { border-color: rgba(255, 138, 61, .55); }
+    .priv .alerta b { color: var(--laranja); }
+    .priv .mudo { color: var(--mudo); font-size: 14px; }
+    .priv table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+    .priv th, .priv td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+    .priv th { font: 700 12px/1.3 "Silk", monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--lilas); }
+  </style>
+</head>
+<body>
+  <header class="topo solido">
+    <a class="marca" href="/" aria-label="FIT.AI, início"><img src="./assets/icone-64.png" alt="" width="32" height="32"><span>FIT.AI</span></a>
+    <a class="btn btn--ouro btn--p" href="/app" style="margin-left:auto">Voltar ao app</a>
+  </header>
+
+  <main class="priv" id="conteudo">
+    <p class="kicker">Confiança</p>
+    <h1>Privacidade e seus dados</h1>
+    <p class="sub">Em palavras simples: o que o FIT.AI guarda, quem vê, como a IA usa e como apagar tudo. Atualizado em 26/11/2026.</p>
+
+    <div class="quadro alerta">
+      <p><b>Antes de treinar:</b> o FIT.AI e o Coach são ferramentas de apoio e podem errar. Eles não substituem um profissional de educação física, um médico ou um nutricionista. Se você tem alguma condição de saúde, está voltando de lesão ou está grávida, fale com um profissional antes de começar. Sentiu dor no peito, tontura ou dor aguda: pare na hora e procure atendimento.</p>
+    </div>
+
+    <h2>O que guardamos</h2>
+    <ul>
+      <li><strong>Sua conta:</strong> nome, e-mail e foto. Se você entra com o Google, recebemos esses três dados de lá.</li>
+      <li><strong>Seus treinos:</strong> séries, cargas, tempos, Max Out, corridas registradas, água, missões, XP, cartas e conquistas.</li>
+      <li><strong>Seu corpo:</strong> peso, altura, idade, medidas e as respostas da nutrição, se você preencher.</li>
+      <li><strong>Fotos de evolução:</strong> só se você enviar, numa pasta que só a sua conta acessa.</li>
+      <li><strong>Grupos:</strong> posts, comentários, reações e desafios que você lança.</li>
+      <li><strong>Uso do app:</strong> marcos como “abriu o app”, “terminou o quiz”, “falou com o Coach” e “fechou uma missão”. Servem para medir se o app ajuda as pessoas a voltar a treinar. Não guardamos o texto das conversas nesses marcos.</li>
+    </ul>
+    <p class="mudo">Os dados ficam no Supabase, em servidores em São Paulo, e o app roda num servidor da Hostinger. Também ficam guardados no seu aparelho, para o app funcionar sem internet.</p>
+
+    <h2>Quem vê o quê</h2>
+    <table>
+      <thead><tr><th>Dado</th><th>Quem vê</th></tr></thead>
+      <tbody>
+        <tr><td>Nome, foto, nível, classe, cartas e conquistas</td><td>Você e quem está nos mesmos grupos que você</td></tr>
+        <tr><td>Treinos, água e ranking da semana</td><td>Você e quem está nos mesmos grupos que você</td></tr>
+        <tr><td>Posts e comentários</td><td>Os membros do grupo onde você postou</td></tr>
+        <tr><td>Peso, altura, idade, medidas e nutrição</td><td>Só você</td></tr>
+        <tr><td>Fotos de evolução</td><td>Só você</td></tr>
+      </tbody>
+    </table>
+    <p>Sem grupo, ninguém além de você vê seus dados. O responsável pelo app consegue ver estatísticas de uso e moderar posts para manter os grupos seguros.</p>
+
+    <h2>Como a inteligência artificial usa seus dados</h2>
+    <ul>
+      <li>O Coach usa a IA Claude, da Anthropic. Para responder, ele recebe a sua mensagem, o programa que você está fazendo e um resumo dos seus treinos.</li>
+      <li>Prints de corrida e fotos do quadro do WOD vão para a IA só para ler os números. A imagem não fica guardada.</li>
+      <li>Fotos de evolução são analisadas pela IA só quando você pede a comparação.</li>
+      <li>No app, a conversa com o Coach fica no seu aparelho. No bot do Telegram, as últimas mensagens ficam no servidor para o Coach lembrar do assunto.</li>
+    </ul>
+
+    <h2>Telegram e notificações</h2>
+    <p>Se você conectar o bot do Telegram, guardamos o seu chat para mandar o treino do dia e os lembretes. Se ligar os lembretes de água, guardamos o endereço de notificação do seu aparelho. Dá para desligar os dois no Perfil.</p>
+
+    <h2>O que não fazemos</h2>
+    <ul>
+      <li>Não vendemos nem alugamos seus dados.</li>
+      <li>Não mostramos anúncios e não usamos ferramentas de rastreamento ou de analytics de terceiros.</li>
+      <li>Alguns conteúdos vêm de fora: vídeos de execução do YouTube (no modo sem cookies), vídeos dos programas do Google Drive e as fontes do Google Fonts. Quando carregam, esses serviços recebem o acesso, como em qualquer site.</li>
+    </ul>
+
+    <h2>Seus direitos e como excluir a conta</h2>
+    <p>Pela LGPD, você pode pedir acesso, correção ou exclusão dos seus dados.</p>
+    <div class="quadro">
+      <p><b>Excluir a conta:</b> no app, vá em <strong>Perfil → Excluir minha conta</strong>. Apagamos na hora seus treinos, recordes, XP, peso, medidas, fotos, posts, a conexão com o Telegram e os lembretes. Um grupo que você criou passa para o membro mais antigo; se você estiver sozinho nele, o grupo também some.</p>
+      <p><b>Levar seus dados:</b> em <strong>Perfil → Exportar backup</strong> você baixa seus treinos num arquivo.</p>
+    </div>
+    <p class="mudo">Dúvidas sobre seus dados: [preencher: e-mail de contato].</p>
+  </main>
+</body>
+</html>

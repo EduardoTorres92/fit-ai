@@ -225,9 +225,9 @@ export async function confirmarMarcados(email, datas) {
   if (conta) { conta.marcar = (conta.marcar || []).filter((k) => !(datas || []).includes(k)); salvar(); }
   return { ok: true };
 }
-export async function desligar(email) {
+export async function desligar(email, excluida = false) {
   const d = await todos(), c = d.contas[email];
-  if (c?.chat) await api("sendMessage", { chat_id: c.chat, text: "Avisos desligados. Para ligar de novo, use o botão no perfil do FIT.AI." }).catch(() => {});
+  if (c?.chat) await api("sendMessage", { chat_id: c.chat, text: excluida ? "Sua conta do FIT.AI foi excluída. Apaguei também a conexão com este bot e a conversa com o Coach. Até a próxima 👋" : "Avisos desligados. Para ligar de novo, use o botão no perfil do FIT.AI." }).catch(() => {});
   delete d.contas[email];
   salvar();
   return { ok: true };
@@ -526,7 +526,7 @@ Escreva para o Telegram: frases curtas, **negrito** e listas com "- ". Sem tabel
     while (historico.length && historico[0].role !== "user") historico.shift();
     const params = paramsCoach(dono ? "dono" : "membro", { papel: nutri ? "nutri" : "coach", programa: nutri ? K.nutriProg : K.prog, contexto: `${(nutri ? K.nutriCtx : K.ctx) || ""}${extra}` }, historico);
     params.tools = dono ? [...FERRAMENTAS, ...FERRAMENTAS_ADMIN] : FERRAMENTAS;
-    if (dono) params.system[1].text += "\nVocê também é o assistente do painel do dono do app: com admin_resumo, admin_usuarios e admin_usuario você vê as estatísticas do app e de cada usuário. Para mandar avisos ou apagar posts, indique o /admin.";
+    if (dono) params.system[1].text += "\nVocê também é o assistente do painel do dono do app: com admin_resumo, admin_metricas, admin_usuarios e admin_usuario você vê as estatísticas do app e de cada usuário. Para mandar avisos ou apagar posts, indique o /admin.";
     const cliente = new Anthropic();
     let resposta = "", msgs = historico;
     for (let volta = 0; volta < 4; volta++) {
@@ -556,13 +556,14 @@ Escreva para o Telegram: frases curtas, **negrito** e listas com "- ". Sem tabel
 const FERRAMENTAS_ADMIN = [
   { name: "admin_resumo", description: "Estatísticas gerais do app: usuários, novos, ativos (hoje/7/30 dias), treinos, minutos, programas, grupos, posts e água.", input_schema: { type: "object", properties: {} } },
   { name: "admin_usuarios", description: "Lista todos os usuários com id, nome, e-mail, programa principal, data do último treino, total de treinos e treinos nos últimos 7 dias.", input_schema: { type: "object", properties: {} } },
+  { name: "admin_metricas", description: "Métricas de produto: cadastros, quiz de entrada (iniciaram/terminaram), ativação (1º treino e 1º treino em até 1 dia), quantos voltaram para o 2º treino e a mediana de dias até ele, retenção D7 e D30 (base = quem tem conta há 7/30 dias ou mais), dias de treino nos últimos 28 dias, uso do Coach, missões, Recruta, desafios do grupo e quem sumiu há 7 dias.", input_schema: { type: "object", properties: {} } },
   { name: "admin_usuario", description: "Detalhe de um usuário pelo id (da lista de admin_usuarios): últimos treinos, água, grupos, posts e conquistas.", input_schema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
 ];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 async function ferramentaAdmin(nome, entrada) {
   try {
     if (nome === "admin_usuario") { if (!UUID.test(String(entrada?.id))) return "id inválido"; return JSON.stringify(await rpc("admin_usuario", { p_id: entrada.id })); }
-    if (nome === "admin_resumo" || nome === "admin_usuarios") return JSON.stringify(await rpc(nome));
+    if (nome === "admin_resumo" || nome === "admin_usuarios" || nome === "admin_metricas") return JSON.stringify(await rpc(nome));
     return "Ferramenta desconhecida.";
   } catch (e) { return e.codigo === "sem_chave" ? "O painel ainda não está liberado: o dono precisa abrir o app uma vez." : `Erro ao consultar: ${e.message}`; }
 }
@@ -572,7 +573,7 @@ async function editarOuEnviar(chat, id, m) {
   if (id) { try { await api("editMessageText", { chat_id: chat, message_id: id, parse_mode: "HTML", disable_web_page_preview: true, ...m }); return; } catch {} }
   await enviar(chat, m);
 }
-const MENU = { inline_keyboard: [[{ text: "📊 Resumo", callback_data: "adm:resumo" }, { text: "👥 Usuários", callback_data: "adm:us:0" }],
+const MENU = { inline_keyboard: [[{ text: "📊 Resumo", callback_data: "adm:resumo" }, { text: "📈 Métricas", callback_data: "adm:met" }], [{ text: "👥 Usuários", callback_data: "adm:us:0" }],
   [{ text: "🛡️ Moderação", callback_data: "adm:mod" }, { text: "📣 Enviar aviso", callback_data: "adm:aviso" }]] };
 const voltar = [{ text: "⬅️ Menu", callback_data: "adm:menu" }];
 async function adminMenu(chat, id) {
@@ -590,6 +591,21 @@ async function adminBotao(c, chat, dado, msgId) {
         `💪 Treinos: hoje ${r.treinos_hoje} · 7 dias ${r.treinos_7d} · 30 dias ${r.treinos_30d}`, `⏱️ ${Math.round((r.minutos_7d || 0) / 60)} h de treino na semana`,
         `📚 Programas (30 dias): ${esc(progs)}`, `💧 Água média (7 dias): ${fmtL(r.agua_media_7d || 0)} por dia`, `💬 Mural (7 dias): ${r.posts_7d} posts · ${r.comentarios_7d} comentários`].join("\n"),
         reply_markup: { inline_keyboard: [[{ text: "🔄 Atualizar", callback_data: "adm:resumo" }], voltar] } });
+    }
+    if (dado === "adm:met") {
+      const m = await rpc("admin_metricas"), pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : "—");
+      const semana = m.ativos_28d ? String(Math.round((m.dias_treino_28d / m.ativos_28d / 4) * 10) / 10).replace(".", ",") : "—";
+      return editarOuEnviar(chat, msgId, { text: [`<b>📈 Métricas</b>`,
+        `👥 ${m.cadastros} cadastros (+${m.cadastros_30d} em 30 dias) · quiz: ${m.quiz_inicio} começaram, ${m.quiz_fim} terminaram`,
+        `🚀 Ativação: <b>${pct(m.ativados, m.cadastros)}</b> fizeram o 1º treino (${m.ativados}) · no 1º dia: ${pct(m.ativados_d1, m.cadastros)}`,
+        `🔁 <b>Voltaram para o 2º treino: ${pct(m.segundo_treino, m.ativados)}</b> (${m.segundo_treino} de ${m.ativados})${m.dias_ate_2o != null ? ` · mediana ${String(m.dias_ate_2o).replace(".", ",")} dia(s) até ele` : ""}`,
+        `📅 Retenção D7: <b>${pct(m.ret_d7, m.base_d7)}</b> (${m.ret_d7}/${m.base_d7}) · D30: <b>${pct(m.ret_d30, m.base_d30)}</b> (${m.ret_d30}/${m.base_d30})`,
+        `💪 Treinos por semana (quem treinou em 28 dias): ${semana} · ${m.ativos_28d} ativos`,
+        `🧠 Coach (7 dias): ${m.coach_msgs_7d} mensagens de ${m.coach_pessoas_7d} pessoas · abriram o app: ${m.abriram_7d}`,
+        `🎯 Missões: ${m.missoes_7d} · Recruta: ${m.recruta_dias_7d} dias · Desafios do grupo: ${m.desafios_grupo_7d}`,
+        `😴 Sumidos (treinaram, mas nada há 7+ dias): ${m.sumidos_7d}`,
+        `<i>Abertura do app, quiz, Coach e missões contam a partir de 26/11/2026.</i>`].join("\n"),
+        reply_markup: { inline_keyboard: [[{ text: "🔄 Atualizar", callback_data: "adm:met" }], voltar] } });
     }
     const pg = dado.match(/^adm:us:(\d+)$/);
     if (pg) {
