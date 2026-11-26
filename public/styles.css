@@ -1714,3 +1714,37 @@ button.alb-it:active { transform: scale(0.96); }
 .banner.com-sprite .banner-bg .home-img { object-position: 40% center; }
 .home-sprite { position: absolute; right: 2%; top: 20%; height: 125%; width: 62%; max-width: none; object-fit: contain; object-position: right top; image-rendering: pixelated; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .5)); }
 .d7-grupo { margin: 10px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- Dojo ---------- */
+.dojo .dj-hero { display: flex; gap: 14px; align-items: center; margin: 8px 20px 4px; padding: 14px; border-radius: 18px; background: linear-gradient(135deg, rgba(255, 210, 63, .12), rgba(79, 210, 255, .06)); border: 1px solid rgba(255, 210, 63, .25); }
+.dojo .dj-sensei { width: 86px; flex: none; border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, .35); }
+.dojo .dj-hero h1 { margin: 2px 0 6px; font-size: 22px; line-height: 1.15; }
+.dojo .dj-fala { margin: 0; font-size: 14px; line-height: 1.45; opacity: .9; }
+.dojo .dj-filtro { margin: 12px 0; }
+.dojo .dj-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.dojo .dj-card { display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: inherit; padding: 8px; border-radius: 16px; background: var(--card, #15181d); border: 1px solid var(--border, rgba(255,255,255,.08)); }
+.dojo .dj-thumb { display: block; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #1c2128; margin-bottom: 6px; }
+.dojo .dj-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dojo .dj-sem, .dojo .dj-sem-video { display: grid; place-items: center; width: 100%; height: 100%; font-size: 44px; }
+.dojo .dj-nome { font-weight: 700; font-size: 15px; line-height: 1.2; }
+.dojo .dj-grupo { font-size: 12px; opacity: .65; }
+.dojo .dj-voltar { color: inherit; text-decoration: none; font-weight: 700; }
+.dojo .dj-mov { padding: 4px 20px 24px; }
+.dojo .dj-video { display: block; width: 100%; max-height: 380px; object-fit: contain; border-radius: 16px; background: #1c2128; margin-bottom: 14px; }
+.dojo .dj-sem-video { height: 200px; }
+.dojo .dj-mov h1 { margin: 2px 0 4px; font-size: 26px; }
+.dojo .dj-h { font-size: 16px; margin: 20px 0 8px; }
+.dojo .dj-passos { margin: 0; padding-left: 22px; line-height: 1.5; }
+.dojo .dj-passos li { margin: 6px 0; }
+.dojo .dj-erros { list-style: none; margin: 0; padding: 0; }
+.dojo .dj-erros li { position: relative; padding-left: 24px; margin: 6px 0; line-height: 1.45; }
+.dojo .dj-erros li::before { content: "✗"; position: absolute; left: 2px; color: var(--danger, #e5484d); font-weight: 800; }
+.dojo .dj-resp { margin: 14px 0; padding: 10px 12px; border-radius: 12px; background: rgba(79, 210, 255, .08); font-size: 14px; }
+.dojo .dj-nivel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dojo .dj-nivel > div { padding: 12px; border-radius: 14px; background: var(--card, #15181d); border: 1px solid var(--border, rgba(255,255,255,.08)); font-size: 14px; }
+.dojo .dj-nivel p { margin: 6px 0 0; line-height: 1.4; opacity: .85; }
+.dojo .dj-estilos { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+.dojo .dj-estilos span { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.07); }
+.dojo .dj-perguntar { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.dojo .dj-perguntar img { width: 26px; height: 34px; object-fit: cover; border-radius: 4px; }
+.dojo .dj-filtro { grid-template-columns: 1fr 1fr; }

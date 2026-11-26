@@ -437,6 +437,7 @@
     { name: "CrossFit", icon: "dumbbell", href: "#/cf", tab: "cf" },
     { name: "Nutrição", icon: "apple", href: "#/nutricao", tab: "nutricao" },
     { name: "Coach AI", icon: "sparkles", href: "#/coach", tab: "coach" },
+    { name: "Dojo", icon: "landmark", href: "#/dojo", tab: "dojo" },
     { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
     { name: "Grupo", icon: "users", href: "#/grupo", tab: "grupo" },
     { name: "Perfil", icon: "user", href: "#/perfil", tab: "perfil" },
@@ -780,6 +781,7 @@
     },
 
 
+    dojo(p1) { setToolbar("dojo"); return DOJO_MOV[p1] ? dojoMovimento(DOJO_MOV[p1]) : dojoHome(); },
     evolucao() {
       setToolbar("evolucao");
       const seq = sequencia();
@@ -4952,6 +4954,7 @@
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     else if (IA[rota] && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
     else if (rota === "cf" && p1 !== undefined) alvo += `/${p1}`;
+    else if (rota === "dojo" && p1 && DOJO_MOV[p1]) alvo += `/${p1}`;
     if (location.hash !== alvo) history.replaceState(null, "", alvo);
     closeChat(true);
     app.innerHTML = telas[rota](p1, p2);
@@ -7136,6 +7139,63 @@
     return "";
   }
   // Mestre que conduz a pessoa: o estilo dos treinos dela ou, antes do primeiro treino, o estilo da trilha escolhida
+  /* ---------- Dojo: técnica dos movimentos, guiada pelo Sensei do seu estilo ---------- */
+  const DOJO = window.FITAI_DOJO || { trilhas: [], grupos: {}, movimentos: [] };
+  const DOJO_MOV = Object.fromEntries(DOJO.movimentos.map((m) => [m.id, m]));
+  let dojoFiltro = "meu";
+  function senseiDe() {
+    const e = estiloAtual().slug || ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], g = sexoArte();
+    return { e, E, g, nome: E.mestre[g], carta: `assets/estilos/${e}-${g}.webp` };
+  }
+  function dojoHome() {
+    const s = senseiDe(), T = DOJO.trilhas[0] || { nome: "Fundamentos", ic: "⛩️", desc: "" };
+    const lista = DOJO.movimentos.filter((m) => dojoFiltro === "todos" || m.estilos.includes(s.e));
+    const card = (m) => `<a class="dj-card" href="#/dojo/${m.id}">
+        <span class="dj-thumb">${m.anim ? `<img src="assets/anim/${m.anim}.jpg" alt="" loading="lazy">` : `<span class="dj-sem">🪢</span>`}</span>
+        <span class="dj-nome">${esc(m.nome)}</span><span class="dj-grupo">${esc(DOJO.grupos[m.grupo] || "")}</span></a>`;
+    return `<section class="screen has-toolbar dojo">
+      <header class="header"><span class="logo-txt dark">Fit.ai</span></header>
+      <div class="dj-hero">
+        <img class="dj-sensei" src="${s.carta}" alt="Carta de ${esc(s.nome)}">
+        <div><p class="qz-kicker">⛩️ Dojo</p><h1>Técnica primeiro.</h1>
+          <p class="dj-fala"><b>Sensei ${esc(s.nome)}</b> ${s.E.ic}: “Antes de buscar variações, domine os fundamentos. Repetição bem feita vale mais que repetição a mais.”</p></div>
+      </div>
+      <div class="section">
+        <div class="sec-head"><h2>${T.ic} ${esc(T.nome)}</h2><span>${lista.length} movimentos</span></div>
+        <p class="note">${esc(T.desc)}</p>
+        <div class="seg dj-filtro"><button class="${dojoFiltro === "meu" ? "on" : ""}" data-dj-filtro="meu">${s.E.ic} Base ${esc(s.E.nome)}</button><button class="${dojoFiltro === "todos" ? "on" : ""}" data-dj-filtro="todos">Todos os estilos</button></div>
+        <div class="dj-grid">${lista.map(card).join("")}</div>
+      </div>
+      <div class="section"><p class="note small">Em breve no Dojo: habilidades de cada estilo e mobilidade. As dicas são de apoio e não substituem um profissional de educação física.</p></div>
+    </section>`;
+  }
+  function dojoMovimento(m) {
+    const s = senseiDe(), base = m.estilos.includes(s.e);
+    return `<section class="screen has-toolbar dojo">
+      <header class="header"><a class="dj-voltar" href="#/dojo">← Dojo</a></header>
+      <div class="dj-mov">
+        ${m.anim ? `<video class="dj-video" src="assets/anim/${m.anim}.mp4" poster="assets/anim/${m.anim}.jpg" autoplay loop muted playsinline></video>` : `<div class="dj-video dj-sem-video">🪢</div>`}
+        <p class="qz-kicker">${esc(DOJO.grupos[m.grupo] || "")}${base ? ` · base do ${esc(s.E.nome)}` : ""}</p>
+        <h1>${esc(m.nome)}</h1>
+        <p class="note">${esc(m.musculos)}</p>
+        <h2 class="dj-h">Como fazer</h2>
+        <ol class="dj-passos">${m.passos.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
+        <h2 class="dj-h">Erros comuns</h2>
+        <ul class="dj-erros">${m.erros.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        <p class="dj-resp">💨 ${esc(m.respira)}</p>
+        <div class="dj-nivel"><div><b>⬇️ Para facilitar</b><p>${esc(m.facil)}</p></div><div><b>⬆️ Para evoluir</b><p>${esc(m.dificil)}</p></div></div>
+        <p class="dj-estilos">${m.estilos.map((k) => `<span>${ESTILOS[k].ic} ${esc(ESTILOS[k].nome)}</span>`).join("")}</p>
+        <button type="button" class="btn btn-blue dj-perguntar" data-dj-perguntar="${m.id}"><img src="${s.carta}" alt="">Perguntar ao Sensei ${esc(s.nome)}</button>
+        <p class="note small">Sentiu dor (não o cansaço normal do músculo)? Pare e procure um profissional.</p>
+      </div>
+    </section>`;
+  }
+  document.addEventListener("click", (e) => {
+    const f = e.target.closest?.("[data-dj-filtro]");
+    if (f) { dojoFiltro = f.dataset.djFiltro; render(); return; }
+    const q = e.target.closest?.("[data-dj-perguntar]");
+    if (q) { const m = DOJO_MOV[q.dataset.djPerguntar]; if (m) openChat(`Sensei, quero acertar a técnica do ${m.nome}. Olhando o meu nível e os meus treinos, qual o ponto que devo cuidar mais e por qual variação começo?`); }
+  });
   function mestreHtml() {
     const e = estiloAtual().slug || ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], T = TRILHAS[trilha()], g = sexoArte(), nome = E.mestre[g];
     return `<div class="fc-mestre">
