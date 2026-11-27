@@ -2482,3 +2482,37 @@ button.alb-it:active { transform: scale(0.96); }
 .acamp .agua-rapida .btn { flex: none; height: 34px; padding: 0 10px; font-size: 13px; }
 .acamp .agua-rapida.falta { border-color: rgba(111, 182, 255, .55); box-shadow: 0 0 0 3px rgba(111, 182, 255, .12); }
 .acamp .agua-rapida .btn { width: auto; min-width: 0; margin: 0; } .acamp .agua-rapida b { white-space: nowrap; } .acamp .agua-rapida small { line-height: 1.3; }
+
+/* Atividade extra e exercício fora do card */
+.extra-home { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.extra-home .btn { flex: none; height: 34px; padding: 0 12px; font-size: 13px; width: auto; }
+.ex-form { display: flex; flex-direction: column; gap: 10px; text-align: left; max-height: 70vh; overflow-y: auto; }
+.ex-form h2 { margin: 0; text-align: center; }
+.ex-form .gami-k { text-align: center; }
+.ex-gr { margin: 6px 0 0; font-size: 13px; font-weight: 700; }
+.ex-gr small { font-weight: 500; opacity: .7; }
+.ex-ops { display: flex; flex-wrap: wrap; gap: 6px; }
+.ex-ops .chip { font-size: 13px; }
+.ex-min input { display: none; }
+.ex-min:has(input:checked) { background: var(--blue, #2f5bff); color: #fff; border-color: transparent; }
+.ex-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.ex-form .btn[disabled] { opacity: .5; }
+.ex-hoje { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.exx { padding: 14px; border-radius: 16px; border: 1px dashed rgba(127,127,127,.4); display: flex; flex-direction: column; gap: 10px; }
+.exx-k { margin: 0; font-weight: 800; font-size: 15px; }
+.exx-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.exx-lista li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(127,127,127,.12); font-size: 13px; }
+.exx-lista b { flex: none; } .exx-lista span { flex: 1; min-width: 0; opacity: .8; }
+.exx-form { display: flex; flex-direction: column; gap: 8px; }
+.exx-form > input { width: 100%; }
+.exx-g { display: grid; grid-template-columns: 70px minmax(0, 1fr) 90px; gap: 8px; align-items: end; }
+.exx-g label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; min-width: 0; }
+.exx-g label select { padding: 2px 4px; font-size: 12px; }
+.exx-g input { width: 100%; min-width: 0; }
+.exx input, .exx select, .ex-form select, .ex-form input[name=nome] { height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.1); color: inherit; font: inherit; font-size: 14px; }
+.exx-g label select { height: 24px; padding: 0 4px; border-radius: 6px; font-size: 12px; }
+.ex-ops .chip.primary { box-shadow: 0 0 0 2px #ffd23f; }
+.exx-btn { width: 100%; }
+.exx-wrap { display: flex; flex-direction: column; gap: 8px; }
+.exx-res { margin: 0; font-size: 12.5px; opacity: .8; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.exx-res .lnk-btn { padding: 0 2px; font-size: 12px; }

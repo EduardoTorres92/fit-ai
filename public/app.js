@@ -761,6 +761,7 @@
         ${ehHoje ? "" : `<button class="btn btn-outline" id="trocar" data-w="${w}" data-d="${d}">Fazer este treino hoje</button>`}
         ${ehHoje ? corridaHoje(t) : ""}
         <div class="ex-list">${t.ex.map((e) => exCard(e, ehHoje)).join("")}</div>
+        ${ehHoje ? exxHtml("cal") : ""}
         ${ehHoje ? `<button class="btn btn-outline${feito(hojeKey) ? " done" : ""}" id="concluir">${feito(hojeKey) ? "Treino concluído ✓" : "Marcar como concluído"}</button>` : ""}
         ${ehHoje && feito(hojeKey) ? `<button class="btn btn-outline btn-strava" id="resumo">Copiar resumo para o Strava</button>` : ""}
         </div></section>`;
@@ -1382,6 +1383,64 @@
       <div class="progress"><div class="bar"><i style="width:${Math.min(100, Math.round((sets.length / ex.series) * 100))}%"></i></div><span>${sets.length}/${ex.series} ${plural}</span></div>` : ""}
     </div>`;
   }
+  /* ---------- Exercício fora do card: o que a pessoa fez além do que o Sensei passou ----------
+     l.extra = [{ nome, un: "reps" | "s", sets: [{ r, kg? }] }] no log do dia (calistenia: S.logs; programas de IA: S[pk].logs) */
+  function exxCatalogo() {
+    const nomes = new Set();
+    try { Object.values(EXI).forEach((e) => e?.nome && nomes.add(e.nome)); } catch {}
+    try { IAK.forEach((pk) => Object.values(IA[pk].ci || {}).forEach((e) => e?.nome && nomes.add(e.nome))); } catch {}
+    return [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")).slice(0, 600);
+  }
+  const exxLog = (alvo) => (alvo === "cal" ? S.logs[hojeKey] : S[alvo]?.logs[hojeKey]);
+  function exxGarantir(alvo) {
+    if (alvo === "cal") { if (!S.logs[hojeKey]) { const { w, d } = ativoHoje(); S.logs[hojeKey] = { w, d, sets: {}, dur: 0, done: false }; } return S.logs[hojeKey]; }
+    return iaGarantirLog(alvo);
+  }
+  // Botão no treino de hoje: abre o Sensei esperando o exercício extra ("3x15 flexão, 2x60s prancha, 4x10 supino 40kg")
+  function exxHtml(alvo) {
+    const lista = exxLog(alvo)?.extra || [];
+    return `<div class="exx-wrap" data-exx-wrap="${alvo}"><button type="button" class="btn btn-outline exx-btn" data-exx-chat="${alvo}">➕ Exercício extra</button>
+      ${lista.length ? `<p class="exx-res">Fora do card: ${lista.map((x, i) => `<span>${esc(x.nome)} ${x.sets.length}×${x.sets[0]?.r}${x.un === "s" ? "s" : ""}${x.sets[0]?.kg ? ` ${String(x.sets[0].kg).replace(".", ",")}kg` : ""} <button type="button" class="lnk-btn" data-exx-del="${alvo}|${i}" aria-label="Apagar ${esc(x.nome)}">✕</button></span>`).join("")}</p>` : ""}</div>`;
+  }
+  let exxChat = null;
+  function exxParse(t) {
+    const out = [];
+    for (let p of String(t).split(/[,;\n+]|\s+e\s+/i)) {
+      p = ` ${p.trim()} `; if (!p.trim()) continue;
+      let kg = 0, n = 1, r = 0, un = "reps";
+      p = p.replace(/(\d+(?:[.,]\d+)?)\s*(kg|quilos?)\b/i, (m, v) => { kg = Number(v.replace(",", ".")); return " "; });
+      let m = p.match(/(\d+)\s*(?:x|×|s[ée]ries?\s+de)\s*(\d+)\s*(s\b|seg\w*|min\w*|")?/i);
+      if (m) { n = +m[1]; r = +m[2]; if (m[3]) { un = "s"; if (/^min/i.test(m[3])) r *= 60; } p = p.replace(m[0], " "); }
+      else { m = p.match(/(\d+)\s*(s\b|seg\w*|min\w*|")?/i); if (!m) continue; r = +m[1]; if (m[2]) { un = "s"; if (/^min/i.test(m[2])) r *= 60; } p = p.replace(m[0], " "); }
+      const nome = p.replace(/\b(de|repeti[çc][õo]es|reps?|s[ée]ries?|com|fiz|fazendo)\b/gi, " ").replace(/\s+/g, " ").trim();
+      if (!nome || !(r > 0)) continue;
+      out.push({ nome: (nome[0].toUpperCase() + nome.slice(1)).slice(0, 60), un, sets: Array.from({ length: Math.min(20, Math.max(1, n)) }, () => ({ r: Math.min(999, r), ...(kg ? { kg: Math.min(500, kg) } : {}) })) });
+    }
+    return out;
+  }
+  function exxChatResposta(texto) {
+    const alvo = exxChat;
+    if (/^cancelar$/i.test(texto.trim())) { exxChat = null; addMsg(msgsEl, "Beleza, nada anotado. 👍", false, chatLog); setChips(chipsEl, CHIPS_PADRAO); return; }
+    const xs = exxParse(texto);
+    if (!xs.length) { addMsg(msgsEl, "Não entendi as séries. 🤔 Escreve assim: <b>3x15 flexão</b>, <b>2x60s prancha</b>, <b>4x10 supino 40kg</b>.", false, chatLog); return; }
+    const l = exxGarantir(alvo); (l.extra = l.extra || []).push(...xs);
+    exxChat = null; save();
+    const w = document.querySelector(`[data-exx-wrap="${alvo}"]`); if (w) w.outerHTML = exxHtml(alvo); // sem render(): o chat continua aberto
+    addMsg(msgsEl, `Anotado no treino de hoje ✅<br>${xs.map((x) => `• <b>${esc(x.nome)}</b>: ${x.sets.length}×${x.sets[0].r}${x.un === "s" ? "s" : ""}${x.sets[0].kg ? ` com ${String(x.sets[0].kg).replace(".", ",")} kg` : ""}`).join("<br>")}<br>Conta para os recordes, chefes e incursões. 💪`, false, chatLog);
+    setChips(chipsEl, ["Exercício extra", ...CHIPS_PADRAO.slice(0, 3)]);
+  }
+  function exxAbrirChat(alvo) {
+    exxChat = alvo; openChat();
+    addMsg(msgsEl, `Bora anotar o que você fez fora do card! 💪 Me diz o exercício e as séries, do jeito que lembrar:<br>• <b>3x15 flexão</b><br>• <b>2x60s prancha</b><br>• <b>4x10 supino 40kg</b><br>Pode mandar vários numa mensagem, separados por vírgula.`, false, chatLog);
+    setChips(chipsEl, ["Cancelar"]);
+    if (matchMedia("(hover: hover)").matches) $("#chat-input")?.focus();
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-exx-chat]"); if (b) exxAbrirChat(b.dataset.exxChat); });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-exx-del]"); if (!b) return;
+    const [alvo, i] = b.dataset.exxDel.split("|"), l = exxLog(alvo); if (!l?.extra) return;
+    l.extra.splice(Number(i), 1); if (!l.extra.length) delete l.extra; save(); render();
+  });
   function telaIaDia(pk, d, w) {
     const t = iaSessao(pk, d, w), l = iaLogHoje(pk);
     const ehHoje = l ? l.d === d && (l.w ?? 0) === w : !!iaHoje(pk) && iaHoje(pk).d === d && iaHoje(pk).w === w;
@@ -1397,6 +1456,7 @@
       ${ehHoje ? `<div class="note-box"><p>${dicaReg}. O contador mostra em qual ${t.rodadas ? "volta" : "série"} você está e o descanso começa sozinho. Na próxima vez, o app compara com hoje.</p></div>`
         : `<button class="btn btn-outline" data-ia-hoje="${d}" data-w="${w}" data-pk="${pk}">Fazer este treino hoje</button>`}
       <div class="ex-list">${t.exercicios.map((ex) => iaExCard(pk, ex, ehHoje, t)).join("")}</div>
+      ${ehHoje ? exxHtml(pk) : ""}
       ${ehHoje ? `<button class="btn btn-outline${done ? " done" : ""}" data-ia-concluir="${pk}">${done ? "Treino concluído ✓" : "Marcar como concluído"}</button>` : ""}
       </div></section>`;
   }
@@ -3096,7 +3156,7 @@
     for (const [k, l] of Object.entries(S.logs)) {
       const t = treino(l.w, l.d);
       out.push({ data: k, programa: "calistenia", titulo: (t ? t.titulo : "Treino").slice(0, 120), concluido: !!l.done, minutos: Math.min(600, minCalistenia(l)),
-        detalhes: { w: l.w, d: l.d, sets: l.sets || {}, dur: l.dur || 0, done: !!l.done } });
+        detalhes: { w: l.w, d: l.d, sets: l.sets || {}, dur: l.dur || 0, done: !!l.done, ...(l.extra?.length ? { extra: l.extra } : {}) } });
     }
     for (const p of VKEYS) for (const [k, l] of Object.entries(S[p].logs)) {
       const t = insDia(p, l.w, l.d), av = (l.avulso || []).map((id) => INSV[id]?.nome || id);
@@ -3107,7 +3167,12 @@
     for (const pk of IAK) for (const [k, l] of Object.entries(S[pk].logs)) {
       const t = iaSessao(pk, l.d, l.w ?? 0);
       out.push({ data: k, programa: pk, titulo: (t ? t.titulo : IA[pk].rotulo).slice(0, 120), concluido: !!l.done, minutos: Math.min(600, iaMin(pk, l)),
-        detalhes: { d: l.d, ...(l.w != null ? { w: l.w } : {}), sets: l.sets || {}, done: !!l.done } });
+        detalhes: { d: l.d, ...(l.w != null ? { w: l.w } : {}), sets: l.sets || {}, done: !!l.done, ...(l.extra?.length ? { extra: l.extra } : {}) } });
+    }
+    for (const [k, l] of Object.entries(S.extras || {})) for (const gr of Object.keys(EXTRA_GR)) {
+      const it = (l || []).filter((a) => EXTRA_DE(a).gr === gr); if (!it.length) continue;
+      out.push({ data: k, programa: `extra-${gr}`, titulo: it.map((a) => EXTRA_DE(a).nome).join(" + ").slice(0, 120), concluido: true, minutos: Math.min(600, soma(it.map((a) => Number(a.min) || 0))),
+        detalhes: { itens: it.map((a) => ({ id: a.id, ...(a.nome ? { nome: a.nome } : {}), gr: EXTRA_DE(a).gr, min: Number(a.min) || 0, int: a.int || "moderada" })), done: true } });
     }
     for (const [k, l] of Object.entries(S.cf.logs)) {
       if (!l.wod) continue;
@@ -3223,7 +3288,7 @@
         if (antes > (d.feitos || []).length + (d.avulso || []).length) localMaior.add(`${r.data}|${r.programa}`);
       }
       if (r.programa === "calistenia" && !S.logs[r.data]) {
-        S.logs[r.data] = { w: d.w === "E" ? "E" : Number(d.w) || 0, d: Number(d.d) || 0, sets: d.sets && typeof d.sets === "object" ? d.sets : {}, dur: Number(d.dur) || 0, done: !!d.done }; mudou = true;
+        S.logs[r.data] = { w: d.w === "E" ? "E" : Number(d.w) || 0, d: Number(d.d) || 0, sets: d.sets && typeof d.sets === "object" ? d.sets : {}, dur: Number(d.dur) || 0, done: !!d.done, ...(Array.isArray(d.extra) ? { extra: d.extra.slice(0, 20) } : {}) }; mudou = true;
       }
       if (r.programa === "cf" && !S.cf.logs[r.data] && d.wod && Array.isArray(d.wod.partes)) {
         S.cf.logs[r.data] = { wod: d.wod, res: d.res && typeof d.res === "object" ? d.res : {}, done: !!d.done, ...(d.msg ? { msg: String(d.msg) } : {}) }; mudou = true;
@@ -3232,10 +3297,15 @@
         const itens = d.itens.map(ativLimpa).filter(Boolean);
         if (itens.length) { S.corrida.logs[r.data] = { itens }; mudou = true; }
       }
+      if (/^extra-/.test(r.programa) && Array.isArray(d.itens)) {
+        const tem = (S.extras?.[r.data] || []).some((a) => EXTRA_DE(a).gr === r.programa.slice(6));
+        if (!tem) { const it = d.itens.filter((a) => a && (EXTRA[a.id] || a.nome)).slice(0, 10).map((a) => ({ id: EXTRA[a.id] ? a.id : "outra", ...(a.nome ? { nome: String(a.nome).slice(0, 40) } : {}), ...(EXTRA[a.id] ? {} : { gr: EXTRA_GR[a.gr] ? a.gr : "individual" }), min: Math.min(600, Number(a.min) || 0), int: a.int || "moderada" }));
+          if (it.length) { S.extras = S.extras || {}; S.extras[r.data] = [...(S.extras[r.data] || []), ...it]; mudou = true; } }
+      }
       if (IA[r.programa] && !S[r.programa].logs[r.data]) {
         const sets = {};
         for (const [id, v] of Object.entries(d.sets && typeof d.sets === "object" ? d.sets : {})) if (Array.isArray(v)) sets[id] = v.filter((x) => x && Number(x.r) > 0).map((x) => ({ ...(Number(x.kg) > 0 ? { kg: Number(x.kg) } : {}), r: Number(x.r) }));
-        S[r.programa].logs[r.data] = { d: Number(d.d) || 0, ...(d.w != null ? { w: Number(d.w) || 0 } : {}), sets, done: !!d.done }; mudou = true;
+        S[r.programa].logs[r.data] = { d: Number(d.d) || 0, ...(d.w != null ? { w: Number(d.w) || 0 } : {}), sets, done: !!d.done, ...(Array.isArray(d.extra) ? { extra: d.extra.slice(0, 20) } : {}) }; mudou = true;
       }
       if (VP[r.programa] && !S[r.programa].logs[r.data]) {
         S[r.programa].logs[r.data] = { w: Number(d.w) || 0, d: Number(d.d) || 0, feitos: Array.isArray(d.feitos) ? d.feitos.filter((x) => INSV[x]) : [], max: d.max && typeof d.max === "object" ? d.max : {},
@@ -3458,11 +3528,64 @@
   const hmsDe = (s) => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`; };
   const segAtiv = (t) => { const p = String(t || "").trim().split(":").map(Number); if (!p.length || p.some((x) => !Number.isFinite(x) || x < 0)) return 0; return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0] * 60; };
   let ativLendo = false;
+  /* ---------- Atividades extras: esporte sem métrica (aula de bike, dança, futebol, tênis…) ----------
+     Contam como treino do dia (XP, sequência, missão, HP) e puxam o estilo: cardio = Ninja, coletivo = Berserker, individual = Ronin. */
+  const EXTRA_GR = { cardio: { nome: "Cardio", estilo: "ninja" }, coletivo: { nome: "Esporte coletivo", estilo: "berserker" }, individual: { nome: "Esporte individual", estilo: "ronin" } };
+  const EXTRA = {
+    bike: { nome: "Aula de bike", ic: "🚴", gr: "cardio" }, danca: { nome: "Dança", ic: "💃", gr: "cardio" }, zumba: { nome: "Zumba", ic: "🪩", gr: "cardio" },
+    aerobico: { nome: "Aeróbico / step", ic: "🤸", gr: "cardio" }, jump: { nome: "Jump", ic: "🦘", gr: "cardio" }, funcional: { nome: "Funcional / HIIT", ic: "🔥", gr: "cardio" },
+    eliptico: { nome: "Elíptico / remo", ic: "🚣", gr: "cardio" },
+    futebol: { nome: "Futebol", ic: "⚽", gr: "coletivo" }, futevolei: { nome: "Futevôlei", ic: "🏐", gr: "coletivo" }, volei: { nome: "Vôlei", ic: "🏐", gr: "coletivo" },
+    basquete: { nome: "Basquete", ic: "🏀", gr: "coletivo" }, handebol: { nome: "Handebol", ic: "🤾", gr: "coletivo" },
+    tenis: { nome: "Tênis", ic: "🎾", gr: "individual" }, beach: { nome: "Beach tennis", ic: "🏖️", gr: "individual" }, luta: { nome: "Luta (jiu-jitsu, muay thai, boxe)", ic: "🥊", gr: "individual" },
+    natacao: { nome: "Natação", ic: "🏊", gr: "individual" }, escalada: { nome: "Escalada", ic: "🧗", gr: "individual" }, yoga: { nome: "Yoga / pilates", ic: "🧘", gr: "individual" },
+    skate: { nome: "Skate / surf", ic: "🛹", gr: "individual" },
+  };
+  const EXTRA_DE = (a) => (EXTRA[a.id] ? EXTRA[a.id] : { nome: a.nome || "Atividade", ic: "🏅", gr: EXTRA_GR[a.gr] ? a.gr : "individual" });
+  function extraAbrir(sel = "", gr = "") {
+    const hojeIt = S.extras?.[hojeKey] || [];
+    dlgGami(`<form class="ex-form" data-extra-form>
+      <p class="gami-k">Atividade extra</p><h2>O que você fez hoje?</h2>
+      ${Object.entries(EXTRA_GR).map(([g, G0]) => `<p class="ex-gr">${esc(G0.nome)} <small>conta para o estilo ${esc(ESTILOS[G0.estilo].nome)} ${ESTILOS[G0.estilo].ic}</small></p>
+        <div class="ex-ops">${Object.entries(EXTRA).filter(([, x]) => x.gr === g).map(([id, x]) => `<button type="button" class="chip${sel === id ? " primary" : ""}" data-extra-sel="${id}">${x.ic} ${esc(x.nome)}</button>`).join("")}</div>`).join("")}
+      <p class="ex-gr">Outra</p><div class="ex-ops"><button type="button" class="chip${sel === "outra" ? " primary" : ""}" data-extra-sel="outra">🏅 Outra atividade</button></div>
+      <input type="hidden" name="id" value="${esc(sel)}">
+      ${sel === "outra" ? `<label>Qual atividade?<input name="nome" maxlength="40" required placeholder="Ex.: Canoagem"></label>
+        <label>Ela é mais…<select name="gr">${Object.entries(EXTRA_GR).map(([g, G0]) => `<option value="${g}"${g === gr ? " selected" : ""}>${esc(G0.nome)}</option>`).join("")}</select></label>` : ""}
+      <label>Quanto tempo?<div class="ex-ops">${[30, 45, 60, 90].map((m) => `<label class="chip ex-min"><input type="radio" name="min" value="${m}"${m === 60 ? " checked" : ""}> ${m} min</label>`).join("")}</div></label>
+      <label>Intensidade<select name="int"><option value="leve">Leve</option><option value="moderada" selected>Moderada</option><option value="intensa">Intensa</option></select></label>
+      <button type="submit" class="btn btn-blue"${sel ? "" : " disabled"}>Lançar atividade</button>
+      ${hojeIt.length ? `<p class="ex-gr">Hoje</p><ul class="ex-hoje">${hojeIt.map((a, i) => `<li>${EXTRA_DE(a).ic} ${esc(EXTRA_DE(a).nome)} · ${a.min} min <button type="button" class="lnk-btn" data-extra-del="${i}" aria-label="Apagar">✕</button></li>`).join("")}</ul>` : ""}
+    </form>`, "Fechar");
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-extra-abrir],[data-extra-sel],[data-extra-del]"); if (!b) return;
+    if (b.hasAttribute("data-extra-abrir")) extraAbrir();
+    else if (b.dataset.extraSel) extraAbrir(b.dataset.extraSel);
+    else if (b.dataset.extraDel) {
+      const l = S.extras?.[hojeKey] || [], [a] = l.splice(Number(b.dataset.extraDel), 1);
+      if (!l.length) delete S.extras[hojeKey];
+      if (a && uid && sb && !l.some((x) => EXTRA_DE(x).gr === EXTRA_DE(a).gr)) sb.from("treinos").delete().eq("usuario_id", uid).eq("data", hojeKey).eq("programa", `extra-${EXTRA_DE(a).gr}`).then(() => {});
+      save(); extraAbrir(); render();
+    }
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target.closest("[data-extra-form]"); if (!f) return;
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(f)), id = d.id;
+    if (!id) return;
+    const a = { id, min: Math.max(5, Math.min(600, Number(d.min) || 60)), int: d.int || "moderada", ...(id === "outra" ? { nome: String(d.nome || "").trim().slice(0, 40) || "Atividade", gr: EXTRA_GR[d.gr] ? d.gr : "individual" } : {}) };
+    S.extras = S.extras || {}; (S.extras[hojeKey] = S.extras[hojeKey] || []).push(a);
+    save(); document.getElementById("gami-dlg")?.close(); render();
+    const x = EXTRA_DE(a); toast(`${x.ic} ${x.nome} lançada · conta como treino do dia e para o estilo ${ESTILOS[EXTRA_GR[x.gr].estilo].nome}`, 3800);
+  });
   function ativHome() {
     const hojeIt = S.corrida.logs[hojeKey]?.itens || [];
     return `<label class="emerg ativ-home${ativLendo ? " lendo" : ""}"><span>${ativLendo ? "⏳" : "🏃"}</span><div><strong>${ativLendo ? "Lendo o print…" : hojeIt.length ? `Hoje: ${esc(hojeIt.map(ativTitulo).join(" + "))} ✓` : "Correu, caminhou ou pedalou?"}</strong>
       <small>${ativLendo ? "O Coach está conferindo os números" : "Mande o print do Strava, do relógio ou da esteira e vira XP"}</small></div>
-      <em class="btn btn-blue">${hojeIt.length ? "+ Outra" : "Enviar print"}</em><input type="file" accept="image/*" data-ativ-print hidden${ativLendo ? " disabled" : ""}></label>`;
+      <em class="btn btn-blue">${hojeIt.length ? "+ Outra" : "Enviar print"}</em><input type="file" accept="image/*" data-ativ-print hidden${ativLendo ? " disabled" : ""}></label>
+      ${(() => { const ex = S.extras?.[hojeKey] || [];
+        return `<button type="button" class="emerg extra-home" data-extra-abrir><span>🏅</span><div><strong>${ex.length ? `Hoje: ${esc(ex.map((a) => EXTRA_DE(a).nome).join(" + "))} ✓` : "Fez aula, dança ou esporte?"}</strong><small>Aula de bike, dança, futebol, tênis, luta… vale como treino do dia</small></div><em class="btn btn-outline">${ex.length ? "+ Outra" : "Lançar"}</em></button>`; })()}`;
   }
   function secaoAtividades() {
     const dias = Object.entries(S.corrida.logs).filter(([, l]) => l.itens?.length).sort((a, b) => b[0].localeCompare(a[0]));
@@ -5216,6 +5339,8 @@
     if (rota === "treino") alvo += `/${p1}/${p2}`;
     else if (VP[rota] && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
     else if (rota === "grupo" && (p1 === "entrar" || p1 === "membro") && p2) alvo += `/${p1}/${p2}`;
+    else if (rota === "grupo" && (p1 === "mural" || p1 === "missoes")) alvo += `/${p1}` + (p2 ? `/${p2}` : "");
+    else if (rota === "cla" && p1 === "membro" && p2) alvo += `/${p1}/${p2}`;
     else if (rota === "plano" && p1 !== undefined) alvo += `/${p1}`;
     else if (IA[rota] && p1 !== undefined) alvo += `/${p1}` + (p2 !== undefined ? `/${p2}` : "");
     else if (rota === "cf" && p1 !== undefined) alvo += `/${p1}`;
@@ -5946,6 +6071,8 @@
     if (!texto || busy) return;
     const coach = chatPapel === "coach";
     if (coach && iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
+    if (coach && exxChat) { addMsg(msgsEl, esc(texto), true, chatLog); exxChatResposta(texto); return; }
+    if (coach && /^exerc[ií]cio extra$/i.test(texto)) { const pk = principal(); exxAbrirChat(IA[pk] ? pk : "cal"); return; }
     if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar na guilda|lançar em todas as guildas|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
     if (coach && atalhoHoje(texto)) return;
     busy = true;
@@ -6677,7 +6804,7 @@
      Conta treinos, recordes, meta da semana, água, desafio da guilda e o desafio de 7 dias. O dos outros sai
      das linhas de treino e do que cada um sincronizou (perfis.config).
      ========================================================== */
-  const MOD_DE = (pr) => (pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
+  const MOD_DE = (pr) => (pr === "extra-cardio" ? "insanity" : pr === "extra-coletivo" ? "cross" : pr === "extra-individual" ? "hibrido" : pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
   const LIGA_T = {
     insanity: { nome: "Insanity", rot: "Canguru", img: "assets/chefes/canguru-rosto.webp" },
     cross: { nome: "Cross", rot: "Loba", img: "assets/chefes/loba-rosto.webp" },
@@ -6944,7 +7071,7 @@
     ronin: { nome: "Ronin", ic: "⚔️", liga: "hibrido", desc: "mistura duas ou mais modalidades", mestre: { m: "Takeshi", f: "Ayame" }, lema: "Sem mestre, sem caminho único." },
   };
   const ESTILO_DA_LIGA = Object.fromEntries(Object.entries(ESTILOS).map(([k, e]) => [e.liga, k]));
-  const TIPOS_TREINO = [["insanity", "Insanity", "#ff6b8b"], ["calistenia", "Calistenia", "#4fd2ff"], ["hipertrofia", "Academia", "#ffb45e"], ["corrida", "Corrida", "#4ee39b"], ["cross", "Cross", "#c78bff"]];
+  const TIPOS_TREINO = [["insanity", "Insanity", "#ff6b8b"], ["calistenia", "Calistenia", "#4fd2ff"], ["hipertrofia", "Academia", "#ffb45e"], ["corrida", "Corrida", "#4ee39b"], ["cross", "Cross", "#c78bff"], ["hibrido", "Esportes", "#ffd23f"]];
   const RONIN_VARIEDADE = 3;
   function estiloDe(rows) {
     const fe = feitas(rows), n = {}; // todo o histórico conta
@@ -6991,6 +7118,7 @@
       const un = e.med === "s" ? "s" : unDe(pk, e);
       for (const x of s || []) { if (!x) continue; out.push({ data: k, nome: e.nome, kg: x.kg || 0, ...(un === "s" ? { s: x.r || 0 } : un === "reps" ? { reps: x.r || 0 } : {}) }); }
     }
+    for (const [k, l] of [...Object.entries(S.logs), ...IAK.flatMap((pk) => Object.entries(S[pk].logs))]) for (const x of l.extra || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
     for (const pr of S.cf?.prs || []) out.push({ data: pr.k || hojeKey, nome: pr.mov || "", kg: pr.kg || 0, reps: pr.reps || 0 });
     for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (ehCorrida(a.tipo) && a.km) out.push({ data: k, nome: "corrida", km: a.km });
     return out;
@@ -7154,7 +7282,7 @@
   }
   const videosDia = (k) => soma(VKEYS.map((p) => (S[p].logs[k]?.feitos || []).length));
   const MISSOES = {
-    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) || VKEYS.some((p) => (S[p].logs[k]?.feitos || []).some((id) => INSV[id]?.tipo !== "Abdômen")) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
+    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) || (S.extras?.[k] || []).length || VKEYS.some((p) => (S[p].logs[k]?.feitos || []).some((id) => INSV[id]?.tipo !== "Abdômen")) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
     minutos: { ic: "⏱️", t: "Treine 30 minutos", v: minutosDia, alvo: () => 30, fmt: (v, a) => `${Math.min(v, a)}/${a} min` },
     series: { ic: "🔁", t: "Registre 15 séries", v: seriesDia, alvo: () => 15, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
     abs: { ic: "🔥", t: "Faça um vídeo de abdômen", v: absDia, alvo: () => 1, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
