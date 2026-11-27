@@ -2209,11 +2209,15 @@ button.alb-it:active { transform: scale(0.96); }
 .ar-carta.t0 img { filter: brightness(0) contrast(1); opacity: .85; }
 .ar-carta.t0 { background: #120d22; }
 .ar-q { position: absolute; inset: 0; display: grid; place-items: center; font: 700 46px "Pixelify Sans", sans-serif; color: #7a6aa8; }
-.ar-carta.t1 img { filter: sepia(.85) saturate(1.35) hue-rotate(-12deg) brightness(.92); }
-.ar-carta.t1 { box-shadow: 0 0 0 3px #b06a3a; }
-.ar-carta.t2 img { filter: grayscale(1) brightness(1.1) contrast(1.08); }
-.ar-carta.t2 { box-shadow: 0 0 0 3px #c9d2e0, 0 0 14px rgba(220, 230, 255, .35); }
-.ar-carta.t3 { box-shadow: 0 0 0 3px #e8b04a, 0 0 22px rgba(255, 200, 80, .55); }
+/* A arte mantém as cores em todos os níveis: o nível aparece na moldura de metal em volta e num brilho que passa */
+.ar-carta.t1, .ar-carta.t2, .ar-carta.t3 { padding: 5px; }
+.ar-carta.t1 { background: linear-gradient(135deg, #6b3a1a, #e0995a 30%, #8a4a22 55%, #f0b070 75%, #6b3a1a); box-shadow: 0 0 12px rgba(210, 130, 60, .35); }
+.ar-carta.t2 { background: linear-gradient(135deg, #7d8796, #f4f7fb 30%, #9aa4b2 55%, #ffffff 75%, #7d8796); box-shadow: 0 0 14px rgba(220, 230, 255, .4); }
+.ar-carta.t3 { background: linear-gradient(135deg, #8a5a08, #ffe08a 30%, #c08a1a 55%, #fff1b8 75%, #8a5a08); box-shadow: 0 0 22px rgba(255, 200, 80, .55); }
+.ar-carta.t1 img, .ar-carta.t2 img, .ar-carta.t3 img { border-radius: 6px; }
+.ar-carta.t1::after, .ar-carta.t2::after, .ar-carta.t3::after { content: ""; position: absolute; inset: 5px; border-radius: 6px; pointer-events: none; background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, .28) 50%, transparent 60%); background-size: 300% 100%; animation: ar-brilho 5s ease-in-out infinite; }
+.ar-carta.t1::after { opacity: .5; } .ar-carta.t2::after { opacity: .75; }
+@media (prefers-reduced-motion: reduce) { .ar-carta.t1::after, .ar-carta.t2::after, .ar-carta.t3::after { animation: none; opacity: 0; } }
 .ar-carta.t4 { box-shadow: 0 0 0 3px #b48aff, 0 0 24px rgba(160, 220, 255, .55); }
 .ar-carta.t4::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(122, 240, 255, .25), rgba(200, 122, 255, .25), rgba(255, 214, 107, .25), transparent 70%); background-size: 250% 250%; mix-blend-mode: color-dodge; animation: ar-brilho 4s linear infinite; }
 @keyframes ar-brilho { from { background-position: 100% 0; } to { background-position: -150% 0; } }
