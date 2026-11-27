@@ -6,7 +6,7 @@
 // LIMITE_GERAL_DIA, DADOS_DIR, PORT, TELEGRAM_TOKEN (opcional: o dono também pode colar no app), FITAI_URL. Iniciar: npm start.
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
@@ -81,20 +81,33 @@ async function arquivo(caminho) {
   return null;
 }
 
+// A CDN da Hostinger guarda .js e .css mesmo com no-cache e ignora "?v=". Por isso cada deploy ganha um caminho
+// novo: o HTML aponta para /v-<versão>/app.js e o servidor tira o prefixo. HTML nunca fica guardado.
+const VERSAO = Date.now().toString(36);
+const VERSIONADO = /^(.*?)\/v-[a-z0-9]+(\/.*)$/;
+const versionar = (html) => html.replace(/(<(?:script|link)\b[^>]*?\s(?:src|href)=")(?!https?:|\/\/|data:|#)([^"]+\.(?:js|css))"/g, `$1v-${VERSAO}/$2"`);
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
     const funcao = ROTAS[url.pathname];
     if (funcao) { await chamaFuncao(funcao, req, res); return; }
     if (req.method !== "GET" && req.method !== "HEAD") { res.writeHead(405, SEGURANCA).end(); return; }
-    const achado = await arquivo(url.pathname);
+    const vers = VERSIONADO.exec(url.pathname);
+    const achado = await arquivo(vers ? vers[1] + vers[2] : url.pathname);
     if (!achado) { res.writeHead(404, { ...SEGURANCA, "content-type": "text/plain; charset=utf-8" }).end("Página não encontrada."); return; }
     const tam = achado.info.size, cab = {
       ...SEGURANCA,
       "content-type": TIPOS[extname(achado.caminho).toLowerCase()] || "application/octet-stream",
       "accept-ranges": "bytes",
-      "cache-control": url.pathname.startsWith("/assets/") ? "public, max-age=604800" : "no-cache",
+      "cache-control": vers ? "public, max-age=31536000, immutable" : url.pathname.startsWith("/assets/") ? "public, max-age=604800" : "no-store",
     };
+    if (extname(achado.caminho).toLowerCase() === ".html") { // HTML com os .js e .css desta versão
+      const corpo = Buffer.from(versionar(await readFile(achado.caminho, "utf8")));
+      res.writeHead(200, { ...cab, "content-length": corpo.length });
+      res.end(req.method === "HEAD" ? undefined : corpo);
+      return;
+    }
     // Pedaços do arquivo (Range): o Safari do iPhone só toca vídeo se o servidor responder 206
     const faixa = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
     if (faixa && (faixa[1] || faixa[2])) {
