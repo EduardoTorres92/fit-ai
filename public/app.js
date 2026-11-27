@@ -7430,7 +7430,7 @@
   /* Loja/Inventário no formato de jogo: categorias na lateral, grade de itens, painel do item escolhido e o herói com balão */
   let ivCat = "armas", ivSel = "", mercCat = "armas", mkSel = "";
   const MERC_FALA = { armas: "Armas novas, novos exercícios! Escolha bem.", armaduras: "Roupa boa não muda o treino, mas muda o ânimo.", pocoes: "Poções só com a bênção de um nutricionista!", artefatos: "Relógios que medem cada passo da jornada." };
-  const lojaCats = (cat, attr) => `<nav class="lj-cats" aria-label="Categorias">${INV.CATS.map((c) => `<button type="button" class="lj-cat rp-rebites" ${attr}="${c.id}" aria-pressed="${c.id === cat}">${c.img ? `<img class="lj-cat-ic" src="${c.img}" alt="">` : INV.icone(c.ic, "lj-cat-ic", true)}<span>${esc(c.nome)}</span></button>`).join("")}</nav>`;
+  const lojaCats = (cat, attr) => `<nav class="lj-cats" aria-label="Categorias">${INV.CATS.map((c) => `<button type="button" class="lj-cat rp-rebites" ${attr}="${c.id}" aria-pressed="${c.id === cat}">${c.img ? `<img class="lj-cat-ic" src="${c.img}" alt="">` : INV.icone(c.ic, "lj-cat-ic", true)}<span>${esc(c.nome)}</span><em class="lj-cat-n">${INV.ITENS.filter((i) => i.cat === c.id).length}</em></button>`).join("")}</nav>`;
   const lojaFala = (fala, cls = "") => `<p class="lj-fala rp-rebites${cls}">${esc(fala)}</p>`;
   telas.arsenal = () => {
     setToolbar("vilarejo");
@@ -7448,8 +7448,8 @@
       </header>
       <div class="lj-loja">
         ${lojaCats(ivCat, "data-iv-cat")}
-        <div class="lj-grade">${lista.map((i) => `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}${invTem(i.id) ? " tem" : " falta"}" data-iv-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}${invTem(i.id) ? ", você tem" : ""}">${INV.icone(i.id)}<span class="lj-etq">${invTem(i.id) ? "✓ Tenho" : esc(i.curto)}</span></button>`).join("")}</div>
-        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img">${INV.icone(it.id)}</div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
+        <div class="lj-grade">${lista.map((i) => `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}${invTem(i.id) ? " tem" : " falta"}" data-iv-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}${invTem(i.id) ? ", você tem" : ""}">${INV.icone(i.id)}${invTem(i.id) ? `<span class="lj-badge tem">✓</span>` : ""}<span class="lj-etq">${esc(i.curto)}</span></button>`).join("")}</div>
+        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img"><span class="lj-foco" aria-hidden="true"></span><span class="lj-moldura">${INV.icone(it.id)}</span><span class="lj-pedestal" aria-hidden="true"></span></div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
           <button type="button" class="lj-btn${on ? " sec" : ""}" data-inv="${it.id}">${on ? "✓ No inventário<small>tocar para tirar</small>" : "Tenho este item"}</button></aside>` : ""}
       </div>
       ${lojaFala(`Poder do arsenal: ${lib} de ${tot} exercícios com equipamento liberados.`)}
@@ -7468,8 +7468,8 @@
       <div class="lj-loja">
         ${lojaCats(mercCat, "data-mc-cat")}
         <div class="lj-grade">${lista.map((i) => { const n = i.eq ? INV.liberados(i.id) : 0;
-          return `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}" data-mk-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}">${INV.icone(i.id)}<span class="lj-etq">${invTem(i.id) ? "✓ Tenho" : n ? `⚡ +${n}` : esc(i.curto)}</span></button>`; }).join("")}</div>
-        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img">${INV.icone(it.id)}</div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
+          return `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}" data-mk-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}">${INV.icone(i.id)}${invTem(i.id) ? `<span class="lj-badge tem">✓</span>` : n ? `<span class="lj-badge">+${n}</span>` : ""}<span class="lj-etq">${esc(i.curto)}</span></button>`; }).join("")}</div>
+        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img"><span class="lj-foco" aria-hidden="true"></span><span class="lj-moldura">${INV.icone(it.id)}</span><span class="lj-pedestal" aria-hidden="true"></span></div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
           ${on ? `<span class="lj-tem">✓ Já é seu</span>` : it.semLoja ? `<a class="lj-btn sec" href="#/arsenal">Marcar no inventário</a>`
             : `<button type="button" class="lj-btn${it.link ? "" : " breve"}" data-mc-oferta="${it.id}">${it.link ? "Ver oferta" : "Em breve"}</button>`}</aside>` : ""}
       </div>

@@ -2034,3 +2034,52 @@ button.alb-it:active { transform: scale(0.96); }
 /* Mercado: a fala do mercador vira caixa de diálogo dentro da cena (não fica atrás da barra de navegação no celular) */
 .lj-cena .lj-fala.na-cena { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; margin: 0; padding: 8px 12px; font-size: 13px; background-color: rgba(21, 16, 12, .9); }
 @media (min-width: 768px) { .lj-cena .lj-fala.na-cena { left: auto; right: 16px; bottom: 14px; max-width: 420px; font-size: 14px; } }
+
+/* ---------- Mercado e Inventário com muitos itens (layout de loja de jogo, celular primeiro) ----------
+   Celular: categorias numa faixa presa no topo, vitrine do item escolhido no pedestal sob o foco
+   (padrão "Bancada" do Pente Fino, ProfitizeBuild) e a grade com o nome de cada item sempre visível.
+   Tablet/PC: categorias à esquerda, grade no meio e a vitrine presa à direita. */
+.lj-loja { grid-template-columns: minmax(0, 1fr); grid-template-areas: "cats" "det" "grade"; gap: 10px; padding: 0 10px; }
+.lj-cats { grid-area: cats; position: sticky; top: 0; z-index: 3; flex-direction: row; gap: 6px; margin: 0 -10px; padding: 10px 10px 8px; background: linear-gradient(180deg, #1a1322 82%, rgba(26, 19, 34, 0)); }
+.lj-cat { position: relative; flex: 1 1 0; min-width: 0; padding: 7px 2px 6px; gap: 2px; font-size: 11px; }
+.lj-cat-ic { width: 24px; height: 24px; }
+.lj-cat span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lj-cat-n { position: absolute; top: -6px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: #15100c; border: 2px solid var(--madeira-borda); color: var(--muted); font: 700 11px/1 var(--font); font-style: normal; }
+.lj-cat[aria-pressed="true"] .lj-cat-n { border-color: var(--ouro); color: var(--ouro); }
+.lj-grade { grid-area: grade; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.lj-slot .lj-etq { font-size: 10.5px; padding: 3px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lj-badge { position: absolute !important; top: 4px; right: 4px; z-index: 1; min-width: 22px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: rgba(10, 6, 4, .86); border: 1px solid #5a3a24; color: var(--ouro); font: 700 11px/1 var(--font); }
+.lj-badge.tem { color: var(--verde); border-color: #2f6b4a; }
+.lj-slot.tem { border-color: #2f6b4a; }
+.lj-slot.sel { border-color: var(--ouro); }
+
+/* Vitrine: o item no pedestal, com o foco de luz de cima */
+.lj-det { grid-area: det; display: grid; grid-template-columns: 124px minmax(0, 1fr); grid-template-areas: "img h2" "img p" "img lib" "btn btn"; align-content: start; column-gap: 12px; row-gap: 4px; padding: 12px; }
+.lj-det > h2 { grid-area: h2; text-align: left; font-size: 17px; align-self: end; }
+.lj-det > p { grid-area: p; font-size: 13px; }
+.lj-det > .lj-lib { grid-area: lib; }
+.lj-det > .lj-btn, .lj-det > .lj-tem { grid-area: btn; margin-top: 8px; }
+.lj-det-img { grid-area: img; position: relative; aspect-ratio: auto; height: 150px; display: block; border: 0; border-radius: 8px; overflow: hidden; background: radial-gradient(120% 70% at 50% 100%, #3a2a20, #120d0a 70%); }
+.lj-foco { position: absolute; left: 50%; top: -10px; width: 150%; height: 150%; transform: translateX(-50%); background: conic-gradient(from 160deg at 50% 0%, transparent 0deg, rgba(255, 230, 170, .22) 14deg, rgba(255, 230, 170, .32) 20deg, rgba(255, 230, 170, .22) 26deg, transparent 40deg); pointer-events: none; }
+.lj-moldura { position: absolute; left: 50%; bottom: 26px; width: 92px; height: 92px; transform: translateX(-50%); display: grid; place-items: center; z-index: 1; border-radius: 8px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #6a5a4e, #2a201a 80%); box-shadow: 0 10px 14px -6px rgba(0, 0, 0, .8); animation: lj-flutua 3.2s ease-in-out infinite; }
+.lj-moldura .inv-svg { width: 70%; height: 70%; }
+.lj-moldura img.inv-svg { width: 100%; height: 100%; object-fit: cover; }
+.lj-moldura img.inv-svg.px { width: 82%; height: 82%; object-fit: contain; }
+.lj-pedestal { position: absolute; left: 50%; bottom: 8px; width: 104px; height: 22px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse at 50% 30%, #8a6a4a, #4a3222 60%, #2a1a10); box-shadow: 0 4px 0 #1c110a, 0 0 22px rgba(255, 210, 120, .25); }
+@keyframes lj-flutua { 50% { transform: translate(-50%, -4px); } }
+@media (prefers-reduced-motion: reduce) { .lj-moldura { animation: none; } }
+@media (max-width: 359px) { .lj-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } .lj-det { grid-template-columns: 104px minmax(0, 1fr); } .lj-cat span { display: none; } }
+
+@media (min-width: 768px) {
+  .lj-loja { grid-template-columns: 104px minmax(0, 1fr) 300px; grid-template-areas: "cats grade det"; gap: 14px; padding: 16px 16px 0; }
+  .lj-cats { position: sticky; top: 12px; flex-direction: column; margin: 0; padding: 0; background: none; }
+  .lj-cat { flex: none; padding: 10px 4px 8px; font-size: 12.5px; }
+  .lj-cat-ic { width: 30px; height: 30px; }
+  .lj-grade { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+  .lj-det { position: sticky; top: 12px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "h2" "img" "p" "lib" "btn"; row-gap: 8px; padding: 14px; }
+  .lj-det > h2 { text-align: center; font-size: 19px; }
+  .lj-det > p { font-size: 14px; }
+  .lj-det-img { height: 220px; }
+  .lj-moldura { width: 140px; height: 140px; bottom: 34px; }
+  .lj-pedestal { width: 160px; height: 30px; bottom: 10px; }
+}
