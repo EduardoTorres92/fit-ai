@@ -4156,47 +4156,105 @@
       <div class="note-box"><p><b>Treinar junto rende mais.</b> Crie um grupo e mande o convite no WhatsApp, ou entre com o código que um amigo te mandou.</p></div>
       <div class="row2" style="margin-top:12px"><button class="btn btn-blue" id="g-criar">Criar grupo</button><button class="btn btn-outline" id="g-codigo">Tenho um código</button></div>
       </div></section>`;
+    if (p1 === "mural") return telaMural();
+    if (p1 === "missoes") return telaProcura();
     const g = grupoSel(), rows = linhasGrupo(), kp = kpis(noPeriodo(rows, G.periodo));
     const semana = feitas(rows).filter((r) => r.data >= keyOf(mondayOf(hoje)) && r.data <= hojeKey).length;
     const ativos = new Set(feitas(noPeriodo(rows, G.periodo)).map((r) => r.usuario_id)).size;
+    const ativosSem = new Set(feitas(rows).filter((r) => r.data >= keyOf(mondayOf(hoje)) && r.data <= hojeKey).map((r) => r.usuario_id)).size;
     const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
-    return `<section class="screen has-toolbar">${head}
-      <div class="chips g-chips">${G.grupos.map((x) => `<button class="chip${x.id === G.sel ? " primary" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="chip" id="g-criar">+ Criar</button><button class="chip" id="g-codigo">Código</button></div>
+    const nivel = pct >= 100 ? "alta" : pct >= 50 ? "media" : "baixa";
+    const R = 30, C = 2 * Math.PI * R;
+    const aguaOk = G.membros.filter((id) => { const r = aguaDe(id).find((x) => x.data === hojeKey); return r && r.ml >= (r.meta || (id === uid ? nutriMetas().agua : 2500)); }).length;
+    const det = (k, ic, t, sub, corpo) => `<details class="ac-linha ac-det tav-det" data-tav="${k}"${TAV_ABERTO.has(k) ? " open" : ""}><summary><span class="ac-li-ic">${ic}</span><span><b>${t}</b><small>${sub}</small></span><em>Ver</em></summary><div class="tav-corpo">${corpo}</div></details>`;
+    return `<section class="screen has-toolbar acamp tav">
+      ${tavTopo(g)}
+      <div class="ac-card tav-meta">
+        <p class="ac-k">🍺 Meta da semana <span>renova na segunda</span></p>
+        <div class="ac-pront tav-pront">
+          <svg class="ac-anel ${nivel}" viewBox="0 0 72 72" aria-label="${pct}%"><circle cx="36" cy="36" r="${R}" class="fundo"/><circle cx="36" cy="36" r="${R}" class="valor" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/><text x="36" y="41">${pct}%</text></svg>
+          <div><b>${semana} de ${g.meta_semanal} treinos</b><small>${pct >= 100 ? "Meta do grupo batida! 🏆" : `Faltam ${g.meta_semanal - semana} para o grupo bater a meta`}</small>
+            <small>👥 ${ativosSem}/${G.membros.length} já treinaram · 💧 ${aguaOk}/${G.membros.length} bateram a água hoje</small>
+            ${g.dono === uid ? `<button class="lnk-btn tav-lnk" id="g-meta">Mudar meta</button>` : ""}</div>
+        </div>
+      </div>
+      ${tavMissao(g)}
       ${rankingSemanaHtml()}
-      <div class="section">
-        <div class="g-head"><div><h2>${esc(g.nome)}</h2><small>${G.membros.length} ${G.membros.length === 1 ? "pessoa" : "pessoas"} · código <b>${esc(g.codigo)}</b></small></div>
-          <button class="btn btn-blue" id="g-convidar">Convidar</button></div>
-        ${avatarGroup(G.membros, { max: 6, size: 40, label: `Membros do grupo ${g.nome}`, link: true })}
-        <div class="meta-g"><div class="sec-head"><h2>Meta da semana</h2><span>${semana}/${g.meta_semanal} treinos</span></div>
-          <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
-          ${g.dono === uid ? `<button class="lnk-btn" id="g-meta">Mudar meta</button>` : ""}</div>
-        ${hidratacaoGrupo()}
+      <div class="section ac-extras tav-extras">
+        ${det("numeros", "📊", "Números do grupo", `${kp.treinos} treinos · ${fmtMin(kp.minutos)} · ${PERIODOS[G.periodo][0].toLowerCase()}`, `
+          <div class="seg seg3">${Object.entries(PERIODOS).map(([k, [n]]) => `<button class="${G.periodo === k ? "on" : ""}" data-g-periodo="${k}">${n}</button>`).join("")}</div>
+          <div class="stats-row" style="margin-top:12px">${stat("circle-check.svg", kp.treinos, "Treinos do grupo")}${stat("hourglass.svg", fmtMin(kp.minutos), "Tempo total")}</div>
+          <div class="stats-row">${stat("user-small.svg", `${ativos}/${G.membros.length}`, "Pessoas ativas")}${stat("flame.svg", kp.maxMedio ? mmss(kp.maxMedio) : "—", "Max Out médio")}</div>
+          <div class="sec-head"><h2>Ranking · ${PERIODOS[G.periodo][0]}</h2></div>
+          <div class="chips">${Object.entries(RANKS).map(([k, [n]]) => `<button class="chip${G.rank === k ? " primary" : ""}" data-g-rank="${k}">${n}</button>`).join("")}</div>
+          ${ranking()}
+          <div class="sec-head"><h2>Treinos por semana</h2></div>
+          ${barras(porSemana(rows, 8), { meta: g.meta_semanal, aria: "Treinos do grupo nas últimas 8 semanas" })}`)}
+        ${det("agua", "💧", "Hidratação de hoje", `${aguaOk} de ${G.membros.length} bateram a meta`, hidratacaoGrupo())}
+        ${det("conq", "🏅", "Conquistas do grupo", "Medalhas que o grupo já ganhou", medalhasGrupo(g))}
+        ${det("ativ", "🕒", "Atividade recente", "Quem treinou e o quê", `${atividade()}<button class="lnk-btn" id="g-atualizar">Atualizar</button>`)}
+        <button class="btn btn-outline tav-sair" id="g-sair">Sair do grupo</button>
+      </div>
+    </section>`;
+  }
+  const TAV_ABERTO = new Set();
+  document.addEventListener("toggle", (e) => { const d = e.target; if (d.matches?.("details[data-tav]")) TAV_ABERTO[d.open ? "add" : "delete"](d.dataset.tav); }, true);
+  // Mural: posts de outras pessoas depois da última visita ao mural daquele grupo
+  const muralNovos = () => { const v = (S.muralVisto || {})[G.sel] || ""; return M.posts.filter((p) => p.usuario_id !== uid && p.criado_em > v).length; };
+  const desafioMeuPendente = () => { const d = desafioDaSemana(); return d && !feitosDe(d).some((f) => f.usuario_id === uid); };
+  function tavTopo(g) {
+    incCarregar();
+    const nm = muralNovos(), incs = (IG.lista || []).filter((i) => i.grupo_id === G.sel && !(hojeKey > i.fim)).length, pend = (desafioMeuPendente() ? 1 : 0) + incs;
+    return `<div class="ac-topo tav-topo">
+      <div class="ac-bg"><img src="${A("taverna-cena.webp")}" alt=""></div>
+      <div class="ac-chips tav-gs">${G.grupos.map((x) => `<button class="ac-chip${x.id === G.sel ? " on" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="ac-chip" id="g-criar" aria-label="Criar grupo">＋</button><button class="ac-chip" id="g-codigo">Código</button></div>
+      <div class="ac-hero tav-hero">
+        <div class="ac-id">
+          <p class="ac-oi">Taverna</p><h1>${esc(g.nome)}</h1>
+          <p class="tav-sub">${G.membros.length} ${G.membros.length === 1 ? "aventureiro" : "aventureiros"} · código <b>${esc(g.codigo)}</b></p>
+          ${avatarGroup(G.membros, { max: 6, size: 36, overlap: 10, label: `Membros do grupo ${g.nome}`, link: true })}
+        </div>
+        <nav class="ac-lado tav-lado" aria-label="Taverna">
+          <a href="#/grupo/missoes" class="tav-procura"><span class="tav-cartaz">📜</span>Procura-se${pend ? `<i class="tav-bdg">${pend}</i>` : ""}</a>
+          <a href="#/grupo/mural"><span>📣</span>Mural${nm ? `<i class="tav-bdg">${nm > 9 ? "9+" : nm}</i>` : ""}</a>
+          <button type="button" id="g-convidar"><span>🤝</span>Convidar</button>
+        </nav>
+      </div>
+      <a class="tav-evo" href="#/evolucao">‹ Minha evolução</a>
+    </div>`;
+  }
+  // Card de destaque: o desafio da semana (ou a incursão aberta) como cartaz de procura-se
+  function tavMissao(g) {
+    const d = desafioDaSemana(), inc = (IG.lista || []).find((i) => i.grupo_id === G.sel && !(hojeKey > i.fim)), x = inc && INC_DE[inc.chefe];
+    const capa = d?.capa && G.capas?.[d.capa];
+    let img, titulo, txt, botao = "Ver";
+    if (d) { const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid);
+      img = capa || (x ? arCarta(x.k) : null); titulo = d.titulo;
+      txt = `${eu ? "✓ Você cumpriu" : faltaDesafio(d)} · ${fs.length ? `${fs.length} ${fs.length === 1 ? "cumpriu" : "cumpriram"}` : "ninguém cumpriu ainda"}`; botao = eu ? "Ver" : "Caçar"; }
+    else if (x) { img = arCarta(x.k); titulo = x.nome; txt = "Incursão aberta. Entre e some no ataque."; botao = "Atacar"; }
+    else { titulo = "Nenhum procurado esta semana"; txt = "Lance o desafio da semana ou uma incursão contra um chefe."; botao = "Lançar"; }
+    return `<a class="ac-card ac-prox tav-missao" href="#/grupo/missoes">
+      <span class="tav-poster">${img ? `<img src="${esc(img)}" alt="">` : `<b>?</b>`}<small>PROCURA-SE</small></span>
+      <div><p class="ac-k dourado">Procura-se</p><b>${esc(titulo)}</b><small>${esc(txt)}</small>${x && d ? `<span class="ac-ganho">👹 + incursão aberta: ${esc(x.nome)}</span>` : ""}</div>
+      <span class="btn btn-blue ac-prox-btn">${botao}</span>
+    </a>`;
+  }
+  const tavHead = (t, sub) => `<div class="tav-pg-head"><a class="icon-btn" href="#/grupo" aria-label="Voltar à Taverna">${icon("chevron-left.svg", 24)}</a><div><small>${esc(grupoSel()?.nome || "Taverna")}</small><h1>${t}</h1></div>${sub || ""}</div>`;
+  function telaMural() {
+    const top = M.posts[0]?.criado_em;
+    if (top && G.sel && (S.muralVisto || {})[G.sel] !== top) { S.muralVisto = { ...(S.muralVisto || {}), [G.sel]: top }; save(); }
+    return `<section class="screen has-toolbar acamp tav tav-pg">${tavHead("📣 Mural")}${muralHtml()}</section>`;
+  }
+  function telaProcura() {
+    const g = grupoSel();
+    return `<section class="screen has-toolbar acamp tav tav-pg">${tavHead("📜 Procura-se")}
+      <div class="tav-quadro">
+        <p class="tav-q-k">Desafio da semana</p>
         ${cardDesafio(g)}
         <div class="sec-head"><h2>Conquistas da semana</h2><span>${G.desafios.filter((d) => G.feitos.some((f) => f.desafio_id === d.id)).length} de 12 semanas</span></div>
         ${historicoDesafios()}
       </div>
-      ${muralHtml()}
-      <div class="section">
-        <div class="seg seg3">${Object.entries(PERIODOS).map(([k, [n]]) => `<button class="${G.periodo === k ? "on" : ""}" data-g-periodo="${k}">${n}</button>`).join("")}</div>
-        <div class="stats-row" style="margin-top:12px">
-          ${stat("circle-check.svg", kp.treinos, "Treinos do grupo")}
-          ${stat("hourglass.svg", fmtMin(kp.minutos), "Tempo total")}
-        </div>
-        <div class="stats-row">
-          ${stat("user-small.svg", `${ativos}/${G.membros.length}`, "Pessoas ativas")}
-          ${stat("flame.svg", kp.maxMedio ? mmss(kp.maxMedio) : "—", "Max Out médio")}
-        </div>
-      </div>
-      <div class="section">
-        <div class="sec-head"><h2>Ranking · ${PERIODOS[G.periodo][0]}</h2></div>
-        <div class="chips">${Object.entries(RANKS).map(([k, [n]]) => `<button class="chip${G.rank === k ? " primary" : ""}" data-g-rank="${k}">${n}</button>`).join("")}</div>
-        ${ranking()}
-      </div>
-      <div class="section"><div class="sec-head"><h2>Treinos do grupo por semana</h2></div>
-        ${barras(porSemana(rows, 8), { meta: g.meta_semanal, aria: "Treinos do grupo nas últimas 8 semanas" })}</div>
-      <div class="section"><div class="sec-head"><h2>Conquistas do grupo</h2></div>${medalhasGrupo(g)}</div>
-      <div class="section"><div class="sec-head"><h2>Atividade recente</h2><button class="lnk-btn" id="g-atualizar">Atualizar</button></div>${atividade()}</div>
-      <div class="section"><button class="btn btn-outline" id="g-sair">Sair do grupo</button></div>
+      <div class="tav-quadro">${incSecao(G.sel)}</div>
     </section>`;
   }
   // Perfil de alguém do grupo: números, Max Out e Fit Test (o que a pessoa sincronizou)
@@ -4251,10 +4309,10 @@
   function desafioHome() {
     if (!uid || !G.grupos || !grupoSel()) return "";
     const d = desafioDaSemana();
-    if (!d) return `<a class="emerg" href="#/grupo"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>`;
+    if (!d) return `<a class="emerg" href="#/grupo/missoes"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>`;
     const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa];
-    return `<div class="sec-head"><h2>Desafio do grupo</h2><a href="#/grupo">${faltaDesafio(d, true)}</a></div>
-      <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo">
+    return `<div class="sec-head"><h2>Desafio do grupo</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
+      <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo/missoes">
         ${capa ? `<img src="${esc(capa)}" alt="" loading="lazy">` : ""}
         <div class="dh-txt"><span class="dh-tag">⚔️ ${esc(MEDIDAS[d.medida].split(" (")[0])}${eu ? " · ✓ você cumpriu" : ""}</span>
           <strong>${esc(d.titulo)}</strong><small>${fs.length ? `🏅 ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}` : "Ninguém cumpriu ainda. Seja o primeiro!"}</small></div></a>`;
@@ -4413,7 +4471,7 @@
       $("#post-dlg").close(); postFoto = null;
       G.sel = alvos.includes(G.sel) ? G.sel : primeiro; G.carregadoEm = 0; await carregarGrupos(true);
       toast(!todos ? "Postado no grupo! 📣" : ok === alvos.length ? `Postado nos ${ok} grupos! 📣` : `Postado em ${ok} de ${alvos.length} grupos. Os outros falharam; tente de novo neles.`, 4000);
-      if (!location.hash.startsWith("#/grupo")) location.hash = "#/grupo";
+      if (location.hash !== "#/grupo/mural") location.hash = "#/grupo/mural";
     } catch (e) { console.error("post", e); toast("Não consegui postar agora. Tente de novo."); btn.disabled = false; btn.textContent = "Postar"; }
   }
   // Depois de concluir um treino: convida a postar no grupo
@@ -5751,7 +5809,7 @@
     if (!G.grupos) await carregarGrupos(true);
     const g = grupoSel();
     if (!g) return fala("Você ainda não está em nenhum grupo. Crie um ou entre com um código na aba <b>Grupo</b> e me mande o link de novo. 🤝", ["Abrir o grupo"]);
-    if (/^editar antes de lançar$/i.test(texto)) { formDesafio = "link"; busy = false; closeChat(); location.hash = "#/grupo"; render(); return; }
+    if (/^editar antes de lançar$/i.test(texto)) { formDesafio = "link"; busy = false; closeChat(); location.hash = "#/grupo/missoes"; render(); return; }
     if (/^lançar (no grupo|em todos os grupos)$/i.test(texto)) {
       const d = desafioRascunho, todos = /todos/i.test(texto), alvos = todos ? G.grupos : [g];
       let ok = 0, ja = 0;
@@ -7740,7 +7798,7 @@
       await incSincronizar();
     } catch (e) { console.error("incursoes", e); if (!IG.lista) IG.lista = []; IG.carregadoEm = Date.now(); }
     IG.carregando = false;
-    if (/^#\/(arena|home)/.test(location.hash)) render();
+    if (/^#\/(arena|home|grupo)/.test(location.hash)) render();
   }
   const incPosso = (i) => i.modo === "grupo" || i.criado_por === uid || i.dupla === uid;
   const incAtiva = (i) => hojeKey >= i.inicio && hojeKey <= i.fim;
@@ -7788,10 +7846,11 @@
         ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b></p>` : ""}
       </div></article>`;
   }
-  function incSecao() {
+  function incSecao(gid) {
     if (!uid) return `<div class="inc-sec"><h2 class="inc-h">⚔️ Incursões</h2><p class="inc-vazio">Entre com uma conta e participe de um grupo para enfrentar chefes junto com os amigos.</p></div>`;
     incCarregar(); incXpAtualizar();
-    const ativas = (IG.lista || []).filter((i) => !(hojeKey > i.fim)), antigas = (IG.lista || []).filter((i) => hojeKey > i.fim).slice(0, 3);
+    const lista = (IG.lista || []).filter((i) => !gid || i.grupo_id === gid);
+    const ativas = lista.filter((i) => !(hojeKey > i.fim)), antigas = lista.filter((i) => hojeKey > i.fim).slice(0, 3);
     return `<div class="inc-sec"><div class="inc-topo"><h2 class="inc-h">⚔️ Incursões</h2>${G.grupos?.length ? `<button type="button" class="btn btn-outline inc-nova" data-inc-nova>+ Lançar</button>` : ""}</div>
       <p class="inc-d">Um chefe, todo o grupo atacando. A vida dele cai com o que cada um soma nos treinos.</p>
       ${!IG.lista ? `<p class="inc-vazio">Carregando…</p>` : ativas.length ? ativas.map(incCard).join("") : `<p class="inc-vazio">${G.grupos?.length ? "Nenhuma incursão aberta. Lance uma e chame o grupo!" : "Entre num grupo na Taverna para lançar incursões."}</p>`}
@@ -8095,7 +8154,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     const s = senseiDe(), a = (() => { try { return tgDia(hoje); } catch { return null; } })(), pk = principal();
     const xpT = pk === "cf" ? XP.cf : VP[pk] ? XP.video : XP.sessao;
     let titulo, txt, href, botao;
-    if (feito(hojeKey)) { titulo = "Treino de hoje concluído ✓"; txt = desafioPendente(hojeKey) ? "Agora o desafio da semana do grupo." : "Hidrate, alongue e volte amanhã."; href = desafioPendente(hojeKey) ? "#/grupo" : "#/dojo"; botao = desafioPendente(hojeKey) ? "Desafio" : "Dojo"; }
+    if (feito(hojeKey)) { titulo = "Treino de hoje concluído ✓"; txt = desafioPendente(hojeKey) ? "Agora o desafio da semana do grupo." : "Hidrate, alongue e volte amanhã."; href = desafioPendente(hojeKey) ? "#/grupo/missoes" : "#/dojo"; botao = desafioPendente(hojeKey) ? "Desafio" : "Dojo"; }
     else if (a?.descanso) { titulo = "Dia de descanso"; txt = "Recuperar também é treino. Beba água e solte o corpo."; href = "#/dojo"; botao = "Dojo"; }
     else { titulo = a?.titulo || "Treino de hoje"; txt = `${a?.prog ? `${esc(a.prog)} · ` : ""}${a?.itens?.length ? (VP[pk] ? `${a.itens.length} ${a.itens.length === 1 ? "vídeo" : "vídeos"}` : `${a.itens.length} ${a.itens.length === 1 ? "exercício" : "exercícios"}`) : "o treino do seu caminho"}`; href = linkBora(w, d); botao = "Bora!"; }
     return `<a class="ac-card ac-prox" href="${href}">

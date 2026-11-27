@@ -2281,3 +2281,67 @@ button.alb-it:active { transform: scale(0.96); }
 .inc-dupla { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .inc-lanc > .btn { width: 100%; margin-top: 8px; }
 .inc-mini { display: block; width: 84px; aspect-ratio: 5 / 7; object-fit: cover; border-radius: 6px; margin: 0 auto 8px; }
+
+/* ==========================================================
+   Taverna (página do grupo) no mesmo visual da home; Mural e Procura-se em páginas próprias
+   ========================================================== */
+.tav .tav-gs { overflow-x: auto; scrollbar-width: none; margin-right: -18px; padding-right: 18px; }
+.tav .tav-gs::-webkit-scrollbar { display: none; }
+.tav .tav-gs .ac-chip { flex: none; cursor: pointer; font-family: inherit; }
+.tav .tav-gs .ac-chip.on { background: var(--ouro); color: #1a1322; border-color: var(--ouro); }
+.tav .tav-topo .ac-bg img { object-position: 50% 35%; filter: brightness(.5) saturate(1.1); image-rendering: pixelated; }
+.tav .tav-hero { grid-template-columns: minmax(0, 1fr) 76px; align-items: end; margin-top: 26px; }
+.tav .ac-id h1 { font-family: "Pixelify Sans", "Inter Tight", sans-serif; font-size: 30px; margin-bottom: 4px !important; color: #fff3d6; text-shadow: 0 2px 0 rgba(0,0,0,.6); }
+.tav .ac-oi { color: var(--ouro); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; opacity: 1; }
+.tav .tav-sub { margin: 0 0 12px; font-size: 13px; color: #d9d3f2; }
+.tav .tav-sub b { color: #fff; letter-spacing: .06em; }
+.tav .tav-lado a, .tav .tav-lado button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.14); color: #f4f1ff; font-family: inherit; font-size: 11px; font-weight: 600; line-height: 1.2; text-decoration: none; cursor: pointer; }
+.tav .tav-lado span { font-size: 20px; }
+.tav .tav-lado .tav-procura { background: linear-gradient(180deg, #e9d3a1, #cfae6c); border-color: #7a5428; color: #3a2310; box-shadow: inset 0 0 0 2px rgba(122, 84, 40, .35); }
+.tav .tav-bdg { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: #ff4d5e; color: #fff; font: 800 11px/20px system-ui, sans-serif; font-style: normal; text-align: center; box-shadow: 0 0 0 2px #14121f; }
+.tav .tav-evo { position: relative; display: inline-block; margin-top: 14px; font-size: 12px; color: #bdb6e6; text-decoration: none; }
+.tav .tav-pront { margin-top: 0; }
+.tav .tav-pront small + small { margin-top: 4px; }
+.tav .tav-lnk { margin-top: 6px; padding: 0; font-size: 12px; }
+/* Cartaz de procura-se */
+.tav .tav-poster { position: relative; flex: none; width: 64px; padding: 5px 5px 4px; border-radius: 3px; background: linear-gradient(180deg, #f0dcae, #d7b77a); box-shadow: 0 3px 8px rgba(0,0,0,.5), inset 0 0 10px rgba(110, 70, 20, .35); transform: rotate(-3deg); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.tav .tav-poster img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 2px; filter: sepia(.35) contrast(1.05); }
+.tav .tav-poster > b { display: grid; place-items: center; width: 100%; aspect-ratio: 1; font: 800 28px/1 "Pixelify Sans", sans-serif; color: #6b4520; background: rgba(110, 70, 20, .15); }
+.tav .tav-poster small { font: 700 7.5px/1 "Pixelify Sans", sans-serif; letter-spacing: .04em; color: #4a2c12; }
+.tav .tav-poster::before { content: ""; position: absolute; top: -4px; left: 50%; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: #9b2c2c; box-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.tav .tav-missao .ac-prox-btn { min-width: 64px; text-align: center; }
+.tav .tp-box { margin: 14px 18px 0; padding: 14px; border-radius: 20px; background: var(--card-ac); border: 1px solid var(--borda-ac); color: #f4f1ff; }
+.tav .tav-extras { padding-top: 16px; }
+.tav .tav-det { background: var(--card-ac); border: 1px solid rgba(255,255,255,.08); color: #f4f1ff; }
+.tav .tav-det summary b { font-size: 15px; }
+.tav .tav-corpo { margin: 0 12px 12px; }
+.tav .tav-corpo .sec-head { margin-top: 16px; }
+.tav .tav-sair { width: 100%; margin-top: 6px; opacity: .8; }
+/* Páginas da Taverna: Mural e Procura-se */
+.tav-pg .tav-pg-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 4px; }
+.tav-pg .tav-pg-head h1 { margin: 0; font-family: "Pixelify Sans", "Inter Tight", sans-serif; font-size: 24px; }
+.tav-pg .tav-pg-head small { font-size: 12px; color: var(--ouro); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.tav-pg .tav-quadro { margin: 14px 18px 0; padding: 14px; border-radius: 18px; background: repeating-linear-gradient(180deg, #4a2f1d 0 22px, #42291a 22px 24px); border: 2px solid #2a190e; box-shadow: inset 0 0 0 2px rgba(255, 210, 140, .08), 0 4px 0 #1d1109; color: #f4ead6; }
+.tav-pg .tav-q-k { margin: 0 0 10px; font: 700 13px/1 "Pixelify Sans", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #ffd98a; }
+.tav-pg .tav-quadro .desafio { background: linear-gradient(180deg, #f3e2b8, #e2c68c); color: #2e1d0c; border-radius: 6px; padding: 14px; box-shadow: 0 4px 10px rgba(0,0,0,.45); }
+.tav-pg .tav-quadro .desafio .note, .tav-pg .tav-quadro .desafio .d-desc, .tav-pg .tav-quadro .desafio .d-status { color: #3d2914; }
+.tav-pg .tav-quadro .desafio h2 { color: #2e1d0c; }
+.tav-pg .tav-quadro > .sec-head h2, .tav-pg .tav-quadro > .sec-head span { color: #f4ead6; }
+.tav-pg .tav-quadro .sem { background: rgba(0,0,0,.25); color: #f4ead6; }
+.tav-pg .tav-quadro .inc-sec { margin: 0; padding: 0; background: none; border: 0; }
+.tav-pg .mural { padding-top: 8px; }
+@media (min-width: 768px) {
+  .tav .tav-topo { margin: 16px 18px 0; }
+  .tav .ac-id h1 { font-size: 36px; }
+  .tav .tav-hero { grid-template-columns: minmax(0, 1fr) 88px; }
+  .tav-pg { padding-inline: max(0px, calc((100% - 760px) / 2)); }
+}
+@media (min-width: 1200px) {
+  .screen.tav > .tav-meta, .screen.tav > .tav-missao { grid-column: 1; margin-right: 9px; }
+  .screen.tav > .tp-box { grid-column: 2; grid-row: span 2; margin-left: 9px; }
+}
+.tav-pg .mural > .sec-head h2 { display: none; }
+.tav-pg .mural > .sec-head { justify-content: flex-end; margin-top: -8px; }
+.tav-pg .tav-quadro > .sec-head { margin-top: 16px; gap: 10px; }
+.tav-pg .tav-quadro > .sec-head h2 { font-size: 16px; }
+.tav-pg .tav-quadro > .sec-head span { font-size: 12px; opacity: .8; white-space: nowrap; }
