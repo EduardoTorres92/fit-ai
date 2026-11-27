@@ -218,12 +218,13 @@
       return s;
     } catch { return { ...padrao, ...Object.fromEntries(VKEYS.map((k) => [k, vazioVP()])), ...Object.fromEntries(IA_KEYS.map((k) => [k, vazioIA()])), cf: { logs: {}, perfil: {} }, corrida: { logs: {} } }; }
   }
-  let CACHE_CHEFES = null; // chefes calculados do histórico (zera a cada save)
+  let CACHE_CHEFES = null;
+  var CACHE_ARENA = null; // chefes da Arena calculados (zera a cada save)
   // Ligas (insígnias por modalidade) e chefes ficam escondidos por enquanto. O XP já ganho com eles continua valendo
   // (ninguém perde nível); para trazer de volta, é só ligar aqui.
   const LIGAS_CHEFES = false;
   let excluindo = false; // conta sendo excluída: nada mais é gravado neste aparelho
-  function save() { if (excluindo) return; CACHE_CHEFES = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
+  function save() { if (excluindo) return; CACHE_CHEFES = null; CACHE_ARENA = null; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof agendarSync === "function") agendarSync(); }
 
   const semanasDesde = (d) => Math.floor(diffDays(parseKey(S.inicio), d) / 7);
   const semanaDe = (d) => { const n = semanasDesde(d); return n < 0 ? -1 : n % PROGRAMA.length; };
@@ -3054,7 +3055,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3505,7 +3506,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.max(0, Math.min(100, Math.round(((xp - ini) / (fim - ini)) * 100))) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + arenaXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
   // Piso: o nível que a pessoa já tinha antes da curva nova (calculado uma vez pela curva antiga) ou o que a conta já mostrava
   function nivelPiso(xp) {
     if (S.nivelPiso == null) { let n = 1; if (S.ficha) while (n < NIVEL_MAX && xp >= xpParaAntigo(n + 1)) n++; S.nivelPiso = n; }
@@ -5162,6 +5163,7 @@
       for (const p of VKEYS) if (perfil.config[p] !== undefined && !Object.keys(S[p].logs).length) S[p].inicio = perfil.config[p];
       if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
       if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
+      if (perfil.config.arena && typeof perfil.config.arena === "object" && !S.arena) { S.arena = perfil.config.arena; S.arenaVisto = perfil.config.arenaVisto || S.arenaVisto; }
       if (Array.isArray(perfil.config.inventario) && !Array.isArray(S.inventario)) S.inventario = perfil.config.inventario.filter((x) => typeof x === "string").slice(0, 30);
       if (perfil.config.nutri && !S.nutri) S.nutri = perfil.config.nutri;
       if (perfil.config.graduado && !S.graduadoMax30) S.graduadoMax30 = perfil.config.graduado;
@@ -6839,6 +6841,9 @@
           <div class="alb-grade">${CLASSES.map(([slug, nome], ci) => albumTem(e, ci)
             ? `<button class="alb-it" data-carta="${e}|${ci}" aria-label="Abrir a carta ${esc(E.nome)} ${esc(nome)}"><img src="${cartaDe(e, slug, g)}" alt="" loading="lazy"></button>`
             : `<div class="alb-it off" title="Chegue a ${esc(nome)} como ${esc(E.nome)}"><img src="${cartaDe(e, slug, g)}" alt="" loading="lazy"><span class="carta-lock">🔒</span><small>${esc(nome)}</small></div>`).join("")}</div></div>`; }).join("")}
+      <div class="alb-sec"><div class="alb-h"><span>⚔️ Chefes da Arena</span><small>${arena().filter((c) => c.nivel).length}/${ARENA.length} derrotados</small></div>
+        <p class="alb-d">Cada nível vencido muda a cor da carta: Bronze, Prata, Ouro e Diamante holográfico.</p>
+        <div class="alb-grade">${arena().map((c) => `<button type="button" class="alb-it ar-alb" data-ar="${c.k}" aria-label="${esc(c.nome)}">${arCartaHtml(c)}</button>`).join("")}</div></div>
     </section>`;
   };
   if (LIGAS_CHEFES) telas.chefes = () => {
@@ -7404,7 +7409,7 @@
   const VILA = [
     { id: "guilda", nome: "Guilda do Aventureiro", sub: "Seu herói e o arsenal", href: "#/arsenal", x: 27, y: 12.5, w: 47, h: 19 },
     { id: "dojo", nome: "Dojo", sub: "Técnica e execução", href: "#/dojo", x: 2, y: 26, w: 33, h: 22 },
-    { id: "arena", nome: "Arena", sub: "Desafio do Recruta", href: "#/recruta", x: 66, y: 26.5, w: 34, h: 22 },
+    { id: "arena", nome: "Arena", sub: "Chefes e Desafio do Recruta", href: "#/arena", x: 66, y: 26.5, w: 34, h: 22 },
     { id: "praca", nome: "Praça", sub: "Álbum de cartas", href: "#/album", x: 37, y: 36, w: 27, h: 26 },
     { id: "mercado", nome: "Mercado", sub: "Equipamentos", href: "#/mercado", x: 0.5, y: 59, w: 37, h: 20 },
     { id: "taverna", nome: "Taverna", sub: "Grupos e ranking", href: "#/grupo", x: 66, y: 53, w: 34, h: 24 },
@@ -7588,6 +7593,167 @@
     }
   });
 
+  /* ==========================================================
+     Arena: chefes de recorde com 4 níveis (Bronze, Prata, Ouro, Diamante). Cada nível vencido muda a cor da carta;
+     o Diamante é holográfico. A marca vem dos treinos registrados ou é lançada na Arena (regra de integridade:
+     cada lançamento sobe no máximo 50% ou um passo fixo sobre a marca anterior). Cartas em assets/chefes/cartas.
+     Grupos: forca (Berserker, Ninja, Gladiador, Batedor, Ronin), cali (Monge, Ninja, Batedor, Ronin) e os de cada estilo.
+     ========================================================== */
+  const AR_NIVEIS = [["bronze", "Bronze", "🥉"], ["prata", "Prata", "🥈"], ["ouro", "Ouro", "🥇"], ["diamante", "Diamante", "💎"]];
+  const AR_XP = [15, 40, 80, 160]; // XP acumulado em cada nível (quem já tinha derrubado o antigo chefe de recorde não ganha de novo)
+  const AR_GRUPOS = { forca: ["berserker", "ninja", "gladiador", "batedor", "ronin"], cali: ["monge", "ninja", "batedor", "ronin"], gladiador: ["gladiador"], monge: ["monge"], ninja: ["ninja"], berserker: ["berserker"], batedor: ["batedor", "ronin"], ronin: ["ronin"] };
+  const AR_UN = { reps: "reps", s: "s", kg: "kg", km: "km", min: "min", pace: "min", nivel: "" };
+  const AR_PASSO = { reps: 5, s: 30, kg: 10, km: 3, min: 10, pace: 3 };
+  const arRe = (re, nao) => (r) => re.test(norm(r.nome)) && !(nao && nao.test(norm(r.nome)));
+  const ARENA = [
+    { k: "goblin", nome: "Goblin das Flexões", g: "forca", met: "reps", n: [15, 20, 30, 40], d: "flexões numa série", old: "goblin", auto: arRe(/flex/, /joelho|inclinad|negativ|isom|hold|pike|handstand|pseudo|parada|half/) },
+    { k: "kobold", nome: "Kobold do Burpee", g: "forca", met: "reps", n: [10, 15, 20, 30], d: "burpees sem parar", auto: arRe(/burpee/) },
+    { k: "ogro", nome: "Ogro do Kettlebell", g: "forca", met: "reps", n: [25, 50, 75, 100], d: "swings seguidos", req: ["kettlebell", "passe"], auto: arRe(/swing/) },
+    { k: "minotauro", nome: "Minotauro do Agachamento", g: "forca", met: "reps", n: [30, 50, 75, 100], d: "agachamentos livres seguidos", auto: (r) => !r.kg && arRe(/agachamento|squat/, /bulgaro|goblet|pistol|sumo|front|hack|smith|salto|jump|barra|cossaco/)(r) },
+    { k: "sentinela", nome: "Sentinela da Prancha", g: "forca", met: "s", n: [60, 120, 180, 300], d: "de prancha", old: "sentinela", auto: arRe(/^prancha$/) },
+    { k: "troll", nome: "Troll da Barra", g: "cali", met: "reps", n: [5, 8, 12, 15], d: "barras numa série", req: ["barra", "passe"], old: "troll", auto: arRe(/barra (fixa|supinada|ombro)|^barra fixa|pull.?up|chin.?up/, /australiana|negativ|isom|escapul|bicep|tricep|joelho|knee/) },
+    { k: "gargula", nome: "Gárgula das Paralelas", g: "cali", met: "reps", n: [10, 15, 20, 30], d: "dips numa série", req: ["paralelas", "passe"], old: "gargula", auto: arRe(/dips|paralela|mergulho/) },
+    { k: "lich", nome: "Lich da Pistol", g: "cali", met: "reps", n: [1, 3, 5, 10], d: "pistol squat(s) sem apoio, cada perna", old: "lich", auto: arRe(/pistol/, /apoio|suporte|assist/) },
+    { k: "kappa", nome: "Kappa do L-sit", g: "cali", met: "s", n: [10, 20, 30, 45], d: "de L-sit", auto: arRe(/l.?sit/) },
+    { k: "tengu", nome: "Tengu da Parada", g: "cali", met: "s", n: [15, 30, 60, 90], d: "de parada de mão na parede", auto: arRe(/parada de mao|handstand/, /flex|push|hspu/) },
+    { k: "golem", nome: "Golem do Supino", g: "gladiador", met: "kg", n: [0.75, 1, 1.25, 1.5], d: "o seu peso no supino", req: ["passe"], old: "golem", auto: arRe(/supino reto com barra|bench press/) },
+    { k: "hidra", nome: "Hidra do Agachamento", g: "gladiador", met: "kg", n: [1, 1.25, 1.5, 2], d: "o seu peso no agachamento", req: ["passe"], old: "hidra", auto: arRe(/agachamento livre|back squat|front squat/) },
+    { k: "dragao", nome: "Dragão da Terra", g: "gladiador", met: "kg", n: [1.25, 1.5, 2, 2.5], d: "o seu peso no levantamento terra", req: ["passe"], old: "dragao", auto: arRe(/levantamento terra|deadlift/, /stiff|romeno|romanian/) },
+    { k: "espectro", nome: "Espectro do Muscle-up", g: "monge", met: "reps", n: [1, 3, 5, 10], d: "muscle-ups numa série", req: ["barra", "passe"], old: "espectro", auto: arRe(/muscle.?up/) },
+    { k: "serpente", nome: "Mestre Serpente", g: "monge", met: "nivel", n: ["tuck", "tuck avançado", "uma perna", "completo"], d: "10 s de front lever", req: ["barra", "passe"] },
+    { k: "oni", nome: "Oni da Bandeira", g: "monge", met: "s", n: [2, 5, 10, 15], d: "de human flag", auto: arRe(/bandeira|human flag/) },
+    { k: "shinobi", nome: "Sombra Shinobi", g: "ninja", met: "reps", n: [50, 100, 150, 200], d: "polichinelos sem parar", auto: arRe(/polichinelo|jumping jack/) },
+    { k: "kitsune", nome: "Raposa Kitsune", g: "ninja", met: "reps", n: [30, 40, 50, 60], d: "mountain climbers em 30 s" },
+    { k: "yokai", nome: "Yokai do Tuck Jump", g: "ninja", met: "reps", n: [10, 20, 30, 40], d: "tuck jumps seguidos", auto: arRe(/tuck jump|salto grupado/) },
+    { k: "troll-gelo", nome: "Troll do Gelo", g: "berserker", met: "km", n: [2, 5, 10, 21], d: "de remo de uma vez", req: ["passe"] },
+    { k: "jotun", nome: "Jotun da Corda", g: "berserker", met: "reps", n: [10, 30, 50, 100], d: "double unders seguidos", req: ["corda"], auto: arRe(/double.?under|\bdu\b/) },
+    { k: "valquiria", nome: "Valquíria do Wall Ball", g: "berserker", met: "reps", n: [30, 50, 75, 100], d: "wall balls sem largar", auto: arRe(/wall.?ball/) },
+    { k: "lobo", nome: "Lobo da Estrada", g: "batedor", met: "km", n: [3, 5, 8, 10], d: "de corrida de uma vez", old: "lobo", corrida: "km" },
+    { k: "centauro", nome: "Centauro do Pace", g: "batedor", met: "pace", n: [35, 30, 27, 24], d: "nos 5 km (abaixo de)", corrida: "pace" },
+    { k: "rei-demonio", nome: "Rei Demônio", g: "batedor", met: "km", n: [12, 15, 21, 42], d: "no longão de uma vez", old: "rei", corrida: "km" },
+    { k: "automato", nome: "Autômato da Ergométrica", g: "batedor", met: "min", n: [20, 30, 45, 60], d: "de bike sem parar", corrida: "bikeMin" },
+    { k: "cavaleiro-sem-cabeca", nome: "Cavaleiro Sem Cabeça", g: "batedor", met: "km", n: [10, 20, 40, 80], d: "de pedal de uma vez", corrida: "bikeKm" },
+    { k: "samurai", nome: "Samurai Fantasma", g: "ronin", met: "nivel", n: ["1 km + 20 + 20", "1 km + 30 + 30", "2 km + 50 + 50", "3 km + 75 + 75"], d: "corrida + flexões + agachamentos, sem parar" },
+  ];
+  const AR = Object.fromEntries(ARENA.map((c) => [c.k, c]));
+  const arCarta = (k, g = false) => `assets/chefes/cartas/chefe-${k}${g ? "-g" : ""}.webp`;
+  const arMenorMelhor = (c) => c.met === "pace";
+  // Meta de cada nível em número (o kg depende do peso do corpo; o "nivel" é o índice)
+  const arMeta = (c, i) => (c.met === "kg" ? Math.round((pesoCorpo() || 75) * c.n[i]) : c.met === "nivel" ? i + 1 : c.n[i]);
+  const arTxtNivel = (c, i) => (c.met === "nivel" ? `${c.n[i]} · ${c.d}` : c.met === "kg" ? `${String(c.n[i]).replace(".", ",")}× ${c.d} (${arMeta(c, i)} kg)` : c.met === "s" && c.n[i] >= 60 && c.n[i] % 60 === 0 ? `${c.n[i] / 60} min ${c.d}` : c.met === "pace" ? `${c.n[i]} min ${c.d}` : `${c.n[i]} ${c.met === "km" ? "km " : c.met === "min" ? "min " : c.met === "s" ? "s " : ""}${c.d}`);
+  const arFmt = (c, v) => (!v ? "—" : c.met === "nivel" ? AR_NIVEIS[v - 1]?.[1] || "—" : c.met === "pace" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} min` : c.met === "km" ? `${String(Math.round(v * 10) / 10).replace(".", ",")} km` : `${Math.round(v)} ${AR_UN[c.met]}`);
+  function arAuto(c) { // melhor marca vinda dos treinos registrados
+    if (c.corrida) {
+      const it = Object.values(S.corrida?.logs || {}).flatMap((l) => l.itens || []);
+      if (c.corrida === "km") return Math.max(0, ...it.filter((a) => ehCorrida(a.tipo)).map((a) => a.km || 0));
+      if (c.corrida === "pace") { const t = it.filter((a) => (a.tipo === "corrida" || a.tipo === "esteira") && a.km >= 5 && a.tempo).map((a) => (a.tempo / 60) * (5 / a.km)); return t.length ? Math.min(...t) : 0; }
+      if (c.corrida === "bikeKm") return Math.max(0, ...it.filter((a) => a.tipo === "bike").map((a) => a.km || 0));
+      if (c.corrida === "bikeMin") return Math.max(0, ...it.filter((a) => a.tipo === "bike").map((a) => (a.tempo || 0) / 60));
+    }
+    if (!c.auto) return 0;
+    const campo = c.met === "s" ? "s" : c.met === "kg" ? "kg" : "reps";
+    return Math.max(0, ...registrosEx().filter((r) => c.auto(r) && (r[campo] || 0) > 0).map((r) => r[campo]));
+  }
+  function arena() {
+    if (CACHE_ARENA && CACHE_ARENA.v === S) return CACHE_ARENA.l;
+    const old = Object.fromEntries(recordes().map((r) => [r.k, r.derrotado]));
+    const l = ARENA.map((c) => {
+      const man = (S.arena?.[c.k] || []).map((x) => x.v), auto = arAuto(c), todos = [auto, ...man].filter((v) => v > 0);
+      const melhor = !todos.length ? 0 : arMenorMelhor(c) ? Math.min(...todos) : Math.max(...todos);
+      let nivel = 0; if (melhor) for (let i = 0; i < 4; i++) if (arMenorMelhor(c) ? melhor <= arMeta(c, i) : melhor >= arMeta(c, i)) nivel = i + 1;
+      const prox = nivel < 4 ? arMeta(c, nivel) : null;
+      const pct = nivel >= 4 ? 100 : !melhor ? 0 : arMenorMelhor(c) ? Math.max(0, Math.min(99, Math.round((prox / melhor) * 100))) : Math.min(99, Math.round((melhor / prox) * 100));
+      const xp = nivel ? Math.max(0, AR_XP[nivel - 1] - (c.old && old[c.old] ? XP.chefe : 0)) : 0;
+      return { ...c, melhor, nivel, pct, xp };
+    });
+    CACHE_ARENA = { v: S, l };
+    return l;
+  }
+  const toastApp = (m, ms) => toast(m, ms);
+  const arenaXp = () => soma(arena().map((c) => c.xp));
+  const arEstilo = () => estiloAtual().slug || senseiDe().e;
+  const arDoEstilo = (e = arEstilo()) => arena().filter((c) => AR_GRUPOS[c.g].includes(e));
+  const arFalta = (c) => (c.req && !c.req.some((x) => inventario().includes(x)) ? INV.ITENS.find((i) => i.id === c.req[0]) : null);
+  let arTodos = false;
+  function arLinha(c) {
+    const N = AR_NIVEIS[c.nivel - 1], falta = arFalta(c);
+    return `<button type="button" class="ar-row t${c.nivel}" data-ar="${c.k}">
+      <span class="ar-ret"><img src="${arCarta(c.k)}" alt="" loading="lazy"></span>
+      <span class="ar-info"><b>${esc(c.nome)}</b>
+        <small>${c.nivel >= 4 ? "💎 Derrotado no Diamante" : `${AR_NIVEIS[c.nivel][2]} ${esc(arTxtNivel(c, c.nivel))}`}</small>
+        <span class="ar-hp"><i style="width:${100 - c.pct}%"></i></span>
+        <span class="ar-pe"><em>HP ${100 - c.pct}%</em><em>${falta ? `🔒 Precisa de ${esc(falta.curto)}` : `Seu marco: ${arFmt(c, c.melhor)}`}</em></span></span>
+      ${N ? `<span class="ar-selo n${c.nivel}" title="${N[1]}">${N[2]}</span>` : ""}</button>`;
+  }
+  telas.arena = () => {
+    setToolbar("vilarejo");
+    const e = arEstilo(), E = ESTILOS[e], l = arTodos ? arena() : arDoEstilo(e), feitos = arDoEstilo(e).reduce((s, c) => s + c.nivel, 0);
+    return `<section class="screen has-toolbar vila ar">
+      <header class="ar-topo"><a class="vl-voltar" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
+        <div><h1>Arena</h1><p>Seus recordes viram monstros</p></div></header>
+      <a class="ar-recruta" href="#/recruta"><span>🎯</span><div><b>${esc(D7.recruta.nome)}</b><small>Dungeon de 7 dias · sozinho ou em dupla</small></div><span>›</span></a>
+      <div class="ar-res"><b>${feitos}/${arDoEstilo(e).length * 4}</b><span>níveis vencidos como ${E ? `${E.ic} ${esc(E.nome)}` : "aventureiro"} · cada nível muda a cor da carta e o Diamante é holográfico</span></div>
+      <div class="ar-seg"><button type="button" class="${arTodos ? "" : "on"}" data-ar-todos="0">Do seu estilo</button><button type="button" class="${arTodos ? "on" : ""}" data-ar-todos="1">Todos os chefes</button></div>
+      <div class="ar-lista">${l.map(arLinha).join("")}</div>
+    </section>${(arAvisos(), "")}`;
+  };
+  // Carta do chefe no nível: t0 em silhueta, Bronze/Prata tingidas, Ouro com brilho, Diamante holográfica
+  function arCartaHtml(c, grande = false) {
+    if (c.nivel >= 4 && grande) return holoCard({ img: arCarta(c.k), tex: arCarta(c.k, true), back: `<div class="ar-verso"><b>${esc(c.nome)}</b><span>💎 Diamante</span><small>Seu marco: ${esc(arFmt(c, c.melhor))}</small></div>`, label: `carta ${c.nome}` }).replace('class="htc"', 'class="htc" data-htc-force="1"');
+    return `<div class="ar-carta t${c.nivel}"><img src="${arCarta(c.k)}" alt="Carta ${esc(c.nome)}" loading="lazy">${c.nivel ? "" : `<span class="ar-q">?</span>`}</div>`;
+  }
+  function abrirChefe(k) {
+    const c = arena().find((x) => x.k === k); if (!c) return;
+    const falta = arFalta(c), un = AR_UN[c.met];
+    dlgGami(`<div class="ar-dlg">${arCartaHtml(c, true)}
+      <p class="gami-k">${c.nivel ? `${AR_NIVEIS[c.nivel - 1][2]} ${AR_NIVEIS[c.nivel - 1][1]}` : "Ainda não derrotado"}</p><h2>${esc(c.nome)}</h2>
+      <ol class="ar-niveis">${AR_NIVEIS.map(([s, nome, ic], i) => `<li class="${i < c.nivel ? "ok" : ""}"><span>${ic}</span><b>${nome}</b><small>${esc(arTxtNivel(c, i))}</small>${i < c.nivel ? "<em>✓</em>" : ""}</li>`).join("")}</ol>
+      <p class="note">Seu marco: <b>${esc(arFmt(c, c.melhor))}</b>${c.auto || c.corrida ? " · conta também o que você registra nos treinos" : ""}</p>
+      ${falta ? `<a class="gami-tag" href="#/mercado" data-gami-ok>🔒 Precisa de ${esc(falta.curto)} · ver no Mercado ›</a>` : ""}
+      ${c.nivel < 4 ? (c.met === "nivel"
+        ? `<div class="ar-reg"><p class="note small">Qual nível você completou?</p><div class="ar-nv">${AR_NIVEIS.map(([, nome, ic], i) => `<button type="button" class="btn btn-outline" data-ar-nv="${c.k}|${i + 1}" ${i < c.nivel ? "disabled" : ""}>${ic} ${nome}</button>`).join("")}</div></div>`
+        : `<form class="ar-reg" data-ar-form="${c.k}"><label class="field"><span class="field-lbl">Registrar marca (${un}${c.met === "pace" ? " nos 5 km" : ""})</span><input name="v" inputmode="decimal" autocomplete="off" placeholder="${arMeta(c, c.nivel)}"></label><button class="btn btn-blue" type="submit">Registrar</button></form>`) : ""}`, "Fechar");
+    if (c.nivel >= 4) setTimeout(htcInit, 50);
+  }
+  function arRegistrar(k, v) {
+    const toast = (m) => { const f = document.querySelector("#gami-dlg .ar-reg"); if (!f) return toastApp(m); let p = f.querySelector(".ar-erro"); if (!p) { p = document.createElement("p"); p.className = "ar-erro"; f.appendChild(p); } p.textContent = m; };
+    const c = arena().find((x) => x.k === k); if (!c || !(v > 0)) { toast("Digite um número válido."); return; }
+    const b = c.melhor, menor = arMenorMelhor(c);
+    if (b && c.met !== "nivel") {
+      const limite = menor ? Math.min(b * 0.85, b - AR_PASSO.pace) : Math.max(b * 1.5, b + (AR_PASSO[c.met] || 5));
+      if (menor ? v < limite : v > limite) { toast(`Salto grande demais desde ${arFmt(c, b)}. Registre uma marca até ${arFmt(c, limite)} e evolua em etapas.`, 4500); return; }
+    } else if (c.met === "nivel" && v > b + 1) { toast("Registre um nível por vez.", 3500); return; }
+    if (menor ? b && v >= b : v <= b) { toast(`Seu marco já é ${arFmt(c, b)}.`); return; }
+    S.arena = { ...(S.arena || {}), [k]: [...(S.arena?.[k] || []), { v, em: hojeKey }].slice(-20) };
+    CACHE_ARENA = null; save();
+    const novo = arena().find((x) => x.k === k);
+    document.getElementById("gami-dlg")?.close();
+    if (novo.nivel > c.nivel) arNovoNivel(novo); else toastApp(`Marca registrada: ${arFmt(novo, novo.melhor)}. Falta ${arFmt(novo, arMeta(novo, novo.nivel))} para o próximo nível.`, 3500);
+    if (location.hash.startsWith("#/arena") || location.hash.startsWith("#/album")) render();
+  }
+  function arNovoNivel(c) {
+    S.arenaVisto = { ...(S.arenaVisto || {}), [c.k]: c.nivel }; save();
+    const N = AR_NIVEIS[c.nivel - 1];
+    dlgGami(`<div class="ar-dlg">${arCartaHtml(c, true)}<p class="gami-k">${N[2]} Chefe derrotado no ${N[1]}!</p><h2>${esc(c.nome)}</h2>
+      <p class="note">${c.nivel < 4 ? `A carta subiu para <b>${N[1]}</b>. Próximo: ${esc(arTxtNivel(c, c.nivel))}.` : "Carta <b>holográfica</b> desbloqueada. Você venceu todos os níveis!"}</p>
+      <a class="gami-tag" href="#/album" data-gami-ok>🃏 Ver no álbum ›</a>`, "Bora!");
+    if (c.nivel >= 4) setTimeout(htcInit, 50);
+  }
+  // Níveis vencidos pelos treinos (sem passar pela Arena): avisa uma vez, ao abrir a Arena
+  function arAvisos() {
+    const novo = arena().find((c) => c.nivel > (S.arenaVisto?.[c.k] || 0));
+    if (novo) setTimeout(() => arNovoNivel(novo), 400);
+  }
+  document.addEventListener("click", (e) => {
+    const r = e.target.closest?.("[data-ar]"); if (r) { abrirChefe(r.dataset.ar); return; }
+    const t = e.target.closest?.("[data-ar-todos]"); if (t) { arTodos = t.dataset.arTodos === "1"; render(); return; }
+    const nv = e.target.closest?.("[data-ar-nv]"); if (nv) { const [k, n] = nv.dataset.arNv.split("|"); arRegistrar(k, Number(n)); }
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target.closest?.("[data-ar-form]"); if (!f) return;
+    e.preventDefault(); arRegistrar(f.dataset.arForm, Number(String(f.v.value).replace(",", ".")));
+  });
+
   telas.ficha = (p1) => {
     setToolbar(null);
     if (!S.ficha || p1 === "quiz") return `<section class="screen quiz" id="quiz"></section>`;
@@ -7649,7 +7815,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
       card.addEventListener("pointermove", mover);
       ["pointerleave", "pointercancel"].forEach((ev) => card.addEventListener(ev, () => (tgt = { ax: 0, ay: 0, active: false })));
       const aplicar = () => { card.style.transform = `rotateX(${ax.toFixed(1)}deg) rotateY(${(ay + (flipped ? 180 : 0)).toFixed(1)}deg)`; };
-      const gl = HOLO_ATIVO ? canvas.getContext("webgl2", { alpha: false, antialias: false }) : null;
+      const gl = HOLO_ATIVO || root.dataset.htcForce ? canvas.getContext("webgl2", { alpha: false, antialias: false }) : null;
       if (!gl) { canvas.replaceWith(Object.assign(new Image(), { src: root.dataset.htcImg, className: "htc__canvas", alt: "" })); aplicar(); return; }
       const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); return x; };
       const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, HTC_VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, HTC_FRAG)); gl.linkProgram(prog);
