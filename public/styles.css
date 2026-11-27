@@ -2083,3 +2083,85 @@ button.alb-it:active { transform: scale(0.96); }
   .lj-moldura { width: 140px; height: 140px; bottom: 34px; }
   .lj-pedestal { width: 160px; height: 30px; bottom: 10px; }
 }
+
+/* ---------- Vitrine do Mercado e do Inventário (padrão "Loja" da Vulto, ProfitizeBuild, no visual RPG) ---------- */
+.vt { padding: 6px 14px 0; }
+.vt-filtros { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 12px; margin: 0 -14px; padding: 0 14px; background: rgba(28, 18, 12, .94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-block: 1px solid #5a3a24; }
+.vt-rolo { flex: 1; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.vt-rolo::-webkit-scrollbar { display: none; }
+.vt-rolo button { flex: none; position: relative; min-height: 44px; padding: 0 10px 0 14px; background: none; border: 0; color: #a8968a; font: 700 15px "Pixelify Sans", "Inter Tight", sans-serif; letter-spacing: .02em; cursor: pointer; }
+.vt-rolo button sup { margin-left: 2px; font: 600 10px var(--font); color: #7d6a5c; }
+.vt-rolo button[aria-pressed="true"] { color: #f6eee0; }
+.vt-rolo button[aria-pressed="true"]::before { content: ""; position: absolute; left: 4px; top: 50%; width: 6px; height: 6px; margin-top: -3px; background: #ffd23f; box-shadow: 0 0 8px rgba(255, 210, 63, .7); }
+.vt-rolo button[aria-pressed="true"] sup { color: #ffd23f; }
+.vt-total { flex: none; font: 600 11px var(--font); letter-spacing: .06em; text-transform: uppercase; color: #7d6a5c; }
+.vt-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; row-gap: 22px; padding-top: 16px; }
+.vt-card { min-width: 0; animation: vt-entra .7s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes vt-entra { from { opacity: 0; filter: blur(12px); transform: translateY(18px); } }
+@media (prefers-reduced-motion: reduce) { .vt-card { animation: none; } }
+.vt-foto { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: #fff; border: 2px solid #4a3a2e; box-shadow: 0 3px 0 #120c08; }
+.vt-abrir { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: radial-gradient(circle at 50% 45%, #6a5a4e, #2a201a 80%); cursor: pointer; }
+.vt-abrir:has(img:not(.px)) { background: #fff; }
+.vt-abrir img.inv-svg { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+.vt-abrir img.inv-svg.px { padding: 22%; image-rendering: pixelated; }
+.vt-abrir svg.inv-svg { width: 56%; height: 56%; }
+.vt-abrir:focus-visible { outline: 3px solid #ffd23f; outline-offset: -3px; }
+.vt-num { position: absolute; left: 6px; top: 6px; padding: 2px 5px; border-radius: 4px; background: rgba(20, 12, 8, .78); color: #e6d6b8; font: 600 10.5px var(--font); letter-spacing: .06em; pointer-events: none; }
+.vt-selo { position: absolute; right: 6px; top: 6px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #1f4a33; border: 2px solid #4ee39b; color: #4ee39b; font-size: 12px; font-weight: 800; pointer-events: none; }
+.vt-card.tem .vt-foto { border-color: #2f6b4a; }
+.vt-faixa { position: absolute; left: 0; right: 0; bottom: 0; display: none; gap: 6px; padding: 8px; background: rgba(20, 12, 8, .92); transform: translateY(100%); transition: transform .32s cubic-bezier(.16, 1, .3, 1); }
+.vt-faixa button { flex: 1; min-height: 34px; padding: 0 8px; border-radius: 6px; border: 2px solid #3a2414; background: linear-gradient(180deg, #ffd66b, #e0a020); color: #2b1d14; font: 700 13px "Pixelify Sans", "Inter Tight", sans-serif; cursor: pointer; }
+.vt-faixa button + button { background: #3a2a1e; color: #f1e2c3; border-color: #7a4b2a; }
+.vt-fx-txt { flex: 1; text-align: center; color: #4ee39b; font: 700 13px "Pixelify Sans", sans-serif; padding: 8px 0; }
+@media (hover: hover) and (pointer: fine) { .vt-faixa { display: flex; } .vt-foto:hover .vt-faixa, .vt-foto:focus-within .vt-faixa { transform: none; } }
+.vt-leg { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 8px; }
+.vt-leg b { font-size: 14px; line-height: 1.25; color: #f6eee0; font-weight: 600; }
+.vt-xp, .vt-ok { flex: none; font: 700 12px var(--font); color: #ffd23f; white-space: nowrap; }
+.vt-ok { color: #4ee39b; }
+.vt-leg2 { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; font-size: 12px; color: #8e7d70; }
+.vt-mono { font: 600 10.5px var(--font); letter-spacing: .06em; text-transform: uppercase; text-align: right; }
+.vt-card.falta .vt-mono { color: #8e7d70; }
+.vt-iv .vt-card.falta .vt-abrir img, .vt-iv .vt-card.falta .vt-abrir svg { filter: grayscale(.9); opacity: .55; }
+/* Fecho: frase em cima e as condições em 2 × 2 */
+.vt-fecho { display: grid; gap: 16px; margin-top: 28px; padding: 18px 0 4px; border-top: 1px solid #5a3a24; }
+.vt-frase { margin: 0; font: 700 24px/1.15 "Pixelify Sans", "Inter Tight", sans-serif; color: #f6eee0; }
+.vt-frase em { font-style: normal; color: #ffd23f; }
+.vt-cond { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.vt-cond div { padding: 10px 0; border-bottom: 1px solid #3a2a1e; }
+.vt-cond div:nth-child(odd) { padding-right: 10px; }
+.vt-cond dt { font: 600 10.5px var(--font); letter-spacing: .08em; text-transform: uppercase; color: #8e7d70; }
+.vt-cond dd { margin: 2px 0 0; font-size: 14px; color: #e6d6b8; }
+/* Gaveta com a ficha do item no pedestal */
+.vt-gaveta { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.vt-veu { position: absolute; inset: 0; background: rgba(5, 3, 8, .6); opacity: 0; transition: opacity .25s; }
+.vt-painel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 88dvh; overflow-y: auto; display: grid; gap: 8px; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; background-color: #1c1410; border: 3px solid #7a4b2a; border-bottom: 0; color: #f6eee0; transform: translateY(102%); transition: transform .32s cubic-bezier(.16, 1, .3, 1); }
+.vt-gaveta.on { pointer-events: auto; }
+.vt-gaveta.on .vt-veu { opacity: 1; }
+.vt-gaveta.on .vt-painel { transform: none; }
+.vt-x { position: absolute; right: 10px; top: 10px; z-index: 2; width: 40px; height: 40px; border-radius: 8px; border: 2px solid #7a4b2a; background: #3a2416; color: #f1e2c3; font-size: 22px; line-height: 1; cursor: pointer; }
+.vt-painel .lj-det-img { height: 200px; }
+.vt-painel .lj-moldura { width: 128px; height: 128px; bottom: 32px; background: #fff; }
+.vt-painel .lj-pedestal { width: 150px; height: 28px; }
+.vt-painel h2 { margin: 0; font: 700 22px/1.15 "Pixelify Sans", "Inter Tight", sans-serif; }
+.vt-g-cat { margin: 6px 0 0; font: 600 11px var(--font); letter-spacing: .08em; text-transform: uppercase; color: #8e7d70; }
+.vt-g-txt { margin: 0; font-size: 15px; line-height: 1.45; color: #c9b8a6; }
+.vt-g-acoes { display: grid; gap: 8px; margin-top: 8px; }
+.vt-painel .lj-btn { min-height: 50px; font: 700 17px "Pixelify Sans", "Inter Tight", sans-serif; }
+@media (prefers-reduced-motion: reduce) { .vt-painel, .vt-veu { transition: none; } }
+@media (min-width: 768px) {
+  .vt { padding: 10px 24px 0; }
+  .vt-filtros { margin: 0 -24px; padding: 0 24px; }
+  .vt-grade { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); column-gap: clamp(14px, 1.6vw, 22px); row-gap: clamp(28px, 3vw, 44px); padding-top: 22px; }
+  .vt-fecho { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; margin-top: 44px; }
+  .vt-frase { font-size: 34px; }
+  .vt-painel { left: 50%; right: auto; bottom: 50%; width: min(440px, 92vw); border-radius: 16px; border-bottom: 3px solid #7a4b2a; transform: translate(-50%, 60%); opacity: 0; transition: transform .32s cubic-bezier(.16, 1, .3, 1), opacity .25s; }
+  .vt-gaveta.on .vt-painel { transform: translate(-50%, 50%); opacity: 1; }
+}
+.vt-painel > * { grid-column: 1; }
+.vt-painel .lj-det-img { grid-area: auto; }
+.vt-painel h2 { padding-right: 44px; }
+.vt-g-cat { margin-top: 4px; }
+.vt-mono { color: #c9a24a; }
+.vt-card.tem .vt-mono, .vt-iv .vt-mono { color: #8e7d70; }
+@media (min-width: 768px) { .vt-foto { aspect-ratio: 4 / 5; } }
+@media (max-width: 479px) { .vt-total { display: none; } }

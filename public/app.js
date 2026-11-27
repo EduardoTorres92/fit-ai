@@ -7432,11 +7432,91 @@
   const MERC_FALA = { armas: "Armas novas, novos exercícios! Escolha bem.", armaduras: "Roupa boa não muda o treino, mas muda o ânimo.", pocoes: "Poções só com a bênção de um nutricionista!", artefatos: "Relógios que medem cada passo da jornada." };
   const lojaCats = (cat, attr) => `<nav class="lj-cats" aria-label="Categorias">${INV.CATS.map((c) => `<button type="button" class="lj-cat rp-rebites" ${attr}="${c.id}" aria-pressed="${c.id === cat}">${c.img ? `<img class="lj-cat-ic" src="${c.img}" alt="">` : INV.icone(c.ic, "lj-cat-ic", true)}<span>${esc(c.nome)}</span><em class="lj-cat-n">${INV.ITENS.filter((i) => i.cat === c.id).length}</em></button>`).join("")}</nav>`;
   const lojaFala = (fala, cls = "") => `<p class="lj-fala rp-rebites${cls}">${esc(fala)}</p>`;
+  /* Vitrine do Mercado e do Inventário (padrão "Loja" da landing Vulto, ProfitizeBuild, no visual RPG):
+     filtros numa faixa entre dois fios com a contagem em sobrescrito, grade de cards do mesmo tamanho com o número
+     no canto, nome que quebra em vez de cortar e legenda em duas linhas; no mouse, uma faixa sobe de dentro da foto
+     com as ações. Tocar no card abre a ficha do item no pedestal (gaveta de baixo), sem recarregar a tela. */
+  const vtCat = (modo) => (modo === "mk" ? mercCat : ivCat);
+  const vtLista = (modo) => (vtCat(modo) === "tudo" ? INV.ITENS : INV.ITENS.filter((i) => i.cat === vtCat(modo)));
+  const catNome = (id) => INV.CATS.find((c) => c.id === id)?.nome || "";
+  function vtCard(i, idx, modo) {
+    const tem = invTem(i.id), n = i.eq ? INV.liberados(i.id) : 0;
+    const dir = tem ? `<span class="vt-ok">✓ Tenho</span>` : n ? `<span class="vt-xp">+${n} exerc.</span>` : "";
+    const mono = modo === "iv" ? (tem ? "Equipado" : "Falta") : tem ? "No inventário" : i.semLoja ? "Marque no inventário" : i.link ? "Ver oferta ›" : "Em breve";
+    const faixa = modo === "mk"
+      ? (tem ? `<span class="vt-fx-txt">✓ Já está no seu inventário</span>` : `${i.link ? `<button type="button" data-mc-oferta="${i.id}">Ver oferta</button>` : ""}<button type="button" data-vt-tenho="${i.id}">Já tenho</button>`)
+      : `<button type="button" data-vt-tenho="${i.id}">${tem ? "Tirar do inventário" : "Tenho este item"}</button>`;
+    return `<article class="vt-card${tem ? " tem" : " falta"}" data-vt-card="${i.id}" style="--i:${idx % 12}">
+      <div class="vt-foto"><button type="button" class="vt-abrir" data-vt-abrir="${i.id}" data-vt-modo="${modo}" aria-label="${esc(i.nome)}">${INV.icone(i.id)}</button>
+        <span class="vt-num" aria-hidden="true">${String(idx + 1).padStart(2, "0")}</span>${tem ? `<span class="vt-selo" aria-hidden="true">✓</span>` : ""}
+        <div class="vt-faixa">${faixa}</div></div>
+      <div class="vt-leg"><b>${esc(i.nome)}</b>${dir}</div>
+      <div class="vt-leg2"><span>${esc(catNome(i.cat))}</span><span class="vt-mono">${mono}</span></div>
+    </article>`;
+  }
+  function lojaVitrine(modo) {
+    const cat = vtCat(modo), lista = vtLista(modo);
+    const filtros = [["tudo", "Tudo", INV.ITENS.length], ...INV.CATS.map((c) => [c.id, c.nome, INV.ITENS.filter((i) => i.cat === c.id).length])];
+    const tens = INV.ITENS.filter((i) => invTem(i.id)).length;
+    return `<div class="vt">
+      <div class="vt-filtros"><div class="vt-rolo" role="group" aria-label="Categorias">${filtros.map(([id, nome, q]) => `<button type="button" data-vt-cat="${id}" data-vt-modo="${modo}" aria-pressed="${id === cat}">${esc(nome)}<sup>${q}</sup></button>`).join("")}</div>
+        <span class="vt-total">${modo === "mk" ? `${lista.length} itens` : `Você tem ${tens} de ${INV.ITENS.length}`}</span></div>
+      <div class="vt-grade vt-${modo}">${lista.map((i, k) => vtCard(i, k, modo)).join("")}</div>
+      <div class="vt-fecho"><p class="vt-frase">${modo === "mk" ? "Cada arma nova,<br><em>um treino novo</em><br>com o Sensei." : "Marque o que você tem.<br><em>O Sensei monta</em><br>com o seu arsenal."}</p>
+        <dl class="vt-cond">${(modo === "mk"
+          ? [["Links", "Mercado Livre, de afiliado"], ["Preço", "O mesmo para você"], ["Sensei", "Usa o que você marcar"], ["Suplementos", "Só com nutricionista"]]
+          : [["Equipamentos", "Mudam o treino"], ["Suporte", "Roupa, água e poções"], ["Mudou algo?", "Vale no próximo plano"], ["Faltou um?", "Ache no Mercado"]])
+          .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>
+    </div>`;
+  }
+  // Ficha do item: gaveta presa ao pé da tela, montada sem recarregar (a rolagem da grade fica onde estava)
+  function vtFicha(id, modo) {
+    const i = INV.ITENS.find((x) => x.id === id); if (!i) return;
+    const tem = invTem(i.id), n = i.eq ? INV.liberados(i.id) : 0;
+    let g = document.getElementById("vt-gaveta");
+    if (!g) { g = document.createElement("div"); g.id = "vt-gaveta"; g.className = "vt-gaveta"; g.setAttribute("role", "dialog"); g.setAttribute("aria-modal", "true"); document.querySelector(".device")?.appendChild(g) || document.body.appendChild(g); }
+    g.dataset.item = id; g.dataset.modo = modo;
+    g.innerHTML = `<div class="vt-veu" data-vt-fechar></div><div class="vt-painel rp-rebites" aria-labelledby="vt-g-t">
+      <button type="button" class="vt-x" data-vt-fechar aria-label="Fechar">×</button>
+      <div class="lj-det-img"><span class="lj-foco" aria-hidden="true"></span><span class="lj-moldura">${INV.icone(i.id)}</span><span class="lj-pedestal" aria-hidden="true"></span></div>
+      <p class="vt-g-cat">${esc(catNome(i.cat))}${i.eq ? " · muda o treino" : ""}</p>
+      <h2 id="vt-g-t">${esc(i.nome)}</h2><p class="vt-g-txt">${esc(i.txt)}</p>${n ? `<span class="lj-lib">⚡ +${n} exercícios com o Sensei</span>` : ""}
+      <div class="vt-g-acoes">${!tem && i.link ? `<button type="button" class="lj-btn" data-mc-oferta="${i.id}">Ver oferta<small>link de afiliado · Mercado Livre</small></button>` : ""}
+        <button type="button" class="lj-btn ${tem ? "sec" : i.link ? "breve" : ""}" data-vt-tenho="${i.id}">${tem ? "✓ No inventário<small>tocar para tirar</small>" : "Já tenho este item"}</button></div></div>`;
+    requestAnimationFrame(() => g.classList.add("on"));
+    g.querySelector(".vt-x")?.focus({ preventScroll: true });
+  }
+  function vtFechar() { const g = document.getElementById("vt-gaveta"); if (g) { g.classList.remove("on"); setTimeout(() => { if (!g.classList.contains("on")) g.remove(); }, 260); } }
+  window.addEventListener("hashchange", () => document.getElementById("vt-gaveta")?.remove());
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") vtFechar(); });
+  document.addEventListener("click", (e) => {
+    if (e.target.closest?.("[data-vt-fechar]")) { vtFechar(); return; }
+    const ab = e.target.closest?.("[data-vt-abrir]");
+    if (ab) { vtFicha(ab.dataset.vtAbrir, ab.dataset.vtModo); return; }
+    const fc = e.target.closest?.("[data-vt-cat]");
+    if (fc) {
+      const sc = document.querySelector("#app .screen"), y = sc?.scrollTop || 0;
+      if (fc.dataset.vtModo === "mk") mercCat = fc.dataset.vtCat; else ivCat = fc.dataset.vtCat;
+      render();
+      const s2 = document.querySelector("#app .screen"); if (s2) s2.scrollTop = y;
+      return;
+    }
+    const tn = e.target.closest?.("[data-vt-tenho]");
+    if (tn) {
+      const it = INV.ITENS.find((x) => x.id === tn.dataset.vtTenho); if (!it) return;
+      const tinha = invTem(it.id); invTrocar(it.id);
+      toast(tinha ? `${it.curto} saiu do inventário.` : it.eq ? `${it.curto} no inventário! O Sensei vai usar nos próximos treinos.` : `${it.curto} no inventário!`);
+      const modo = location.hash.startsWith("#/mercado") ? "mk" : "iv";
+      const card = document.querySelector(`[data-vt-card="${it.id}"]`);
+      if (card) { const idx = vtLista(modo).findIndex((x) => x.id === it.id); card.outerHTML = vtCard(it, idx, modo); }
+      const tot = document.querySelector(".vt-total"); if (tot && modo === "iv") tot.textContent = `Você tem ${INV.ITENS.filter((i) => invTem(i.id)).length} de ${INV.ITENS.length}`;
+      const g = document.getElementById("vt-gaveta"); if (g?.classList.contains("on")) vtFicha(it.id, g.dataset.modo);
+      if (modo === "iv") { const { lib, tot: t } = invLiberados(inventario()); const b = document.querySelector(".iv-bar.poder i"), st = document.querySelector(".iv-bar.poder + strong"); if (b) b.style.width = `${t ? Math.round((lib / t) * 100) : 0}%`; if (st) st.textContent = `${lib}/${t}`; }
+    }
+  });
   telas.arsenal = () => {
     setToolbar("vilarejo");
     const n = meuNivel(), { lib, tot } = invLiberados(inventario()), pct = tot ? Math.round((lib / tot) * 100) : 0;
-    const lista = INV.ITENS.filter((i) => i.cat === ivCat), it = lista.find((i) => i.id === ivSel) || lista[0];
-    const on = it && invTem(it.id), q = it?.eq ? INV.liberados(it.id) : 0;
     return `<section class="screen has-toolbar vila lj">
       <header class="lj-cena iv-cena"><img class="lj-cena-bg" src="${A("banner-home-cena.jpg")}" alt="">
         <a class="lj-voltar rp-rebites" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
@@ -7446,33 +7526,19 @@
           <span class="iv-medidor"><em>XP</em><span class="iv-bar xp"><i style="width:${n.pct}%"></i></span></span>
           <span class="iv-medidor"><em>Poder</em><span class="iv-bar poder"><i style="width:${pct}%"></i></span><strong>${lib}/${tot}</strong></span></span></a>
       </header>
-      <div class="lj-loja">
-        ${lojaCats(ivCat, "data-iv-cat")}
-        <div class="lj-grade">${lista.map((i) => `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}${invTem(i.id) ? " tem" : " falta"}" data-iv-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}${invTem(i.id) ? ", você tem" : ""}">${INV.icone(i.id)}${invTem(i.id) ? `<span class="lj-badge tem">✓</span>` : ""}<span class="lj-etq">${esc(i.curto)}</span></button>`).join("")}</div>
-        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img"><span class="lj-foco" aria-hidden="true"></span><span class="lj-moldura">${INV.icone(it.id)}</span><span class="lj-pedestal" aria-hidden="true"></span></div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
-          <button type="button" class="lj-btn${on ? " sec" : ""}" data-inv="${it.id}">${on ? "✓ No inventário<small>tocar para tirar</small>" : "Tenho este item"}</button></aside>` : ""}
-      </div>
+      ${lojaVitrine("iv")}
       ${lojaFala(`Poder do arsenal: ${lib} de ${tot} exercícios com equipamento liberados.`)}
       <a class="lj-placa" href="#/mercado">🛒 <b>Ir ao Mercado</b> ›</a>
     </section>`;
   };
   telas.mercado = () => {
     setToolbar("vilarejo");
-    const lista = INV.ITENS.filter((i) => i.cat === mercCat), it = lista.find((i) => i.id === mkSel) || lista[0];
-    const on = it && invTem(it.id), q = it?.eq ? INV.liberados(it.id) : 0;
     return `<section class="screen has-toolbar vila lj">
       <header class="lj-cena"><img class="lj-cena-bg" src="assets/mercado-cena.webp" alt="O mercador na barraca">
         <a class="lj-voltar rp-rebites" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
         <h1 class="lj-titulo rp-rebites">Mercado</h1>
-        ${lojaFala(MERC_FALA[mercCat] || MERC_FALA.armas, " na-cena")}</header>
-      <div class="lj-loja">
-        ${lojaCats(mercCat, "data-mc-cat")}
-        <div class="lj-grade">${lista.map((i) => { const n = i.eq ? INV.liberados(i.id) : 0;
-          return `<button type="button" class="lj-slot rp-rebites${i.id === it.id ? " sel" : ""}" data-mk-sel="${i.id}" aria-pressed="${i.id === it.id}" aria-label="${esc(i.nome)}">${INV.icone(i.id)}${invTem(i.id) ? `<span class="lj-badge tem">✓</span>` : n ? `<span class="lj-badge">+${n}</span>` : ""}<span class="lj-etq">${esc(i.curto)}</span></button>`; }).join("")}</div>
-        ${it ? `<aside class="lj-det rp-rebites"><h2>${esc(it.nome)}</h2><div class="lj-det-img"><span class="lj-foco" aria-hidden="true"></span><span class="lj-moldura">${INV.icone(it.id)}</span><span class="lj-pedestal" aria-hidden="true"></span></div><p>${esc(it.txt)}</p>${q ? `<span class="lj-lib">⚡ +${q} exercícios</span>` : ""}
-          ${on ? `<span class="lj-tem">✓ Já é seu</span>` : it.semLoja ? `<a class="lj-btn sec" href="#/arsenal">Marcar no inventário</a>`
-            : `<button type="button" class="lj-btn${it.link ? "" : " breve"}" data-mc-oferta="${it.id}">${it.link ? "Ver oferta" : "Em breve"}</button>`}</aside>` : ""}
-      </div>
+        ${lojaFala(MERC_FALA[mercCat] || "Arsenal completo na barraca. Escolha bem, aventureiro.", " na-cena")}</header>
+      ${lojaVitrine("mk")}
       <p class="mk-nota">Links de afiliado: o FIT.AI ganha uma comissão e o preço para você não muda. Suplemento só com orientação de um nutricionista.</p>
     </section>`;
   };
@@ -7488,7 +7554,7 @@
     const eqv = e.target.closest?.("[data-eq-ver]");
     if (eqv) {
       const it = INV.ITENS.find((x) => x.id === eqv.dataset.eqVer); if (!it) return;
-      mercCat = it.cat; mkSel = it.id; evento("mercado_treino", { item: it.id }); location.hash = "#/mercado"; return;
+      mercCat = it.cat; evento("mercado_treino", { item: it.id }); location.hash = "#/mercado"; setTimeout(() => vtFicha(it.id, "mk"), 350); return;
     }
     const eqt = e.target.closest?.("[data-eq-tenho]");
     if (eqt) {
