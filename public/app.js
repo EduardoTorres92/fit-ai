@@ -441,6 +441,7 @@
     { name: "Dojo", icon: "landmark", href: "#/dojo", tab: "dojo" },
     { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
     { name: "Guilda", icon: "users", href: "#/grupo", tab: "grupo" },
+    ...(claLiberado() ? [{ name: "Clã", icon: "shield", href: "#/cla", tab: "cla" }] : []),
     { name: "Perfil", icon: "user", href: "#/perfil", tab: "perfil" },
   ];
   let tabAtual = "home", menuNav = null;
@@ -3955,7 +3956,7 @@
   function avatarGroup(ids, { max = 5, size = 40, overlap = 14, label = "Participantes", link = false, estatico = false } = {}) {
     const vis = ids.slice(0, max), extra = ids.length - vis.length;
     return `<ul class="ag-group" aria-label="${esc(label)}"${estatico ? " data-ag-estatico" : ""}>${vis.map((id, i) => {
-      const p = G.perfis[id] || (id === uid ? { nome: nomeCompleto(), foto_url: S.user?.foto } : null), nome = (p?.nome || "Atleta").split(" ")[0] + (id === uid ? " (você)" : "");
+      const p = G.perfis[id] || CL.perfis[id] || (id === uid ? { nome: nomeCompleto(), foto_url: S.user?.foto } : null), nome = (p?.nome || "Atleta").split(" ")[0] + (id === uid ? " (você)" : "");
       const foto = p?.foto_url ? `<img class="ag-photo" src="${esc(p.foto_url)}" alt="${esc(p.nome || "Atleta")}" width="${size}" height="${size}" draggable="false" referrerpolicy="no-referrer" loading="lazy">`
         : `<span class="ag-photo ag-ini" style="font-size:${Math.round(size * 0.34)}px" role="img" aria-label="${esc(p?.nome || "Atleta")}">${esc(iniciais(p?.nome))}</span>`;
       const tag = link && !estatico ? "a" : "span", attrs = link && !estatico ? `href="#/grupo/membro/${esc(id)}"` : estatico ? "" : 'tabindex="0"';
@@ -4078,10 +4079,10 @@
     try { await carregarMural(id); } catch (e) { console.error("mural", e); M.posts = []; }
   }
   const grupoSel = () => (G.grupos || []).find((g) => g.id === G.sel) || null;
-  const linhasDe = (id) => (id === uid ? linhasLocais().map((r) => ({ ...r, usuario_id: uid })) : G.linhas.filter((r) => r.usuario_id === id));
+  const linhasDe = (id) => (id === uid ? linhasLocais().map((r) => ({ ...r, usuario_id: uid })) : (G.membros.includes(id) ? G.linhas : CL.linhas).filter((r) => r.usuario_id === id));
   const linhasGrupo = () => G.membros.flatMap(linhasDe);
   // Água de cada pessoa da guilda (a minha vem do aparelho, que está sempre em dia)
-  const aguaDe = (id) => (id === uid ? aguaLinhas().map((r) => ({ ...r, usuario_id: uid })) : G.agua.filter((r) => r.usuario_id === id));
+  const aguaDe = (id) => (id === uid ? aguaLinhas().map((r) => ({ ...r, usuario_id: uid })) : (G.membros.includes(id) ? G.agua : CL.agua).filter((r) => r.usuario_id === id));
   const aguaGrupo = () => G.membros.flatMap(aguaDe);
   const mlNoPeriodo = (lista, ini, fim = hojeKey) => soma(lista.filter((r) => r.data >= ini && r.data <= fim).map((r) => r.ml));
   async function entrarComCodigo(codigo) {
@@ -4159,7 +4160,7 @@
     xp: ["🛡️ XP", (k) => k.xp, (v) => (v ? `${v.toLocaleString("pt-BR")} XP` : "—")],
   };
   // Nível de quem está na guilda: o meu é calculado aqui; o dos outros vem do que cada um sincronizou (perfis.config)
-  const cfgNivel = (id) => (id === uid ? (() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, estilo: estiloAtual().slug }; })() : G.perfis[id]?.config || null);
+  const cfgNivel = (id) => (id === uid ? (() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, estilo: estiloAtual().slug }; })() : pfDe(id)?.config || null);
   function ranking() {
     const [, val, fmt] = RANKS[G.rank];
     const lista = G.membros.map((id) => { const rows = linhasDe(id); return { id, p: G.perfis[id], k: { ...kpis(noPeriodo(rows, G.periodo)), seq: sequencias(rows).atual, agua: mlNoPeriodo(aguaDe(id), PERIODOS[G.periodo][1]()), xp: Number(cfgNivel(id)?.xp) || 0 } }; })
@@ -4269,6 +4270,7 @@
         <nav class="ac-lado tav-lado" aria-label="Taverna">
           <a href="#/grupo/missoes" class="tav-procura"><span class="tav-cartaz">📜</span>Procura-se${pend ? `<i class="tav-bdg">${pend}</i>` : ""}</a>
           <a href="#/grupo/mural"><span>📣</span>Mural${nm ? `<i class="tav-bdg">${nm > 9 ? "9+" : nm}</i>` : ""}</a>
+          <a href="#/cla"><span>${claLiberado() ? "🏯" : "🔒"}</span>Clã</a>
           <button type="button" id="g-convidar"><span>🤝</span>Convidar</button>
         </nav>
       </div>
@@ -4310,19 +4312,20 @@
     </section>`;
   }
   // Perfil de alguém da guilda: números, Max Out e Fit Test (o que a pessoa sincronizou)
-  function telaMembro(id) {
-    const p = G.perfis[id];
-    if (!p || !G.membros.includes(id)) return telaGrupo();
+  function telaMembro(id, viaCla = false) {
+    const daGuilda = (G.membros || []).includes(id), p = daGuilda ? G.perfis[id] : CL.perfis[id];
+    if (!p || (!daGuilda && !CL.membros.includes(id))) return viaCla ? telaCla() : telaGrupo();
+    viaCla = viaCla || !daGuilda;
     const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows), eu = id === uid;
     if (!eu && !G.conqDe?.[id] && sb) { G.conqDe = G.conqDe || {}; G.conqDe[id] = "carregando";
-      sb.from("conquistas").select("codigo, ganha_em").eq("usuario_id", id).then(({ data }) => { G.conqDe[id] = data || []; if (location.hash === `#/grupo/membro/${id}`) render(); }); }
+      sb.from("conquistas").select("codigo, ganha_em").eq("usuario_id", id).then(({ data }) => { G.conqDe[id] = data || []; if (location.hash.endsWith(`/membro/${id}`)) render(); }); }
     const nome1 = esc((p.nome || "Atleta").split(" ")[0]), c = membroCfg(id), g = membroG(id);
     const n = eu ? meuNivel() : nivelDe(Number(c.xp) || 0, Number(c.nivel_xp) || 1), est = estiloDe(rows), E = est.slug && ESTILOS[est.slug];
     const sp = (() => { try { return spriteDe(NIVEIS_ARTE.has(est.slug) ? est.slug : null, g, n.slug); } catch { return null; } })();
     const carta = est.slug && NIVEIS_ARTE.has(est.slug) ? cartaDe(est.slug, n.slug, g) : `assets/classes/cartas/${n.slug}-${g}.webp`;
     const seg = keyOf(mondayOf(hoje)), meta = Number(eu ? metaSemana() : c.meta) || 3;
     const semana = feitas(rows).filter((r) => r.data >= seg && r.data <= hojeKey).length, pct = Math.min(100, Math.round((semana / meta) * 100));
-    const rk = G.membros.map((m) => ({ m, xp: xpSemanaDe(m) })).sort((x, y) => y.xp - x.xp), pos = rk.findIndex((x) => x.m === id) + 1, xpSem = rk[pos - 1]?.xp || 0;
+    const rk = (viaCla ? CL.membros : G.membros).map((m) => ({ m, xp: xpSemanaDe(m) })).sort((x, y) => y.xp - x.xp), pos = rk.findIndex((x) => x.m === id) + 1, xpSem = rk[pos - 1]?.xp || 0;
     const al = c.album || {}, nCartas = ESTILOS_ORDEM.reduce((t, e) => t + Math.min(CLASSES.length, (al[e] ?? -1) + 1), 0);
     const nConq = eu ? null : Array.isArray(G.conqDe?.[id]) ? G.conqDe[id].filter((x) => CONQI[x.codigo]).length : null;
     const R = 30, C = 2 * Math.PI * R, nivelCor = pct >= 100 ? "alta" : pct >= 50 ? "media" : "baixa";
@@ -4335,10 +4338,10 @@
     return `<section class="screen has-toolbar acamp mb-pg">
       <div class="ac-topo">
         <div class="ac-bg"><img src="${A("banner-home-cena.jpg")}" alt=""></div>
-        <div class="ac-chips"><a class="ac-chip" href="#/grupo" aria-label="Voltar à Taverna">‹ Taverna</a><span class="ac-chip fogo">🔥 ${sq.atual} ${sq.atual === 1 ? "dia" : "dias"}</span><span class="ac-chip">🎯 ${semana}/${meta} na semana</span></div>
+        <div class="ac-chips"><a class="ac-chip" href="${viaCla ? "#/cla" : "#/grupo"}" aria-label="Voltar">‹ ${viaCla ? "Clã" : "Taverna"}</a><span class="ac-chip fogo">🔥 ${sq.atual} ${sq.atual === 1 ? "dia" : "dias"}</span><span class="ac-chip">🎯 ${semana}/${meta} na semana</span></div>
         <div class="ac-hero">
           <div class="ac-id">
-            <p class="ac-oi">${esc(grupoSel()?.nome || "Guilda")}</p><h1>${esc(p.nome || "Atleta")}${eu ? " (você)" : ""}</h1>
+            <p class="ac-oi">${esc(viaCla ? CLAS[CL.meu]?.nome || "Clã" : grupoSel()?.nome || "Guilda")}</p><h1>${esc(p.nome || "Atleta")}${eu ? " (você)" : ""}</h1>
             <p class="ac-nv-k">Nível</p><p class="ac-nv">${n.nivel}</p>
             <p class="ac-classe">${esc(n.classe)}${E ? ` · ${E.ic} ${esc(E.nome)}` : ""}</p>
             ${membroTitulo(id)}
@@ -4361,7 +4364,7 @@
         </div>
         <div class="mb-nums">
           <span><b>${k.treinos}</b><small>treinos</small></span><span><b>${fmtMin(k.minutos)}</b><small>de treino</small></span>
-          <span><b>${sq.melhor}</b><small>melhor sequência</small></span><span><b>${desafiosOk}</b><small>desafios da guilda</small></span>
+          <span><b>${sq.melhor}</b><small>melhor sequência</small></span><span><b>${viaCla ? sq.atual : desafiosOk}</b><small>${viaCla ? "sequência atual" : "desafios da guilda"}</small></span>
         </div>
       </div>
       ${f ? `<div class="ac-card mb-ficha">
@@ -4407,7 +4410,7 @@
     } catch { return null; }
   }
   // Perfil de outra pessoa: a carta e o álbum saem do que ela sincronizou (perfis.config) e dos treinos dela
-  const membroCfg = (id) => (id === uid ? { xp: meuNivel().xp, arte: sexoArte(), album: S.album, d7Feito: S.d7Feito } : G.perfis[id]?.config || {});
+  const membroCfg = (id) => (id === uid ? { xp: meuNivel().xp, arte: sexoArte(), album: S.album, d7Feito: S.d7Feito } : pfDe(id)?.config || {});
   const membroG = (id) => { const c = membroCfg(id); return id === uid ? sexoArte() : c.arte === "f" || (c.arte !== "m" && c.quiz?.sexo === "f") ? "f" : "m"; };
   function membroTitulo(id) { const f = membroCfg(id).d7Feito; return f && D7[f.k] ? `<span class="pf-titulo">🎖️ ${esc(D7[f.k].titulo)}</span>` : ""; }
   function cartaMembroHtml(id, rows) {
@@ -6628,7 +6631,7 @@
   // Data em que o app abriu para todos: quem treinou antes ganhou o bônus de veterano
   const INICIO_ABERTO = "2026-11-23";
   function xpSemanaDe(id) {
-    const seg = semanaAtual(), eu = id === uid, cfg = eu ? { meta: metaSemana(), d7: S.d7, d7Feito: S.d7Feito } : G.perfis[id]?.config || {};
+    const seg = semanaAtual(), eu = id === uid, cfg = eu ? { meta: metaSemana(), d7: S.d7, d7Feito: S.d7Feito } : pfDe(id)?.config || {};
     const meta = Number(cfg.meta) || 6, rows = linhasDe(id);
     const agua = aguaDe(id).filter((a) => a.data >= seg && a.ml && a.meta);
     const desafios = (G.feitos || []).filter((f) => f.usuario_id === id && f.feito_em && keyOf(new Date(f.feito_em)) >= seg).length;
@@ -6713,7 +6716,7 @@
     return { n, hojeOk, dia, fase: d7Fase(dia), reg: d.dias[dia - 1] || {}, fim: d.fim };
   }
   const d7Nome = (id) => esc((pfDe(id)?.nome || "Atleta").split(" ")[0]);
-  const pfDe = (id) => G.perfis[id] || G.perfisT?.[id] || null;
+  const pfDe = (id) => G.perfis[id] || G.perfisT?.[id] || CL.perfis[id] || null;
   // Todo mundo dos minhas guildas, menos eu
   const d7Ids = () => [...new Set([...(G.todosMembros || []).map((m) => m.usuario_id), ...(G.membros || [])])].filter((id) => id !== uid);
   const d7Cfg = (id) => pfDe(id)?.config || {};
@@ -7894,7 +7897,15 @@
     { k: "rei-demonio", nome: "Marcha do Rei Demônio", meta: 15, un: "km", dias: 7, modo: "grupo", f: "km", dificil: true },
     { k: "samurai", nome: "Guerra do Samurai", meta: 3, un: "treinos", dias: 5, modo: "grupo", f: "treinos" },
   ];
-  const INC_DE = Object.fromEntries(INC.map((x) => [x.k, x]));
+  const INC_CLA = [
+    { k: "cla-insanity", img: "shinobi", nome: "Sombra dos Shinobi", meta: 90, un: "min de Insanity", dias: 7, modo: "cla", f: "min:insanity" },
+    { k: "cla-calistenia", img: "troll", nome: "Troll da Montanha", meta: 90, un: "min de calistenia", dias: 7, modo: "cla", f: "min:calistenia" },
+    { k: "cla-hipertrofia", img: "ogro", nome: "Ogro de Ferro", meta: 90, un: "min de academia", dias: 7, modo: "cla", f: "min:hipertrofia" },
+    { k: "cla-corrida", img: "lobo", nome: "Alfa da Matilha", meta: 10, un: "km", dias: 7, modo: "cla", f: "km" },
+    { k: "cla-cross", img: "valquiria", nome: "Valquíria Furiosa", meta: 90, un: "min de cross", dias: 7, modo: "cla", f: "min:cross" },
+  ];
+  const INC_DE = Object.fromEntries([...INC, ...INC_CLA].map((x) => [x.k, x]));
+  const incImg = (i) => arCarta(INC_DE[i.chefe]?.img || i.chefe);
   const incHp = (x, membros) => Math.round(x.meta * (x.modo === "dupla" ? 2 : Math.max(2, Math.ceil(membros / 2))));
   const incFmt = (x, v) => `${String(Math.round(v * 10) / 10).replace(".", ",")} ${x.un}`;
   // Quanto eu somei no período, pelos treinos registrados
@@ -7904,6 +7915,7 @@
     if (x.f === "km") return soma(ativ.filter((a) => ehCorrida(a.tipo)).map((a) => a.km || 0));
     if (x.f === "bikeKm") return soma(ativ.filter((a) => a.tipo === "bike").map((a) => a.km || 0));
     if (x.f === "bikeMin") return soma(ativ.filter((a) => a.tipo === "bike").map((a) => (a.tempo || 0) / 60));
+    if (x.f.startsWith("min:")) { const liga = x.f.slice(4); return soma(feitas(linhasLocais()).filter((r) => dentro(r.data) && MOD_DE(r.programa) === liga).map((r) => Number(r.minutos) || 0)); }
     const regs = registrosEx().filter((r) => dentro(r.data));
     if (x.f === "treinos") return new Set([...regs.map((r) => r.data), ...Object.keys(S.corrida?.logs || {}).filter(dentro)]).size;
     if (x.f === "prancha") return soma(regs.filter(AR.sentinela.auto).map((r) => r.s || 0)) / 60;
@@ -7916,7 +7928,7 @@
     if (!forcar && IG.lista && Date.now() - IG.carregadoEm < 45000) return;
     IG.carregando = true;
     try {
-      const { data, error } = await sb.from("incursoes").select("id, grupo_id, chefe, modo, dupla, hp, inicio, fim, criado_por, criado_em").gte("fim", keyOf(addDays(hoje, -21))).order("inicio", { ascending: false });
+      const { data, error } = await sb.from("incursoes").select("id, grupo_id, cla, chefe, modo, dupla, hp, inicio, fim, criado_por, criado_em").gte("fim", keyOf(addDays(hoje, -21))).order("inicio", { ascending: false });
       if (error) throw error;
       IG.lista = (data || []).filter((i) => INC_DE[i.chefe]);
       const ids = IG.lista.map((i) => i.id);
@@ -7927,7 +7939,7 @@
     IG.carregando = false;
     if (/^#\/(arena|home|grupo)/.test(location.hash)) render();
   }
-  const incPosso = (i) => i.modo === "grupo" || i.criado_por === uid || i.dupla === uid;
+  const incPosso = (i) => i.modo === "grupo" || (i.modo === "cla" && i.cla === CL.meu) || i.criado_por === uid || i.dupla === uid;
   const incAtiva = (i) => hojeKey >= i.inicio && hojeKey <= i.fim;
   // Manda o meu "auto" das incursões abertas em que eu já entrei (ou que são da minha dupla)
   async function incSincronizar() {
@@ -7936,6 +7948,7 @@
       if (!meu && i.modo === "grupo") continue; // na aberta, entra quem quiser (botão "Entrar")
       const auto = Math.round(incAuto(INC_DE[i.chefe], i.inicio, i.fim) * 10) / 10;
       if (meu && Number(meu.auto) === auto) continue;
+      if (!meu && !auto) continue; // no chefe do clã entra quem já somou algo
       const { error } = await sb.from("incursao_golpes").upsert({ incursao_id: i.id, usuario_id: uid, auto, manual: meu?.manual || 0, atualizado_em: new Date().toISOString() });
       if (!error) { if (meu) meu.auto = auto; else IG.golpes.push({ incursao_id: i.id, usuario_id: uid, auto, manual: 0 }); }
     }
@@ -7957,12 +7970,12 @@
   }
   const incXp = () => soma(Object.values(S.incXp || {}));
   function incCard(i) {
-    const e = incEstado(i), x = e.x, g = (G.grupos || []).find((gg) => gg.id === i.grupo_id);
+    const e = incEstado(i), x = e.x, g = i.cla ? { nome: CLAS[i.cla]?.nome || "Clã" } : (G.grupos || []).find((gg) => gg.id === i.grupo_id);
     const nome = (id) => id === uid ? "Você" : esc((pfDe(id)?.nome || "Alguém").split(" ")[0]);
     const status = e.caiu ? "⚔️ Chefe derrotado!" : e.acabou ? "O chefe escapou" : e.diasRest === 1 ? "Último dia" : `${e.diasRest} dias restantes`;
     const posso = incPosso(i) && incAtiva(i) && !e.caiu;
     return `<article class="inc-card${e.caiu ? " caiu" : ""}${e.acabou && !e.caiu ? " fugiu" : ""}">
-      <div class="inc-banner"><img src="${arCarta(i.chefe)}" alt="" loading="lazy"><span class="inc-modo">${i.modo === "dupla" ? "👥 Dupla" : "🛡️ Guilda aberta"}</span>${x.dificil ? `<span class="inc-dif">Difícil</span>` : ""}</div>
+      <div class="inc-banner"><img src="${incImg(i)}" alt="" loading="lazy"><span class="inc-modo">${i.modo === "dupla" ? "👥 Dupla" : i.modo === "cla" ? `${CLAS[i.cla]?.ic || "🏯"} Clã inteiro` : "🛡️ Guilda aberta"}</span>${x.dificil ? `<span class="inc-dif">Difícil</span>` : ""}</div>
       <div class="inc-corpo">
         <p class="inc-k">${esc(g?.nome || "Guilda")} · ${status}</p>
         <h3>${esc(x.nome)}</h3>
@@ -7976,10 +7989,10 @@
   }
   function incCompartilhar(id) {
     const i = (IG.lista || []).find((x) => x.id === id); if (!i) return;
-    const e = incEstado(i), x = e.x, g = (G.grupos || []).find((gg) => gg.id === i.grupo_id);
-    const link = `${location.origin}/#/grupo/missoes/${i.grupo_id}`;
+    const e = incEstado(i), x = e.x, g = i.cla ? null : (G.grupos || []).find((gg) => gg.id === i.grupo_id);
+    const link = i.cla ? `${location.origin}/#/cla` : `${location.origin}/#/grupo/missoes/${i.grupo_id}`;
     const falta = Math.max(0, i.hp - e.dano);
-    const txt = `👹 ${x.nome} invadiu a guilda${g ? ` "${g.nome}"` : ""}! Faltam ${incFmt(x, falta)} para derrubar o chefe e ${e.diasRest === 1 ? "hoje é o último dia" : `restam ${e.diasRest} dias`}. ${i.modo === "dupla" ? "Bora fechar essa dupla" : "Entra e ataca comigo"} no FIT.AI ⚔️ ${link}${g ? `\nAinda não está na guilda? Código ${g.codigo}` : ""}`;
+    const txt = `👹 ${x.nome} invadiu ${i.cla ? `o ${CLAS[i.cla]?.nome || "clã"}` : `a guilda${g ? ` "${g.nome}"` : ""}`}! Faltam ${incFmt(x, falta)} para derrubar o chefe e ${e.diasRest === 1 ? "hoje é o último dia" : `restam ${e.diasRest} dias`}. ${i.modo === "dupla" ? "Bora fechar essa dupla" : "Entra e ataca comigo"} no FIT.AI ⚔️ ${link}${g ? `\nAinda não está na guilda? Código ${g.codigo}` : ""}`;
     if (navigator.share && matchMedia("(pointer: coarse)").matches) navigator.share({ title: x.nome, text: txt }).catch(() => {});
     else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Incursão copiada. Cole no WhatsApp. 📲"), () => prompt("Copie a mensagem:", txt));
     else prompt("Copie a mensagem:", txt);
@@ -7987,15 +8000,15 @@
   document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-inc-compart]"); if (b) incCompartilhar(b.dataset.incCompart); });
   // Início: incursões abertas das minhas guildas, logo abaixo do desafio da semana
   function incHome() {
-    if (!uid || !G.grupos?.length) return "";
+    if (!uid || (!G.grupos?.length && !CL.meu)) return "";
     incCarregar();
-    const ativas = (IG.lista || []).filter((i) => incAtiva(i) && G.grupos.some((g) => g.id === i.grupo_id) && (i.modo === "grupo" || i.criado_por === uid || i.dupla === uid));
+    const ativas = (IG.lista || []).filter((i) => incAtiva(i) && ((i.cla && i.cla === CL.meu) || ((G.grupos || []).some((g) => g.id === i.grupo_id) && (i.modo === "grupo" || i.criado_por === uid || i.dupla === uid))));
     if (!ativas.length) return "";
-    return `<div class="inc-home">${ativas.map((i) => { const e = incEstado(i), g = G.grupos.find((gg) => gg.id === i.grupo_id);
-      return `<a class="inc-hm${e.caiu ? " caiu" : ""}" href="#/grupo/missoes/${i.grupo_id}"><img src="${arCarta(i.chefe)}" alt="" loading="lazy">
+    return `<div class="inc-home">${ativas.map((i) => { const e = incEstado(i), g = i.cla ? { nome: CLAS[i.cla]?.nome } : G.grupos.find((gg) => gg.id === i.grupo_id);
+      return `<a class="inc-hm${e.caiu ? " caiu" : ""}${i.cla ? " cla" : ""}" href="${i.cla ? "#/cla" : `#/grupo/missoes/${i.grupo_id}`}"><img src="${incImg(i)}" alt="" loading="lazy">
         <span class="inc-hm-t"><small>👹 Incursão · ${esc(g?.nome || "Guilda")} · ${e.caiu ? "derrotado!" : e.diasRest === 1 ? "último dia" : `${e.diasRest} dias`}</small><b>${esc(e.x.nome)}</b>
           <span class="inc-hp"><i style="width:${e.hpPct}%"></i><span>HP ${e.hpPct}%</span></span>
-          <small>${e.meu ? `Você somou ${incFmt(e.x, e.meu.tot)}` : i.modo === "grupo" ? "Você ainda não entrou" : `Dupla com ${esc((pfDe(i.criado_por === uid ? i.dupla : i.criado_por)?.nome || "alguém").split(" ")[0])}`}</small></span>
+          <small>${e.meu ? `Você somou ${incFmt(e.x, e.meu.tot)}` : i.modo === "cla" ? "Seus treinos da semana viram golpes" : i.modo === "grupo" ? "Você ainda não entrou" : `Dupla com ${esc((pfDe(i.criado_por === uid ? i.dupla : i.criado_por)?.nome || "alguém").split(" ")[0])}`}</small></span>
         <em>${e.caiu ? "🏆" : e.meu ? "Atacar ›" : "Entrar ›"}</em></a>`; }).join("")}</div>`;
   }
   function incSecao(gid) {
@@ -8048,7 +8061,7 @@
   }
   function incGolpe(id) {
     const i = (IG.lista || []).find((ii) => ii.id === id); if (!i) return; const x = INC_DE[i.chefe];
-    dlgGami(`<div class="inc-lanc"><img class="inc-mini" src="${arCarta(i.chefe)}" alt=""><p class="gami-k">Lançar golpe</p><h2>${esc(x.nome)}</h2>
+    dlgGami(`<div class="inc-lanc"><img class="inc-mini" src="${incImg(i)}" alt=""><p class="gami-k">Lançar golpe</p><h2>${esc(x.nome)}</h2>
       <p class="note">O que você registra nos treinos já conta sozinho. Use aqui para o que fez fora do app (até ${incFmt(x, x.meta)} por vez).</p>
       <form class="ar-reg" data-inc-form="${id}"><label class="field"><span class="field-lbl">Quanto você fez (${esc(x.un)})</span><input name="v" inputmode="decimal" autocomplete="off"></label><button class="btn btn-blue" type="submit">Atacar ⚔️</button></form></div>`, "Fechar");
   }
@@ -8065,7 +8078,7 @@
     document.getElementById("gami-dlg")?.close();
     await incCarregar(true);
     const e = incEstado(i);
-    if (e.caiu) dlgGami(`<div class="ar-dlg"><div class="ar-carta t3"><img src="${arCarta(i.chefe)}" alt=""></div><p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">A guilda venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}.</p></div>`, "Bora!");
+    if (e.caiu) dlgGami(`<div class="ar-dlg"><div class="ar-carta t3"><img src="${incImg(i)}" alt=""></div><p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">A guilda venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}.</p></div>`, "Bora!");
     else toast(`Golpe de ${incFmt(x, v)}! HP do chefe: ${e.hpPct}%.`, 3000);
   }
   document.addEventListener("click", (e) => {
@@ -8376,6 +8389,155 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     else if (e.target.closest("[data-ficha-refazer]")) location.hash = "#/ficha/quiz";
     else if (e.target.closest("[data-ficha-meta]")) { novaMeta(); save(); render(); }
     else if (e.target.closest("[data-arte]")) { S.arte = e.target.closest("[data-arte]").dataset.arte; save(); render(); }
+  });
+
+
+  /* ==========================================================
+     Clãs: juntam gente do mesmo esporte vinda de guildas diferentes (um clã por pessoa, troca a cada 30 dias).
+     Quem divide clã vê o perfil completo, tem ranking semanal, mural próprio e um chefe por semana que o clã inteiro ataca.
+     Tabelas: cla_membros, posts.cla, incursoes.cla (migração 20261127_clas).
+     ========================================================== */
+  const CLAS = {
+    calistenia: { nome: "Clã Monge", esporte: "Calistenia", estilo: "monge", ic: "🥋", chefe: "cla-calistenia" },
+    corrida: { nome: "Clã Batedor", esporte: "Corrida", estilo: "batedor", ic: "🏹", chefe: "cla-corrida" },
+    hipertrofia: { nome: "Clã Gladiador", esporte: "Academia", estilo: "gladiador", ic: "🛡️", chefe: "cla-hipertrofia" },
+    insanity: { nome: "Clã Ninja", esporte: "Insanity", estilo: "ninja", ic: "🥷", chefe: "cla-insanity" },
+    cross: { nome: "Clã Berserker", esporte: "Cross", estilo: "berserker", ic: "🪓", chefe: "cla-cross" },
+  };
+  const CLA_NIVEL = 5; // clã libera no nível 5, para não confundir quem está começando
+  const claLiberado = () => { try { return !!CL.meu || meuNivel().nivel >= CLA_NIVEL; } catch { return false; } };
+  const CL = { meu: null, desde: null, membros: [], perfis: {}, linhas: [], agua: [], posts: [], reacoes: [], contagem: {}, carregadoEm: 0, carregando: false, erro: false };
+  // Sugestão: a modalidade que a pessoa mais treina
+  function claSugerido() { const e = estiloAtual(); if (e.liga && CLAS[e.liga]) return e.liga; if (e.top && CLAS[e.top]) return e.top; const t = trilha(); return CLAS[t] ? t : t === "academia" ? "hipertrofia" : "calistenia"; }
+  async function carregarCla(forcar = false) {
+    if (!uid || !sb || CL.carregando) return;
+    if (!forcar && CL.carregadoEm && Date.now() - CL.carregadoEm < 60000) return;
+    CL.carregando = true;
+    try {
+      const ms = await sb.from("cla_membros").select("usuario_id, cla, desde");
+      if (ms.error) throw ms.error;
+      const eu = (ms.data || []).find((m) => m.usuario_id === uid);
+      CL.meu = eu?.cla || null; CL.desde = eu?.desde || null;
+      const ct = await sb.rpc("cla_contagem"); CL.contagem = Object.fromEntries((ct.data || []).map((x) => [x.cla, Number(x.n)]));
+      if (CL.meu) {
+        CL.membros = (ms.data || []).filter((m) => m.cla === CL.meu).map((m) => m.usuario_id);
+        const outros = CL.membros.filter((id) => id !== uid), seg = keyOf(mondayOf(hoje));
+        const [pf, tr, ag, ps] = await Promise.all([
+          sb.from("perfis").select("id, nome, foto_url, config").in("id", CL.membros),
+          outros.length ? sb.from("treinos").select("usuario_id, data, programa, titulo, concluido, minutos, detalhes, atualizado_em").in("usuario_id", outros).gte("data", keyOf(addDays(hoje, -120))) : { data: [] },
+          outros.length ? sb.from("agua").select("usuario_id, data, ml, meta, atualizado_em").in("usuario_id", outros).gte("data", seg) : { data: [] },
+          sb.from("posts").select("id, usuario_id, texto, treino, criado_em").eq("cla", CL.meu).order("criado_em", { ascending: false }).limit(30),
+        ]);
+        CL.perfis = Object.fromEntries((pf.data || []).map((p) => [p.id, p])); CL.linhas = tr.data || []; CL.agua = ag.data || []; CL.posts = ps.data || [];
+        const ids = CL.posts.map((p) => p.id);
+        CL.reacoes = ids.length ? (await sb.from("post_reacoes").select("post_id, usuario_id, emoji").in("post_id", ids)).data || [] : [];
+        await claChefeGarantir();
+      } else { CL.membros = []; CL.perfis = {}; CL.linhas = []; CL.agua = []; CL.posts = []; }
+      CL.erro = false;
+    } catch (e) { console.error("cla", e); CL.erro = true; }
+    CL.carregadoEm = Date.now(); CL.carregando = false;
+    if (/^#\/(cla|home)/.test(location.hash)) render();
+  }
+  // O chefe da semana do clã: quem abrir primeiro na semana cria (um por clã por semana, o banco garante)
+  async function claChefeGarantir() {
+    await incCarregar(true);
+    const seg = keyOf(mondayOf(hoje));
+    if ((IG.lista || []).some((i) => i.cla === CL.meu && i.inicio === seg)) return;
+    const x = INC_DE[CLAS[CL.meu].chefe];
+    const { error } = await sb.from("incursoes").insert({ cla: CL.meu, grupo_id: null, chefe: x.k, modo: "cla", dupla: null, hp: x.meta * Math.max(3, CL.membros.length), inicio: seg, fim: keyOf(addDays(parseKey(seg), 6)), criado_por: uid });
+    if (error && error.code !== "23505") console.error("chefe do clã", error);
+    await incCarregar(true);
+  }
+  async function claEntrar(k) {
+    if (!CLAS[k]) return;
+    const novo = !CL.meu;
+    const { error } = novo ? await sb.from("cla_membros").insert({ usuario_id: uid, cla: k }) : await sb.from("cla_membros").update({ cla: k }).eq("usuario_id", uid);
+    if (error) { toast(/30 dias/.test(error.message) ? "Você só pode trocar de clã 30 dias depois de entrar." : "Não consegui entrar no clã agora."); return; }
+    toast(`${CLAS[k].ic} Bem-vindo ao ${CLAS[k].nome}!`); CL.escolhendo = false; CL.carregadoEm = 0; IG.carregadoEm = 0; carregarCla(true);
+  }
+  const claTrocaEm = () => (CL.desde ? Math.max(0, 30 - Math.floor((Date.now() - new Date(CL.desde)) / 864e5)) : 0);
+  function claEscolha() {
+    const sug = claSugerido(), ordem = [sug, ...Object.keys(CLAS).filter((k) => k !== sug)], g = sexoArte();
+    return `<section class="screen has-toolbar acamp cla-pg">
+      <div class="cla-esc-topo"><a class="ac-chip" href="#/grupo">‹ Taverna</a><p class="ac-oi">Clãs</p><h1>${CL.meu ? "Trocar de clã" : "Escolha o seu clã"}</h1>
+        <p>O clã junta quem treina o mesmo esporte, de todas as guildas. Ranking da semana, mural e um chefe por semana que o clã inteiro ataca. Você fica em um clã e pode trocar a cada 30 dias.</p></div>
+      <div class="cla-lista">${ordem.map((k) => { const c = CLAS[k], E = ESTILOS[c.estilo], n = CL.contagem[k] || 0;
+        return `<button type="button" class="cla-op${k === sug ? " sug" : ""}${k === CL.meu ? " atual" : ""}" data-cla-entrar="${k}" ${k === CL.meu ? "disabled" : ""}>
+          <img src="assets/estilos/${c.estilo}-${g}.webp" alt="" loading="lazy">
+          <span><small>${k === CL.meu ? "Seu clã" : k === sug ? "Sugerido para você" : esc(c.esporte)}</small><b>${c.ic} ${esc(c.nome)}</b><em>${esc(c.esporte)} · ${n} ${n === 1 ? "membro" : "membros"}</em><i>${esc(E?.lema || "")}</i></span></button>`; }).join("")}</div>
+      ${CL.meu ? `<button class="btn btn-outline cla-voltar" data-cla-cancelar>Ficar no ${esc(CLAS[CL.meu].nome)}</button>` : ""}
+    </section>`;
+  }
+  function claPostHtml(p) {
+    const rs = CL.reacoes.filter((r) => r.post_id === p.id), pf = CL.perfis[p.usuario_id];
+    return `<article class="post"><header class="post-head">${avatar(pf, 36)}<div><strong>${esc(pf?.nome || "Atleta")}</strong><small>${quando(p.criado_em)}</small></div>
+      ${p.usuario_id === uid ? `<button class="lnk-btn post-del" data-cla-apagar="${p.id}">Apagar</button>` : ""}</header>
+      ${p.treino?.titulo ? `<p class="post-treino">✅ ${esc(p.treino.titulo)}${p.treino.minutos ? ` · ${fmtMin(p.treino.minutos)}` : ""}</p>` : ""}
+      <p class="post-txt">${esc(p.texto || "")}</p>
+      <div class="post-reacoes">${REACOES.map((e) => { const n = rs.filter((r) => r.emoji === e).length, eu = rs.some((r) => r.emoji === e && r.usuario_id === uid);
+        return `<button class="reacao${eu ? " on" : ""}" data-cla-reagir="${e}" data-post-id="${p.id}" aria-pressed="${eu}">${e}${n ? ` <b>${n}</b>` : ""}</button>`; }).join("")}</div></article>`;
+  }
+  function telaCla(p1, p2) {
+    setToolbar("cla");
+    if (!uid) return `<section class="screen has-toolbar acamp cla-pg"><div class="cla-esc-topo"><h1>Clãs</h1><p>Entre com uma conta para fazer parte de um clã.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div></section>`;
+    if (!G.grupos) carregarGrupos();
+    carregarCla();
+    if (!CL.carregadoEm) return `<section class="screen has-toolbar acamp cla-pg"><p class="note" style="padding:24px">Carregando o clã…</p></section>`;
+    if (p1 === "membro" && p2) return telaMembro(p2, true);
+    if (!CL.meu && !claLiberado()) { const n = meuNivel();
+      return `<section class="screen has-toolbar acamp cla-pg"><div class="cla-esc-topo"><a class="ac-chip" href="#/grupo">‹ Taverna</a><p class="ac-oi">Clãs</p><h1>🔒 Libera no nível ${CLA_NIVEL}</h1>
+        <p>O clã junta quem treina o mesmo esporte, de todas as guildas: ranking da semana, mural e um chefe por semana que o clã inteiro ataca.</p>
+        <p>Você está no <b>nível ${n.nivel}</b>. Continue treinando: no nível ${CLA_NIVEL} você escolhe o seu clã.</p>
+        <span class="ac-bar cla-lock-bar"><i style="width:${Math.min(100, Math.round(((n.nivel - 1 + n.pct / 100) / (CLA_NIVEL - 1)) * 100))}%"></i></span></div></section>`; }
+    if (!CL.meu || CL.escolhendo) return claEscolha();
+    const c = CLAS[CL.meu], E = ESTILOS[c.estilo], g = sexoArte(), seg = keyOf(mondayOf(hoje));
+    const chefe = (IG.lista || []).find((i) => i.cla === CL.meu && i.inicio === seg);
+    const rk = CL.membros.map((m) => ({ m, xp: xpSemanaDe(m) })).sort((a, b) => b.xp - a.xp);
+    const fim = addDays(mondayOf(hoje), 6), faltam = diffDays(hoje, fim), troca = claTrocaEm();
+    return `<section class="screen has-toolbar acamp cla-pg">
+      <div class="ac-topo cla-topo">
+        <div class="ac-bg"><img src="assets/estilos/${c.estilo}-${g}.webp" alt=""></div>
+        <div class="ac-chips"><a class="ac-chip" href="#/grupo">‹ Taverna</a><span class="ac-chip">${CL.membros.length} ${CL.membros.length === 1 ? "membro" : "membros"}</span></div>
+        <div class="cla-hero"><p class="ac-oi">Clã · ${esc(c.esporte)}</p><h1>${c.ic} ${esc(c.nome)}</h1>
+          <p class="cla-lema">${esc(E?.lema || "")}</p>
+          ${avatarGroup(CL.membros, { max: 7, size: 34, overlap: 10, label: `Membros do ${c.nome}`, estatico: true })}</div>
+      </div>
+      <div class="cla-sec"><p class="ac-k">👹 Chefe do clã <span>${faltam ? `${faltam + 1} dias` : "último dia"}</span></p>
+        ${chefe ? incCard(chefe) : `<p class="note small">O chefe da semana aparece em instantes…</p>`}
+        <p class="cla-d">Todo treino de ${esc(c.esporte.toLowerCase())} da semana vira golpe, sem precisar lançar. Derrotado: +100 XP para quem atacou e +50 para quem mais bateu.</p></div>
+      <div class="ac-card cla-rank"><p class="ac-k">⚡ Ranking da semana <span>zera ${faltam ? `em ${faltam} ${faltam === 1 ? "dia" : "dias"}` : "amanhã"}</span></p>
+        <ol class="tp-rank">${rk.map((x, i) => { const pf = CL.perfis[x.m] || (x.m === uid ? { nome: nomeCompleto(), foto_url: S.user?.foto } : null);
+          return `<li class="${x.m === uid ? "eu" : ""}"><a href="#/cla/membro/${x.m}"><span class="tp-pos">${i + 1}º</span>${avatar(pf, 32)}<span class="tp-nome"><b>${esc((pf?.nome || "Atleta").split(" ")[0])}${x.m === uid ? " (você)" : ""}</b><small>${esc(claGuildaDe(x.m))}</small></span><strong>${x.xp}<small> XP</small></strong></a></li>`; }).join("")}</ol></div>
+      <div class="ac-card cla-mural"><p class="ac-k">📣 Mural do clã <button class="lnk-btn" data-cla-atualizar>Atualizar</button></p>
+        <form class="cla-post" data-cla-post autocomplete="off"><textarea name="t" maxlength="500" rows="2" placeholder="Fala com o clã: dica, marca nova, convite pro treino…"></textarea><button type="submit" class="btn btn-blue">Postar</button></form>
+        ${CL.posts.length ? CL.posts.map(claPostHtml).join("") : `<p class="note small">Ninguém postou ainda no clã.</p>`}</div>
+      <div class="cla-pe">${troca ? `<small>Troca de clã liberada em ${troca} ${troca === 1 ? "dia" : "dias"}</small>` : `<button class="lnk-btn" data-cla-trocar>Trocar de clã</button>`}</div>
+    </section>`;
+  }
+  // Mostra de qual guilda a pessoa é, quando divide guilda comigo
+  const claGuildaDe = (id) => (id === uid ? "você" : (G.membros || []).includes(id) ? `da guilda ${grupoSel()?.nome || ""}` : "outra guilda");
+  telas.cla = (p1, p2) => telaCla(p1, p2);
+  document.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-cla-entrar],[data-cla-trocar],[data-cla-cancelar],[data-cla-atualizar],[data-cla-reagir],[data-cla-apagar]");
+    if (!t) return;
+    if (t.dataset.claEntrar) { const k = t.dataset.claEntrar; if (CL.meu && !confirm(`Trocar para o ${CLAS[k].nome}? Você só poderá trocar de novo em 30 dias.`)) return; claEntrar(k); }
+    else if (t.hasAttribute("data-cla-trocar")) { CL.escolhendo = true; render(); }
+    else if (t.hasAttribute("data-cla-cancelar")) { CL.escolhendo = false; render(); }
+    else if (t.hasAttribute("data-cla-atualizar")) { carregarCla(true); toast("Atualizando…"); }
+    else if (t.dataset.claReagir) {
+      const pid = t.dataset.postId, emoji = t.dataset.claReagir, ja = CL.reacoes.find((r) => r.post_id === pid && r.usuario_id === uid && r.emoji === emoji);
+      if (ja) { CL.reacoes = CL.reacoes.filter((r) => r !== ja); render(); await sb.from("post_reacoes").delete().eq("post_id", pid).eq("usuario_id", uid).eq("emoji", emoji); }
+      else { CL.reacoes.push({ post_id: pid, usuario_id: uid, emoji }); render(); await sb.from("post_reacoes").insert({ post_id: pid, usuario_id: uid, emoji }); }
+    } else if (t.dataset.claApagar) { if (!confirm("Apagar este post do clã?")) return; await sb.from("posts").delete().eq("id", t.dataset.claApagar); CL.posts = CL.posts.filter((p) => p.id !== t.dataset.claApagar); render(); }
+  });
+  document.addEventListener("submit", async (e) => {
+    const f = e.target.closest("[data-cla-post]"); if (!f) return;
+    e.preventDefault();
+    const texto = String(f.elements.t.value || "").trim().slice(0, 500); if (!texto) { toast("Escreva algo para o clã."); return; }
+    const b = f.querySelector("button"); b.disabled = true;
+    const { error } = await sb.from("posts").insert({ cla: CL.meu, grupo_id: null, usuario_id: uid, texto, foto: null, treino: null });
+    if (error) { console.error("post clã", error); toast("Não consegui postar agora."); b.disabled = false; return; }
+    toast("Postado no clã! 📣"); carregarCla(true);
   });
 
   if (S.logado && !S.user) aplicarTrava(); // visitante: só o MAX:30 (e a Fera de apoio)
