@@ -3018,7 +3018,7 @@
   let syncTimer = null, sincronizando = false, deNovo = false;
   function agendarSync() {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { verificarConquistas(); if (registrarMissoes()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) sincronizar(); }, 1200);
+    syncTimer = setTimeout(() => { verificarConquistas(); if (registrarMissoes()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) { sincronizar(); if (typeof incSincronizar === "function" && IG.lista) incSincronizar(); } }, 1200);
   }
   async function sincronizar() {
     if (!uid || !sb) return;
@@ -3055,7 +3055,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null, incXp: S.incXp || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3506,7 +3506,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.max(0, Math.min(100, Math.round(((xp - ini) / (fim - ini)) * 100))) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + arenaXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + arenaXp() + incXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
   // Piso: o nível que a pessoa já tinha antes da curva nova (calculado uma vez pela curva antiga) ou o que a conta já mostrava
   function nivelPiso(xp) {
     if (S.nivelPiso == null) { let n = 1; if (S.ficha) while (n < NIVEL_MAX && xp >= xpParaAntigo(n + 1)) n++; S.nivelPiso = n; }
@@ -5163,6 +5163,7 @@
       for (const p of VKEYS) if (perfil.config[p] !== undefined && !Object.keys(S[p].logs).length) S[p].inicio = perfil.config[p];
       if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
       if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
+      if (perfil.config.incXp && typeof perfil.config.incXp === "object" && !S.incXp) S.incXp = perfil.config.incXp;
       if (perfil.config.arena && typeof perfil.config.arena === "object" && !S.arena) { S.arena = perfil.config.arena; S.arenaVisto = perfil.config.arenaVisto || S.arenaVisto; }
       if (Array.isArray(perfil.config.inventario) && !Array.isArray(S.inventario)) S.inventario = perfil.config.inventario.filter((x) => typeof x === "string").slice(0, 30);
       if (perfil.config.nutri && !S.nutri) S.nutri = perfil.config.nutri;
@@ -7685,6 +7686,190 @@
         <span class="ar-pe"><em>HP ${100 - c.pct}%</em><em>${falta ? `🔒 Precisa de ${esc(falta.curto)}` : `Seu marco: ${arFmt(c, c.melhor)}`}</em></span></span>
       ${N ? `<span class="ar-selo n${c.nivel}" title="${N[1]}">${N[2]}</span>` : ""}</button>`;
   }
+  /* ==========================================================
+     Incursões: um chefe da Arena enfrentado em grupo (aberta: quem quiser do grupo contribui) ou em dupla, por 3 a 7 dias.
+     A vida do chefe é a meta coletiva: aberta = meta por pessoa × metade do grupo (mínimo 2); dupla = meta × 2.
+     O que cada um soma vem dos treinos registrados no período (auto) e do que lançar à mão (manual, com limite por lançamento).
+     XP: chefe derrotado = 100 para quem contribuiu e +50 para o top 1; não derrotado = 25 para quem contribuiu.
+     Tabelas: incursoes e incursao_golpes (migração 20261127_incursoes).
+     ========================================================== */
+  const INC = [
+    { k: "goblin", nome: "Invasão dos Goblins", meta: 60, un: "flexões", dias: 3, modo: "grupo", f: "goblin" },
+    { k: "lobo", nome: "Encontro da Matilha", meta: 8, un: "km", dias: 5, modo: "grupo", f: "km" },
+    { k: "kobold", nome: "Ninho do Kobold", meta: 40, un: "burpees", dias: 3, modo: "dupla", f: "kobold" },
+    { k: "minotauro", nome: "Labirinto do Minotauro", meta: 150, un: "agachamentos", dias: 5, modo: "grupo", f: "minotauro" },
+    { k: "sentinela", nome: "Vigília da Sentinela", meta: 5, un: "min de prancha", dias: 3, modo: "dupla", f: "prancha" },
+    { k: "troll", nome: "Ponte do Troll", meta: 25, un: "barras", dias: 5, modo: "grupo", f: "troll", req: ["barra", "passe"] },
+    { k: "gargula", nome: "Telhado das Gárgulas", meta: 50, un: "dips", dias: 5, modo: "dupla", f: "gargula" },
+    { k: "shinobi", nome: "Noite dos Shinobi", meta: 200, un: "polichinelos", dias: 3, modo: "grupo", f: "shinobi" },
+    { k: "ogro", nome: "Forja do Ogro", meta: 100, un: "swings", dias: 5, modo: "dupla", f: "ogro", req: ["kettlebell", "passe"] },
+    { k: "valquiria", nome: "Salão das Valquírias", meta: 75, un: "wall balls", dias: 5, modo: "grupo", f: "valquiria" },
+    { k: "cavaleiro-sem-cabeca", nome: "Estrada do Cavaleiro Sem Cabeça", meta: 30, un: "km de bike", dias: 7, modo: "grupo", f: "bikeKm" },
+    { k: "automato", nome: "Fornalha do Autômato", meta: 60, un: "min de ergométrica", dias: 5, modo: "dupla", f: "bikeMin" },
+    { k: "rei-demonio", nome: "Marcha do Rei Demônio", meta: 15, un: "km", dias: 7, modo: "grupo", f: "km", dificil: true },
+    { k: "samurai", nome: "Guerra do Samurai", meta: 3, un: "treinos", dias: 5, modo: "grupo", f: "treinos" },
+  ];
+  const INC_DE = Object.fromEntries(INC.map((x) => [x.k, x]));
+  const incHp = (x, membros) => Math.round(x.meta * (x.modo === "dupla" ? 2 : Math.max(2, Math.ceil(membros / 2))));
+  const incFmt = (x, v) => `${String(Math.round(v * 10) / 10).replace(".", ",")} ${x.un}`;
+  // Quanto eu somei no período, pelos treinos registrados
+  function incAuto(x, ini, fim) {
+    const dentro = (k) => k >= ini && k <= fim;
+    const ativ = Object.entries(S.corrida?.logs || {}).filter(([k]) => dentro(k)).flatMap(([, l]) => l.itens || []);
+    if (x.f === "km") return soma(ativ.filter((a) => ehCorrida(a.tipo)).map((a) => a.km || 0));
+    if (x.f === "bikeKm") return soma(ativ.filter((a) => a.tipo === "bike").map((a) => a.km || 0));
+    if (x.f === "bikeMin") return soma(ativ.filter((a) => a.tipo === "bike").map((a) => (a.tempo || 0) / 60));
+    const regs = registrosEx().filter((r) => dentro(r.data));
+    if (x.f === "treinos") return new Set([...regs.map((r) => r.data), ...Object.keys(S.corrida?.logs || {}).filter(dentro)]).size;
+    if (x.f === "prancha") return soma(regs.filter(AR.sentinela.auto).map((r) => r.s || 0)) / 60;
+    const c = AR[x.f]; if (!c?.auto) return 0;
+    return soma(regs.filter((r) => c.auto(r)).map((r) => r.reps || 0));
+  }
+  const IG = { lista: null, golpes: [], carregadoEm: 0 };
+  async function incCarregar(forcar = false) {
+    if (!uid || !sb || IG.carregando) return;
+    if (!forcar && IG.lista && Date.now() - IG.carregadoEm < 45000) return;
+    IG.carregando = true;
+    try {
+      const { data, error } = await sb.from("incursoes").select("id, grupo_id, chefe, modo, dupla, hp, inicio, fim, criado_por, criado_em").gte("fim", keyOf(addDays(hoje, -21))).order("inicio", { ascending: false });
+      if (error) throw error;
+      IG.lista = (data || []).filter((i) => INC_DE[i.chefe]);
+      const ids = IG.lista.map((i) => i.id);
+      IG.golpes = ids.length ? (await sb.from("incursao_golpes").select("incursao_id, usuario_id, auto, manual").in("incursao_id", ids)).data || [] : [];
+      IG.carregadoEm = Date.now();
+      await incSincronizar();
+    } catch (e) { console.error("incursoes", e); if (!IG.lista) IG.lista = []; IG.carregadoEm = Date.now(); }
+    IG.carregando = false;
+    if (/^#\/(arena|home)/.test(location.hash)) render();
+  }
+  const incPosso = (i) => i.modo === "grupo" || i.criado_por === uid || i.dupla === uid;
+  const incAtiva = (i) => hojeKey >= i.inicio && hojeKey <= i.fim;
+  // Manda o meu "auto" das incursões abertas em que eu já entrei (ou que são da minha dupla)
+  async function incSincronizar() {
+    for (const i of (IG.lista || []).filter((i) => incPosso(i) && hojeKey <= keyOf(addDays(parseKey(i.fim), 1)))) {
+      const meu = IG.golpes.find((g) => g.incursao_id === i.id && g.usuario_id === uid);
+      if (!meu && i.modo === "grupo") continue; // na aberta, entra quem quiser (botão "Entrar")
+      const auto = Math.round(incAuto(INC_DE[i.chefe], i.inicio, i.fim) * 10) / 10;
+      if (meu && Number(meu.auto) === auto) continue;
+      const { error } = await sb.from("incursao_golpes").upsert({ incursao_id: i.id, usuario_id: uid, auto, manual: meu?.manual || 0, atualizado_em: new Date().toISOString() });
+      if (!error) { if (meu) meu.auto = auto; else IG.golpes.push({ incursao_id: i.id, usuario_id: uid, auto, manual: 0 }); }
+    }
+  }
+  function incEstado(i) {
+    const x = INC_DE[i.chefe], gs = IG.golpes.filter((g) => g.incursao_id === i.id).map((g) => ({ ...g, tot: Number(g.auto) + Number(g.manual) })).sort((a, b) => b.tot - a.tot);
+    const dano = soma(gs.map((g) => g.tot)), caiu = dano >= i.hp, acabou = hojeKey > i.fim;
+    return { x, gs, dano, caiu, acabou, hpPct: Math.max(0, Math.round((1 - Math.min(1, dano / i.hp)) * 100)), meu: gs.find((g) => g.usuario_id === uid), diasRest: Math.max(0, Math.round((parseKey(i.fim) - parseKey(hojeKey)) / 864e5) + 1) };
+  }
+  // XP das incursões (guardado em S.incXp para não sumir quando a incursão sai da lista)
+  function incXpAtualizar() {
+    let mud = false;
+    for (const i of IG.lista || []) {
+      const e = incEstado(i); if (!e.meu || e.meu.tot <= 0 || (!e.caiu && !e.acabou)) continue;
+      const xp = e.caiu ? 100 + (e.gs[0]?.usuario_id === uid ? 50 : 0) : 25;
+      if ((S.incXp?.[i.id] || 0) !== xp) { S.incXp = { ...(S.incXp || {}), [i.id]: xp }; mud = true; }
+    }
+    if (mud) save();
+  }
+  const incXp = () => soma(Object.values(S.incXp || {}));
+  function incCard(i) {
+    const e = incEstado(i), x = e.x, g = (G.grupos || []).find((gg) => gg.id === i.grupo_id);
+    const nome = (id) => id === uid ? "Você" : esc((pfDe(id)?.nome || "Alguém").split(" ")[0]);
+    const status = e.caiu ? "⚔️ Chefe derrotado!" : e.acabou ? "O chefe escapou" : e.diasRest === 1 ? "Último dia" : `${e.diasRest} dias restantes`;
+    const posso = incPosso(i) && incAtiva(i) && !e.caiu;
+    return `<article class="inc-card${e.caiu ? " caiu" : ""}${e.acabou && !e.caiu ? " fugiu" : ""}">
+      <div class="inc-banner"><img src="${arCarta(i.chefe)}" alt="" loading="lazy"><span class="inc-modo">${i.modo === "dupla" ? "👥 Dupla" : "🛡️ Grupo aberto"}</span>${x.dificil ? `<span class="inc-dif">Difícil</span>` : ""}</div>
+      <div class="inc-corpo">
+        <p class="inc-k">${esc(g?.nome || "Grupo")} · ${status}</p>
+        <h3>${esc(x.nome)}</h3>
+        <div class="inc-hp"><i style="width:${e.hpPct}%"></i><span>HP ${e.hpPct}% · ${incFmt(x, Math.min(e.dano, i.hp))} de ${incFmt(x, i.hp)}</span></div>
+        <ol class="inc-rank">${e.gs.filter((gg) => gg.tot > 0).slice(0, 5).map((gg, n) => `<li><b>${n === 0 ? "👑" : n + 1}</b><span>${nome(gg.usuario_id)}</span><em>${incFmt(x, gg.tot)}</em></li>`).join("") || `<li class="vazio">Ninguém atacou ainda.</li>`}</ol>
+        ${i.modo === "dupla" ? `<p class="inc-sub">${nome(i.criado_por)} + ${nome(i.dupla)}</p>` : ""}
+        ${posso ? `<div class="inc-acoes">${!e.meu && i.modo === "grupo" ? `<button type="button" class="btn btn-blue" data-inc-entrar="${i.id}">Entrar na incursão</button>` : `<button type="button" class="btn btn-blue" data-inc-golpe="${i.id}">Lançar golpe</button>`}</div>` : ""}
+        ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b></p>` : ""}
+      </div></article>`;
+  }
+  function incSecao() {
+    if (!uid) return `<div class="inc-sec"><h2 class="inc-h">⚔️ Incursões</h2><p class="inc-vazio">Entre com uma conta e participe de um grupo para enfrentar chefes junto com os amigos.</p></div>`;
+    incCarregar(); incXpAtualizar();
+    const ativas = (IG.lista || []).filter((i) => !(hojeKey > i.fim)), antigas = (IG.lista || []).filter((i) => hojeKey > i.fim).slice(0, 3);
+    return `<div class="inc-sec"><div class="inc-topo"><h2 class="inc-h">⚔️ Incursões</h2>${G.grupos?.length ? `<button type="button" class="btn btn-outline inc-nova" data-inc-nova>+ Lançar</button>` : ""}</div>
+      <p class="inc-d">Um chefe, todo o grupo atacando. A vida dele cai com o que cada um soma nos treinos.</p>
+      ${!IG.lista ? `<p class="inc-vazio">Carregando…</p>` : ativas.length ? ativas.map(incCard).join("") : `<p class="inc-vazio">${G.grupos?.length ? "Nenhuma incursão aberta. Lance uma e chame o grupo!" : "Entre num grupo na Taverna para lançar incursões."}</p>`}
+      ${antigas.length ? `<details class="inc-antigas"><summary>Incursões anteriores</summary>${antigas.map(incCard).join("")}</details>` : ""}</div>`;
+  }
+  // Lançar: escolher o grupo, o chefe e (na dupla) a parceria
+  function incNova(gsel, ksel) {
+    const grupos = G.grupos || []; if (!grupos.length) return;
+    const gid = gsel || G.sel || grupos[0].id, x = INC_DE[ksel];
+    const membros = (G.todosMembros || []).filter((m) => m.grupo_id === gid).map((m) => m.usuario_id);
+    const nMem = Math.max(membros.length, gid === G.sel ? (G.membros || []).length : 0, 2);
+    // Uma incursão aberta de grupo por vez em cada grupo; dupla: uma por pessoa em cada grupo
+    const ocupado = x && (IG.lista || []).some((i) => i.grupo_id === gid && !(hojeKey > i.fim) && i.modo === x.modo && (x.modo === "grupo" || i.criado_por === uid || i.dupla === uid));
+    dlgGami(`<div class="inc-lanc"><p class="gami-k">Nova incursão</p><h2>${x ? esc(x.nome) : "Escolha o chefe"}</h2>
+      ${grupos.length > 1 ? `<div class="seg inc-gs">${grupos.map((g) => `<button type="button" class="${g.id === gid ? "on" : ""}" data-inc-g="${g.id}|${ksel || ""}">${esc(g.nome)}</button>`).join("")}</div>` : ""}
+      ${!x
+        ? `<div class="inc-esc">${INC.map((c) => `<button type="button" class="inc-op" data-inc-esc="${gid}|${c.k}"><img src="${arCarta(c.k)}" alt=""><span><b>${esc(c.nome)}</b><small>${c.meta} ${esc(c.un)} por pessoa · ${c.dias} dias · ${c.modo === "dupla" ? "dupla" : "grupo aberto"}${c.dificil ? " · difícil" : ""}</small></span></button>`).join("")}</div>`
+        : `<div class="ar-carta t0 inc-prev" style="filter:none"><img src="${arCarta(x.k)}" alt="" style="filter:none;opacity:1"></div>
+          ${ocupado ? `<p class="note">${x.modo === "dupla" ? "Você já está numa incursão em dupla nesse grupo. Termine ela primeiro." : "Esse grupo já tem uma incursão aberta. Termine ela primeiro."}</p>` : `<p class="note">${x.modo === "dupla" ? `Você e mais uma pessoa somam <b>${incFmt(x, incHp(x, 2))}</b> em ${x.dias} dias.` : `Quem quiser do grupo entra. Juntos, somem <b>${incFmt(x, incHp(x, nMem))}</b> em ${x.dias} dias.`} Começa hoje.</p>
+          ${x.modo === "dupla" ? `<div class="inc-dupla">${membros.filter((id) => id !== uid).map((id) => `<button type="button" class="btn btn-outline" data-inc-criar="${gid}|${x.k}|${id}">${esc((pfDe(id)?.nome || "Alguém").split(" ")[0])}</button>`).join("") || `<p class="note">Ninguém mais no grupo ainda.</p>`}</div>`
+            : `<button type="button" class="btn btn-blue" data-inc-criar="${gid}|${x.k}|">Lançar ${esc(x.nome)}</button>`}`}
+          <button type="button" class="btn btn-outline" data-inc-g="${gid}|">← outros chefes</button>`}
+    </div>`, "Fechar");
+  }
+  async function incCriar(gid, k, dupla) {
+    const x = INC_DE[k]; if (!x || !uid) return;
+    const membros = (G.todosMembros || []).filter((m) => m.grupo_id === gid).length || (G.membros || []).length || 2;
+    const { error } = await sb.from("incursoes").insert({ grupo_id: gid, chefe: k, modo: x.modo, dupla: dupla || null, hp: incHp(x, membros), inicio: hojeKey, fim: keyOf(addDays(hoje, x.dias - 1)) });
+    document.getElementById("gami-dlg")?.close();
+    if (error) { toast("Não consegui lançar a incursão. Tente de novo."); return; }
+    toast(`${x.nome} lançada! Chame o grupo. ⚔️`, 3500);
+    await incCarregar(true);
+    const nova = (IG.lista || []).find((i) => i.grupo_id === gid && i.chefe === k && i.criado_por === uid);
+    if (nova) await incEntrar(nova.id, true);
+  }
+  async function incEntrar(id, quieto) {
+    const i = (IG.lista || []).find((ii) => ii.id === id); if (!i) return;
+    const auto = Math.round(incAuto(INC_DE[i.chefe], i.inicio, i.fim) * 10) / 10;
+    const { error } = await sb.from("incursao_golpes").upsert({ incursao_id: id, usuario_id: uid, auto, manual: 0, atualizado_em: new Date().toISOString() });
+    if (error) { toast("Não consegui entrar agora."); return; }
+    if (!quieto) toast(auto > 0 ? `Você entrou e já causou ${incFmt(INC_DE[i.chefe], auto)} de dano!` : "Você entrou! Seus treinos agora atacam o chefe.", 3500);
+    await incCarregar(true);
+  }
+  function incGolpe(id) {
+    const i = (IG.lista || []).find((ii) => ii.id === id); if (!i) return; const x = INC_DE[i.chefe];
+    dlgGami(`<div class="inc-lanc"><img class="inc-mini" src="${arCarta(i.chefe)}" alt=""><p class="gami-k">Lançar golpe</p><h2>${esc(x.nome)}</h2>
+      <p class="note">O que você registra nos treinos já conta sozinho. Use aqui para o que fez fora do app (até ${incFmt(x, x.meta)} por vez).</p>
+      <form class="ar-reg" data-inc-form="${id}"><label class="field"><span class="field-lbl">Quanto você fez (${esc(x.un)})</span><input name="v" inputmode="decimal" autocomplete="off"></label><button class="btn btn-blue" type="submit">Atacar ⚔️</button></form></div>`, "Fechar");
+  }
+  async function incManual(id, v) {
+    const i = (IG.lista || []).find((ii) => ii.id === id), x = i && INC_DE[i.chefe];
+    const erro = (m) => { const f = document.querySelector("#gami-dlg .ar-reg"); if (!f) return toast(m); let p = f.querySelector(".ar-erro"); if (!p) { p = document.createElement("p"); p.className = "ar-erro"; f.appendChild(p); } p.textContent = m; };
+    if (!x || !(v > 0)) return erro("Digite um número válido.");
+    if (v > x.meta) return erro(`No máximo ${incFmt(x, x.meta)} por golpe. Lance em partes.`);
+    const meu = IG.golpes.find((g) => g.incursao_id === id && g.usuario_id === uid);
+    const manual = Math.round((Number(meu?.manual || 0) + v) * 10) / 10;
+    if (manual > x.meta * 3) return erro("Você já lançou muito à mão nesta incursão. O resto conta pelos treinos registrados.");
+    const { error } = await sb.from("incursao_golpes").upsert({ incursao_id: id, usuario_id: uid, auto: Number(meu?.auto || 0), manual, atualizado_em: new Date().toISOString() });
+    if (error) return erro("Não consegui lançar agora.");
+    document.getElementById("gami-dlg")?.close();
+    await incCarregar(true);
+    const e = incEstado(i);
+    if (e.caiu) dlgGami(`<div class="ar-dlg"><div class="ar-carta t3"><img src="${arCarta(i.chefe)}" alt=""></div><p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">O grupo venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}.</p></div>`, "Bora!");
+    else toast(`Golpe de ${incFmt(x, v)}! HP do chefe: ${e.hpPct}%.`, 3000);
+  }
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest?.("[data-inc-nova]"); if (t) { incNova(); return; }
+    const g = e.target.closest?.("[data-inc-g]"); if (g) { const [gid, k] = g.dataset.incG.split("|"); incNova(gid, k || undefined); return; }
+    const es = e.target.closest?.("[data-inc-esc]"); if (es) { const [gid, k] = es.dataset.incEsc.split("|"); incNova(gid, k); return; }
+    const cr = e.target.closest?.("[data-inc-criar]"); if (cr) { const [gid, k, d] = cr.dataset.incCriar.split("|"); cr.disabled = true; incCriar(gid, k, d); return; }
+    const en = e.target.closest?.("[data-inc-entrar]"); if (en) { en.disabled = true; incEntrar(en.dataset.incEntrar); return; }
+    const go = e.target.closest?.("[data-inc-golpe]"); if (go) { incGolpe(go.dataset.incGolpe); return; }
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target.closest?.("[data-inc-form]"); if (!f) return;
+    e.preventDefault(); incManual(f.dataset.incForm, Number(String(f.v.value).replace(",", ".")));
+  });
+
   telas.arena = () => {
     setToolbar("vilarejo");
     const e = arEstilo(), E = ESTILOS[e], l = arTodos ? arena() : arDoEstilo(e), feitos = arDoEstilo(e).reduce((s, c) => s + c.nivel, 0);
@@ -7692,6 +7877,8 @@
       <header class="ar-topo"><a class="vl-voltar" href="#/vilarejo" aria-label="Voltar ao vilarejo">‹</a>
         <div><h1>Arena</h1><p>Seus recordes viram monstros</p></div></header>
       <a class="ar-recruta" href="#/recruta"><span>🎯</span><div><b>${esc(D7.recruta.nome)}</b><small>Dungeon de 7 dias · sozinho ou em dupla</small></div><span>›</span></a>
+      ${incSecao()}
+      <h2 class="inc-h ar-h2">👹 Chefes de recorde</h2>
       <div class="ar-res"><b>${feitos}/${arDoEstilo(e).length * 4}</b><span>níveis vencidos como ${E ? `${E.ic} ${esc(E.nome)}` : "aventureiro"} · cada nível muda a cor da carta e o Diamante é holográfico</span></div>
       <div class="ar-seg"><button type="button" class="${arTodos ? "" : "on"}" data-ar-todos="0">Do seu estilo</button><button type="button" class="${arTodos ? "on" : ""}" data-ar-todos="1">Todos os chefes</button></div>
       <div class="ar-lista">${l.map(arLinha).join("")}</div>
