@@ -7224,7 +7224,7 @@
     { k: "objetivo", kicker: "Objetivo", q: "O que você quer conquistar?", op: [["massa", "💪", "Ganhar massa muscular"], ["gordura", "🔥", "Perder gordura"], ["forca", "🏋️", "Ganhar força"], ["saude", "❤️", "Condicionamento e saúde"], ["correr", "🏃", "Correr mais e melhor"]] },
     { k: "nivel", kicker: "Condicionamento", q: "Como está o seu condicionamento hoje?", op: NIVEIS.map(([v, t], i) => [v, ["🌱", "⚡", "🦾"][i], v, t]) },
     { k: "local", kicker: "Campo de treino", q: "Onde você vai treinar?", op: [["casa", "🏠", "Em casa, sem equipamento"], ["barra", "🤸", "Em casa, com barra fixa"], ["halteres", "🏋️", "Em casa, com halteres"], ["academia", "🏢", "Na academia"], ["box", "⏱️", "Num box de CrossFit"], ["rua", "🌳", "Ao ar livre, correndo"]] },
-    { k: "arsenal", kicker: "Seu arsenal", q: "O que você tem para treinar?", sub: "Pode marcar mais de um. O Sensei monta os treinos só com o que você tem, e dá para mudar depois na Guilda do Vilarejo.", semXp: true, multi: true,
+    { k: "arsenal", kicker: "Seu arsenal", q: "O que você tem para treinar?", sub: "Pode marcar mais de um. O Sensei monta os treinos só com o que você tem, e dá para mudar depois no Salão do Herói, no Vilarejo.", semXp: true, multi: true,
       op: [...(window.FITAI_INVENTARIO?.ITENS || []).filter((i) => i.eq && !i.semLoja).map((i) => [i.id, window.FITAI_INVENTARIO.icone(i.id, "qz-inv"), i.curto]), ["nada", "🙌", "Nada disso, só o corpo"]] },
     { k: "dias", kicker: "Frequência", q: "Quantos dias por semana dá para treinar?", op: ["2", "3", "4", "5", "6"].map((n) => [n, "📅", `${n} dias por semana`]) },
     { k: "tempo", kicker: "Tempo", q: "Quanto tempo você tem por treino?", op: [["20", "⏱️", "Até 20 min"], ["30", "⏱️", "30 min"], ["45", "⏱️", "45 min"], ["60", "⏱️", "1 hora ou mais"]] },
@@ -7556,7 +7556,7 @@
       </div>`;
   }
   /* ==========================================================
-     Vilarejo (aba): o mapa com atalhos para os prédios. Guilda = herói e Arsenal (inventário), Mercado = itens com
+     Vilarejo (aba): o mapa com atalhos para os prédios. Salão do Herói = herói e Arsenal (inventário), Fortaleza = clãs, Mercado = itens com
      link de afiliado, Taverna = grupos, Arena = desafios, Dojo = técnica, Praça = álbum de cartas.
      O inventário (S.inventario) vai no config do perfil e o Sensei só usa exercícios que dá para fazer com ele.
      ========================================================== */
@@ -7596,18 +7596,19 @@
       <button type="button" class="eq-tenho" data-eq-tenho="${i.id}">Já tenho</button><button type="button" class="eq-ver" data-eq-ver="${i.id}">Mercado ›</button></div>`).join("")}</div>`;
   }
   const VILA = [
-    { id: "guilda", nome: "Guilda do Aventureiro", sub: "Seu herói e o arsenal", href: "#/arsenal", x: 27, y: 12.5, w: 47, h: 19 },
-    { id: "dojo", nome: "Dojo", sub: "Técnica e execução", href: "#/dojo", x: 2, y: 26, w: 33, h: 22 },
-    { id: "arena", nome: "Arena", sub: "Chefes e Desafio do Recruta", href: "#/arena", x: 66, y: 26.5, w: 34, h: 22 },
-    { id: "praca", nome: "Praça", sub: "Álbum de cartas", href: "#/album", x: 37, y: 36, w: 27, h: 26 },
-    { id: "mercado", nome: "Mercado", sub: "Equipamentos", href: "#/mercado", x: 0.5, y: 59, w: 37, h: 20 },
-    { id: "taverna", nome: "Taverna", sub: "Guildas e ranking", href: "#/grupo", x: 66, y: 53, w: 34, h: 24 },
+    { id: "heroi", nome: "Salão do Herói", sub: "Seu herói e o arsenal", href: "#/arsenal", x: 7, y: 11, w: 47, h: 21 },
+    { id: "clas", nome: "Fortaleza dos Clãs", sub: "Seu clã, ranking e chefe da semana", href: "#/cla", x: 57.5, y: 2.5, w: 40.5, h: 18 },
+    { id: "dojo", nome: "Dojo", sub: "Técnica e execução", href: "#/dojo", x: 0, y: 31, w: 32, h: 17 },
+    { id: "arena", nome: "Arena", sub: "Chefes e Desafio do Recruta", href: "#/arena", x: 58.5, y: 31, w: 41, h: 18 },
+    { id: "praca", nome: "Praça", sub: "Álbum de cartas", href: "#/album", x: 33, y: 38, w: 33, h: 25 },
+    { id: "mercado", nome: "Mercado", sub: "Equipamentos", href: "#/mercado", x: 0, y: 57, w: 37, h: 24 },
+    { id: "taverna", nome: "Taverna", sub: "Guildas e ranking", href: "#/grupo", x: 60.5, y: 58.5, w: 39.5, h: 23 },
   ];
   telas.vilarejo = () => {
     setToolbar("vilarejo");
     return `<section class="screen has-toolbar vila">
       <header class="vl-top"><h1>Vilarejo</h1><p>Toque num prédio para entrar</p></header>
-      <div class="vl-mapa"><img src="assets/vilarejo.webp" alt="Vilarejo com Guilda do Aventureiro, Dojo, Arena, Praça, Mercado e Taverna">
+      <div class="vl-mapa"><img src="assets/vilarejo.webp" alt="Vilarejo com Salão do Herói, Fortaleza dos Clãs, Dojo, Arena, Praça, Mercado e Taverna">
         ${VILA.map((p) => `<a class="vl-hot" href="${p.href}" aria-label="${esc(p.nome)}: ${esc(p.sub)}" style="left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%"><i></i></a>`).join("")}</div>
       <nav class="vl-lista" aria-label="Prédios do vilarejo">${VILA.map((p) => `<a href="${p.href}"><b>${esc(p.nome)}</b><span>${esc(p.sub)}</span></a>`).join("")}</nav>
     </section>`;
