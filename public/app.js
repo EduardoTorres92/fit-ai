@@ -437,7 +437,6 @@
     { name: "Vilarejo", icon: "map", href: "#/vilarejo", tab: "vilarejo" },
     { name: "Treinos", icon: "calendar-days", href: `#/${principal()}`, tab: "plano" },
     { name: "CrossFit", icon: "dumbbell", href: "#/cf", tab: "cf" },
-    { name: "Nutrição", icon: "apple", href: "#/nutricao", tab: "nutricao" },
     { name: "Sensei", icon: "sparkles", href: "#/coach", tab: "coach" },
     { name: "Dojo", icon: "landmark", href: "#/dojo", tab: "dojo" },
     { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
@@ -710,7 +709,7 @@
           ${desafioHome()}
           ${pesagemPendente() ? `<details class="ac-linha ac-det"><summary><span class="ac-li-ic">⚖️</span><span><b>Pesagem da semana</b><small>Anote o peso e veja a evolução · +${XP.pesagem} XP</small></span><em>Anotar</em></summary><div class="ac-pz">${pesagemForm(true)}</div></details>` : ""}
           ${ativHome()}
-          <div class="emerg agua-home"><span>💧</span><div><strong>Água: ${fmtL(aguaHoje())} de ${fmtL(nutriMetas().agua)}</strong><small>${S.aguaLembrete?.on ? `Lembrete a cada ${S.aguaLembrete.intervalo} min` : `<a href="#/nutricao" class="lnk">Ligar lembrete de água</a>`}</small></div><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
+          ${staminaHome()}
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -2316,6 +2315,58 @@
     if (uid && G.grupos?.length) G.carregadoEm = 0; // o ranking de água da guilda atualiza na próxima visita
   }
 
+  /* ---------- Stamina: a água vira uma barra que cai ao longo do dia e sobe quando a pessoa bebe ----------
+     Acorda com 70%. Do início ao fim da janela do lembrete (padrão 8h às 22h) gasta o equivalente à meta de água do dia;
+     um "tanque" de 50% da meta enche a barra (meta 3 L: cada 300 ml devolve 20%). Antes de treinar, 300 ml no dia. */
+  const STAMINA_TREINO = 300;
+  const minDe = (hm) => { const [h, m] = String(hm || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+  function staminaJanela() { const L = { ini: "08:00", fim: "22:00", ...(S.aguaLembrete || {}) }; let a = minDe(L.ini), b = minDe(L.fim); if (b - a < 360) { a = 480; b = 1320; } return [a, b]; }
+  // Simula o dia: drinks com horário (os meus) ou só o total (de outra pessoa, como se bebesse no ritmo certo)
+  function staminaDe(drinks, meta, agora = new Date()) {
+    const [ini, fim] = staminaJanela(), tanque = Math.max(800, 0.5 * (meta || 2500)), queda = 100 / ((0.5 * (fim - ini)) / 60) / 60; // % por minuto
+    const now = agora.getHours() * 60 + agora.getMinutes(), gasto = (a, b) => Math.max(0, Math.min(b, fim) - Math.max(a, ini)) * queda;
+    let v = 70, t = 0;
+    for (const d of [...drinks].filter((x) => x.min <= now).sort((x, y) => x.min - y.min)) { v = Math.max(0, v - gasto(t, d.min)); v = Math.min(100, v + (d.ml / tanque) * 100); t = d.min; }
+    return Math.round(Math.max(0, v - gasto(t, now)));
+  }
+  const minhaStamina = () => staminaDe((S.agua?.[hojeKey] || []).map((x) => ({ min: minDe(x.t), ml: x.ml || 0 })), nutriMetas().agua);
+  // Outra pessoa: só sabemos o total do dia. Conta como se tivesse bebido no ritmo (70% + o que bebeu além do esperado até agora).
+  function staminaTotal(ml, meta) {
+    const [ini, fim] = staminaJanela(), d = new Date(), now = d.getHours() * 60 + d.getMinutes(), M = meta || 2500;
+    const esperado = M * Math.max(0, Math.min(1, (now - ini) / (fim - ini)));
+    return Math.round(Math.max(0, Math.min(100, 70 + ((ml - esperado) / Math.max(800, 0.5 * M)) * 100)));
+  }
+  const staminaCor = (v) => (v >= 60 ? "alta" : v >= 30 ? "media" : "baixa");
+  function staminaHome() {
+    const v = minhaStamina(), tot = aguaHoje(), meta = nutriMetas().agua, falta = tot < STAMINA_TREINO;
+    return `<div class="stamina ${staminaCor(v)}">
+      <div class="st-topo"><span class="st-ic">⚡</span><div><strong>Stamina ${v}%</strong><small>${falta ? `Beba ${STAMINA_TREINO - tot} ml para liberar o treino` : v < 30 ? "Exausto! Beba água para recuperar" : v < 60 ? "Cansando… um copo d'água recupera" : "Energia cheia para treinar"}</small></div>
+        <button class="btn btn-blue" data-agua="300">+300 ml</button></div>
+      <span class="st-bar"><i style="width:${v}%"></i></span>
+      <small class="st-pe">💧 ${fmtL(tot)} de ${fmtL(meta)} hoje · cai ao longo do dia, sobe quando você bebe${S.aguaLembrete?.on ? "" : ` · <a href="#/nutricao" class="lnk">lembrete</a>`}</small>
+    </div>`;
+  }
+  // Antes de treinar: pelo menos 300 ml no dia
+  let staminaPend = null;
+  function staminaPedir(refazer) {
+    staminaPend = refazer;
+    const v = minhaStamina();
+    dlgGami(`<div class="st-dlg"><p class="gami-k">Stamina baixa</p><h2>⚡ ${v}%</h2><span class="st-bar ${staminaCor(v)}"><i style="width:${v}%"></i></span>
+      <p class="note">Antes de treinar, beba pelo menos <b>300 ml</b> de água. Recupera a stamina e o corpo agradece.</p>
+      <button type="button" class="btn btn-blue" data-st-bebi>💧 Bebi 300 ml, bora!</button></div>`, "Agora não");
+  }
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-st-bebi]")) { document.getElementById("gami-dlg")?.close(); aguaAdd(300); const f = staminaPend; staminaPend = null; if (f) setTimeout(f, 60); return; }
+    if (aguaHoje() >= STAMINA_TREINO) return;
+    const ini = e.target.closest("#iniciar, [data-vt-toggle], a[data-stamina]");
+    if (!ini) return;
+    if (ini.id === "iniciar" && (timer.ativo || timer.seg)) return; // já começou: pausar/continuar não pede
+    if (ini.hasAttribute("data-vt-toggle") && /pausar|continuar|\d:\d/i.test(ini.textContent)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const href = ini.getAttribute("href"), id = ini.id, vt = ini.getAttribute("data-vt-toggle");
+    staminaPedir(() => { if (href) location.hash = href; else if (id) document.getElementById(id)?.click(); else if (vt != null) document.querySelector(`[data-vt-toggle="${vt}"]`)?.click(); });
+  }, true);
+
   /* ---------- Lembrete de água (push) ---------- */
   const pushOk = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const b64u8 = (b) => { const s = atob((b + "=".repeat((4 - (b.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
@@ -2413,6 +2464,7 @@
   });
 
   /* ---------- Tela ---------- */
+  const NUTRI_AI = false; // Nutri AI (chat de nutrição) desligada por enquanto: ninguém estava usando. Para voltar, troque para true.
   const NUTRI_PERGUNTAS = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?", "Lanches práticos e baratos"];
   telas.nutricao = (p1, p2) => {
     setToolbar("nutricao");
@@ -2455,12 +2507,12 @@
         <p class="note">Objetivo: <b>${esc(M.obj)}</b>. Gasto estimado ${M.gasto} kcal/dia (metabolismo ${M.tmb} kcal × atividade ${String(M.fator).replace(".", ",")}), pelas fórmulas do Guia de Alimentação. São estimativas para orientar; para um plano individual, procure um nutricionista.</p>`}
       </div>
       ${GUIA ? guiaCardapio(M) : ""}
-      <div class="section">
+      ${!NUTRI_AI ? "" : `<div class="section">
         <div class="sec-head"><h2>Nutri AI</h2></div>
         <div class="note-box"><p><b>Sua nutricionista virtual.</b> Pergunte o que comer, quando e quanto. Ela usa suas metas, seus treinos e a água de hoje.</p>
           <button class="btn btn-blue" data-nutri-chat>Conversar com a Nutri AI</button></div>
         <div class="chips nutri-chips">${NUTRI_PERGUNTAS.map((q) => `<button type="button" class="chip" data-nutri-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
-      </div>
+      </div>`}
       <div class="section">
         <div class="sec-head"><h2>Meu perfil alimentar</h2></div>
         <form class="nutri-form" id="form-nutri">
@@ -2525,7 +2577,7 @@
     if (t.dataset.agua) { aguaAdd(Number(t.dataset.agua)); render(); }
     else if (t.hasAttribute("data-agua-desfazer")) { (S.agua?.[hojeKey] || []).pop(); save(); render(); }
     else if (t.hasAttribute("data-agua-desligar")) aguaDesligar();
-    else if (t.hasAttribute("data-nutri-chat")) openChat(null, "nutri");
+    else if (t.hasAttribute("data-nutri-chat")) { if (NUTRI_AI) openChat(null, "nutri"); }
     else if (t.dataset.nutriQ) openChat(t.dataset.nutriQ, "nutri");
   });
   document.addEventListener("submit", (ev) => {
@@ -4126,16 +4178,16 @@
   }
   // Hidratação do dia na guilda: quem está bebendo mais hoje e quem já bateu a meta
   function hidratacaoGrupo() {
-    const lista = G.membros.map((id) => { const r = aguaDe(id).find((x) => x.data === hojeKey); return { id, ml: r?.ml || 0, meta: r?.meta || (id === uid ? nutriMetas().agua : 2500) }; })
-      .sort((a, b) => b.ml - a.ml);
-    const batidas = lista.filter((x) => x.ml >= x.meta).length, semana = mlNoPeriodo(aguaGrupo(), keyOf(mondayOf(hoje)));
+    const lista = G.membros.map((id) => { const r = aguaDe(id).find((x) => x.data === hojeKey), meta = r?.meta || (id === uid ? nutriMetas().agua : 2500), ml = r?.ml || 0;
+      return { id, ml, meta, st: id === uid ? minhaStamina() : staminaTotal(ml, meta) }; }).sort((a, b) => b.st - a.st || b.ml - a.ml);
+    const cheios = lista.filter((x) => x.st >= 60).length, semana = mlNoPeriodo(aguaGrupo(), keyOf(mondayOf(hoje)));
     return `<div class="hidra">
-      <div class="sec-head"><h2>💧 Hidratação de hoje</h2><span>${batidas}/${lista.length} bateram a meta</span></div>
-      <ol class="hidra-lista">${lista.map((x, i) => { const pct = Math.min(100, Math.round((x.ml / x.meta) * 100));
-        return `<li class="${x.id === uid ? "eu" : ""}"><span class="pos">${x.ml && i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>${avatar(G.perfis[x.id], 28)}
-          <div class="hidra-bar"><span>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</span><div class="bar"><i style="width:${pct}%"></i></div></div>
-          <strong>${fmtL(x.ml)}${pct >= 100 ? " ✓" : ""}</strong></li>`; }).join("")}</ol>
-      <div class="hidra-pe"><span>Guilda na semana: <b>${fmtL(semana)}</b></span><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
+      <div class="sec-head"><h2>⚡ Stamina da guilda</h2><span>${cheios}/${lista.length} com energia</span></div>
+      <ol class="hidra-lista">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}"><span class="pos">${i + 1}</span>${avatar(G.perfis[x.id], 28)}
+          <div class="hidra-bar st-${staminaCor(x.st)}"><span>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""} · ${fmtL(x.ml)}</span><div class="bar"><i style="width:${x.st}%"></i></div></div>
+          <strong>${x.st}%</strong></li>`).join("")}</ol>
+      <div class="hidra-pe"><span>Água da guilda na semana: <b>${fmtL(semana)}</b></span><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
+      <p class="note small">A stamina cai ao longo do dia e sobe quando a pessoa bebe. Antes de treinar, 300 ml.</p>
     </div>`;
   }
   const evoSwitch = (on) => `<nav class="seg prog" aria-label="Evolução">
@@ -4157,7 +4209,7 @@
       <div class="row2" style="margin-top:12px"><button class="btn btn-blue" id="g-criar">Criar guilda</button><button class="btn btn-outline" id="g-codigo">Tenho um código</button></div>
       </div></section>`;
     if (p1 === "mural") return telaMural();
-    if (p1 === "missoes") return telaProcura();
+    if (p1 === "missoes") { if (p2 && p2 !== G.sel && G.grupos.some((x) => x.id === p2)) { G.sel = p2; G.carregadoEm = 0; carregarGrupos(true); } return telaProcura(); }
     const g = grupoSel(), rows = linhasGrupo(), kp = kpis(noPeriodo(rows, G.periodo));
     const semana = feitas(rows).filter((r) => r.data >= keyOf(mondayOf(hoje)) && r.data <= hojeKey).length;
     const ativos = new Set(feitas(noPeriodo(rows, G.periodo)).map((r) => r.usuario_id)).size;
@@ -4190,7 +4242,7 @@
           ${ranking()}
           <div class="sec-head"><h2>Treinos por semana</h2></div>
           ${barras(porSemana(rows, 8), { meta: g.meta_semanal, aria: "Treinos da guilda nas últimas 8 semanas" })}`)}
-        ${det("agua", "💧", "Hidratação de hoje", `${aguaOk} de ${G.membros.length} bateram a meta`, hidratacaoGrupo())}
+        ${det("agua", "⚡", "Stamina da guilda", `Água: ${aguaOk} de ${G.membros.length} bateram a meta hoje`, hidratacaoGrupo())}
         ${det("conq", "🏅", "Conquistas da guilda", "Medalhas que a guilda já ganhou", medalhasGrupo(g))}
         ${det("ativ", "🕒", "Atividade recente", "Quem treinou e o quê", `${atividade()}<button class="lnk-btn" id="g-atualizar">Atualizar</button>`)}
         <button class="btn btn-outline tav-sair" id="g-sair">Sair da guilda</button>
@@ -4384,13 +4436,13 @@
   function desafioHome() {
     if (!uid || !G.grupos || !grupoSel()) return "";
     const d = desafioDaSemana();
-    if (!d) return `<a class="emerg" href="#/grupo/missoes"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>`;
+    if (!d) return `<div class="sec-head"><h2>Desafios da guilda</h2></div><a class="emerg" href="#/grupo/missoes"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>${incHome()}`;
     const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa];
-    return `<div class="sec-head"><h2>Desafio da guilda</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
+    return `<div class="sec-head"><h2>Desafios da guilda</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
       <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo/missoes">
         ${capa ? `<img src="${esc(capa)}" alt="" loading="lazy">` : ""}
         <div class="dh-txt"><span class="dh-tag">⚔️ ${esc(MEDIDAS[d.medida].split(" (")[0])}${eu ? " · ✓ você cumpriu" : ""}</span>
-          <strong>${esc(d.titulo)}</strong><small>${fs.length ? `🏅 ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}` : "Ninguém cumpriu ainda. Seja o primeiro!"}</small></div></a>`;
+          <strong>${esc(d.titulo)}</strong><small>${fs.length ? `🏅 ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}` : "Ninguém cumpriu ainda. Seja o primeiro!"}</small></div></a>${incHome()}`;
   }
   function grupoHome() {
     if (!uid) return "";
@@ -5749,7 +5801,7 @@
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
   const CHIPS_PADRAO = ["Anotar meu treino", "Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
-  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Nutrição", "Minha evolução", "Evolução por foto"];
+  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Minha evolução", "Evolução por foto"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
   const chatLogs = { coach: chatLog, nutri: [] };
@@ -5913,7 +5965,7 @@
   function atalhoHoje(texto) {
     const t = norm(texto);
     const fera = norm(NOME_PROG);
-    if (t === "nutricao") { openChat(null, "nutri"); return true; }
+    if (t === "nutricao") { if (NUTRI_AI) openChat(null, "nutri"); else { closeChat(); location.hash = "#/nutricao"; } return true; }
     if (t === "abrir a guilda") { closeChat(); location.hash = "#/grupo"; return true; }
     if (t === "evolucao por foto" || t === "ver ultima analise" || t === "apagar minhas fotos") { evoChip(t, texto); return true; }
     if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", "corrida", "corrida e hibrido", fera].includes(t)) return false;
@@ -7918,8 +7970,33 @@
         <ol class="inc-rank">${e.gs.filter((gg) => gg.tot > 0).slice(0, 5).map((gg, n) => `<li><b>${n === 0 ? "👑" : n + 1}</b><span>${nome(gg.usuario_id)}</span><em>${incFmt(x, gg.tot)}</em></li>`).join("") || `<li class="vazio">Ninguém atacou ainda.</li>`}</ol>
         ${i.modo === "dupla" ? `<p class="inc-sub">${nome(i.criado_por)} + ${nome(i.dupla)}</p>` : ""}
         ${posso ? `<div class="inc-acoes">${!e.meu && i.modo === "grupo" ? `<button type="button" class="btn btn-blue" data-inc-entrar="${i.id}">Entrar na incursão</button>` : `<button type="button" class="btn btn-blue" data-inc-golpe="${i.id}">Lançar golpe</button>`}</div>` : ""}
+        ${incAtiva(i) && !e.caiu ? `<button type="button" class="lnk-btn inc-compart" data-inc-compart="${i.id}">📲 Compartilhar incursão</button>` : ""}
         ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b></p>` : ""}
       </div></article>`;
+  }
+  function incCompartilhar(id) {
+    const i = (IG.lista || []).find((x) => x.id === id); if (!i) return;
+    const e = incEstado(i), x = e.x, g = (G.grupos || []).find((gg) => gg.id === i.grupo_id);
+    const link = `${location.origin}/#/grupo/missoes/${i.grupo_id}`;
+    const falta = Math.max(0, i.hp - e.dano);
+    const txt = `👹 ${x.nome} invadiu a guilda${g ? ` "${g.nome}"` : ""}! Faltam ${incFmt(x, falta)} para derrubar o chefe e ${e.diasRest === 1 ? "hoje é o último dia" : `restam ${e.diasRest} dias`}. ${i.modo === "dupla" ? "Bora fechar essa dupla" : "Entra e ataca comigo"} no FIT.AI ⚔️ ${link}${g ? `\nAinda não está na guilda? Código ${g.codigo}` : ""}`;
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) navigator.share({ title: x.nome, text: txt }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Incursão copiada. Cole no WhatsApp. 📲"), () => prompt("Copie a mensagem:", txt));
+    else prompt("Copie a mensagem:", txt);
+  }
+  document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-inc-compart]"); if (b) incCompartilhar(b.dataset.incCompart); });
+  // Início: incursões abertas das minhas guildas, logo abaixo do desafio da semana
+  function incHome() {
+    if (!uid || !G.grupos?.length) return "";
+    incCarregar();
+    const ativas = (IG.lista || []).filter((i) => incAtiva(i) && G.grupos.some((g) => g.id === i.grupo_id) && (i.modo === "grupo" || i.criado_por === uid || i.dupla === uid));
+    if (!ativas.length) return "";
+    return `<div class="inc-home">${ativas.map((i) => { const e = incEstado(i), g = G.grupos.find((gg) => gg.id === i.grupo_id);
+      return `<a class="inc-hm${e.caiu ? " caiu" : ""}" href="#/grupo/missoes/${i.grupo_id}"><img src="${arCarta(i.chefe)}" alt="" loading="lazy">
+        <span class="inc-hm-t"><small>👹 Incursão · ${esc(g?.nome || "Guilda")} · ${e.caiu ? "derrotado!" : e.diasRest === 1 ? "último dia" : `${e.diasRest} dias`}</small><b>${esc(e.x.nome)}</b>
+          <span class="inc-hp"><i style="width:${e.hpPct}%"></i><span>HP ${e.hpPct}%</span></span>
+          <small>${e.meu ? `Você somou ${incFmt(e.x, e.meu.tot)}` : i.modo === "grupo" ? "Você ainda não entrou" : `Dupla com ${esc((pfDe(i.criado_por === uid ? i.dupla : i.criado_por)?.nome || "alguém").split(" ")[0])}`}</small></span>
+        <em>${e.caiu ? "🏆" : e.meu ? "Atacar ›" : "Entrar ›"}</em></a>`; }).join("")}</div>`;
   }
   function incSecao(gid) {
     if (!uid) return `<div class="inc-sec"><h2 class="inc-h">⚔️ Incursões</h2><p class="inc-vazio">Entre com uma conta e participe de uma guilda para enfrentar chefes junto com os amigos.</p></div>`;
@@ -8232,7 +8309,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     if (feito(hojeKey)) { titulo = "Treino de hoje concluído ✓"; txt = desafioPendente(hojeKey) ? "Agora o desafio da semana da guilda." : "Hidrate, alongue e volte amanhã."; href = desafioPendente(hojeKey) ? "#/grupo/missoes" : "#/dojo"; botao = desafioPendente(hojeKey) ? "Desafio" : "Dojo"; }
     else if (a?.descanso) { titulo = "Dia de descanso"; txt = "Recuperar também é treino. Beba água e solte o corpo."; href = "#/dojo"; botao = "Dojo"; }
     else { titulo = a?.titulo || "Treino de hoje"; txt = `${a?.prog ? `${esc(a.prog)} · ` : ""}${a?.itens?.length ? (VP[pk] ? `${a.itens.length} ${a.itens.length === 1 ? "vídeo" : "vídeos"}` : `${a.itens.length} ${a.itens.length === 1 ? "exercício" : "exercícios"}`) : "o treino do seu caminho"}`; href = linkBora(w, d); botao = "Bora!"; }
-    return `<a class="ac-card ac-prox" href="${href}">
+    return `<a class="ac-card ac-prox" href="${href}"${botao === "Bora!" ? " data-stamina" : ""}>
       <img class="ac-prox-carta" src="${s.carta}" alt="">
       <div><p class="ac-k dourado">Próximo passo</p><b>${esc(titulo)}</b><small>${txt}</small>${!feito(hojeKey) && !a?.descanso ? `<span class="ac-ganho">⚡ +${xpT} XP · +${XP.missao} da missão</span>` : ""}</div>
       <span class="btn btn-blue ac-prox-btn">${botao}</span>
