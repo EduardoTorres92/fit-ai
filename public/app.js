@@ -441,7 +441,7 @@
     { name: "Sensei", icon: "sparkles", href: "#/coach", tab: "coach" },
     { name: "Dojo", icon: "landmark", href: "#/dojo", tab: "dojo" },
     { name: "Evolução", icon: "chart-column", href: "#/evolucao", tab: "evolucao" },
-    { name: "Grupo", icon: "users", href: "#/grupo", tab: "grupo" },
+    { name: "Guilda", icon: "users", href: "#/grupo", tab: "grupo" },
     { name: "Perfil", icon: "user", href: "#/perfil", tab: "perfil" },
   ];
   let tabAtual = "home", menuNav = null;
@@ -824,7 +824,7 @@
           ${fichaPerfil()}
           ${nivelCard()}
           ${ligasPerfilHtml(linhasLocais(), true, meuOpts())}
-          ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de grupos e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
+          ${uid ? "" : `<div class="note-box"><p>Você está como <b>visitante</b>: seus treinos ficam só neste aparelho. Entre com uma conta para salvar na nuvem, participar de guildas e aparecer no ranking.</p><button class="btn btn-blue" id="ir-login">Entrar ou criar conta</button></div>`}
           <div class="stats-grid">
             ${stat("weight.svg", P.peso || "—", "Peso (kg)", { edit: "peso" })}
             ${stat("ruler.svg", P.altura || "—", "Altura (cm)", { edit: "altura" })}
@@ -843,7 +843,7 @@
               <span class="po-n">${travado(x.k) ? "🔒" : i + 1}</span><span class="po-txt"><strong>${esc(x.nome)}</strong><small>${travado(x.k) ? esc(motivoTrava(x.k)[0].toUpperCase() + motivoTrava(x.k).slice(1)) : `${esc(x.nivel)}${S.nivel === x.nivel ? " · seu nível" : ""}`}</small></span>${principal() === x.k ? "<b>✓</b>" : ""}</button>`).join("")}</div>
           </div>
           <div class="perfil-rec">
-            <div class="sec-head"><h2>Meus recordes</h2>${uid ? `<span>visíveis para o seu grupo</span>` : ""}</div>
+            <div class="sec-head"><h2>Meus recordes</h2>${uid ? `<span>visíveis para o sua guilda</span>` : ""}</div>
             ${recordesHtml(linhasLocais(), "Registre o Max Out no MAX:30 ou faça o Fit Test do Insanity para ver seus recordes aqui.")}
           </div>
           <div class="field">
@@ -2313,7 +2313,7 @@
     aguaAvisarServidor("bebeu");
     const meta = nutriMetas().agua, tot = aguaHoje();
     toast(tot >= meta && tot - ml < meta ? `Meta de água batida! 💧 ${fmtL(tot)}` : `+${ml} ml 💧 ${fmtL(tot)} de ${fmtL(meta)}`);
-    if (uid && G.grupos?.length) G.carregadoEm = 0; // o ranking de água do grupo atualiza na próxima visita
+    if (uid && G.grupos?.length) G.carregadoEm = 0; // o ranking de água da guilda atualiza na próxima visita
   }
 
   /* ---------- Lembrete de água (push) ---------- */
@@ -2726,12 +2726,12 @@
     if (link && !/^https:\/\//i.test(link)) { toast("O link precisa começar com https://"); return; }
     const btn = ev.target.querySelector("button[type=submit]"); btn.disabled = true;
     const campos = { titulo, descricao: String(d.descricao || "").trim().slice(0, 500), link: link || null, medida: MEDIDAS[d.medida] ? d.medida : "feito" };
-    if (formDesafio === "editar" && desafioEditando) { // edição: quem lançou ou o dono do grupo
+    if (formDesafio === "editar" && desafioEditando) { // edição: quem lançou ou o dono da guilda
       const e0 = desafioEditando, prazo = d.prazo === "manter" ? e0.prazo || null : prazoDe(d.prazo);
       const { titulo: tituloAntes, semana: semanaAntes } = e0;
       const mud = { ...campos, prazo: prazo && prazo >= e0.semana ? prazo : keyOf(addDays(parseKey(e0.semana), 6)) };
       const { error } = await sb.from("desafios").update(mud).eq("id", e0.id);
-      if (!error && d.todos && e0.criado_por === uid) // o mesmo desafio lançado junto nos outros grupos (mesma semana e título)
+      if (!error && d.todos && e0.criado_por === uid) // o mesmo desafio lançado junto nos outras guildas (mesma semana e título)
         await sb.from("desafios").update(mud).eq("criado_por", uid).eq("semana", semanaAntes).eq("titulo", tituloAntes);
       btn.disabled = false;
       if (error) { toast("Não consegui salvar a edição."); return; }
@@ -2746,9 +2746,9 @@
       if (!error) ok++; else if (/duplicate|unique/i.test(error.message)) ja++; else falhou++;
     }
     btn.disabled = false;
-    if (!ok) { toast(ja ? (alvos.length > 1 ? "Todos os grupos já têm desafio esta semana." : "Alguém já lançou o desafio desta semana.") : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
+    if (!ok) { toast(ja ? (alvos.length > 1 ? "Todas as guildas já têm desafio esta semana." : "Alguém já lançou o desafio desta semana.") : "Não consegui lançar o desafio."); formDesafio = null; carregarGrupos(true); return; }
     formDesafio = null; desafioRascunho = null; await carregarGrupos(true);
-    toast(alvos.length > 1 ? `Desafio lançado em ${ok} ${ok === 1 ? "grupo" : "grupos"}${ja ? ` (${ja} já ${ja === 1 ? "tinha" : "tinham"} desafio nesta semana)` : ""}. ⚔️` : "Desafio lançado! Avise a galera. ⚔️", 4000);
+    toast(alvos.length > 1 ? `Desafio lançado em ${ok} ${ok === 1 ? "guilda" : "guildas"}${ja ? ` (${ja} já ${ja === 1 ? "tinha" : "tinham"} desafio nesta semana)` : ""}. ⚔️` : "Desafio lançado! Avise a galera. ⚔️", 4000);
   });
   document.addEventListener("submit", (ev) => {
     const mx = ev.target.closest(".ins-max");
@@ -2856,7 +2856,7 @@
 
   /* ---------- Cronômetro dos treinos em vídeo ----------
      Fica salvo (S.vtimer = { p, k, ini }) para sobreviver a recarregar a página ou bloquear o celular.
-     Ao pausar, o tempo soma em log.dur. Esse tempo vai para o Supabase e entra no ranking "Tempo" do grupo. */
+     Ao pausar, o tempo soma em log.dur. Esse tempo vai para o Supabase e entra no ranking "Tempo" da guilda. */
   const vtDecorrido = () => (S.vtimer ? Math.max(0, Math.round((Date.now() - S.vtimer.ini) / 1000)) : 0);
   const vtAtivo = (p, k) => !!(S.vtimer && S.vtimer.p === p && S.vtimer.k === k);
   const vtTotal = (p, k) => (S[p].logs[k]?.dur || 0) + (vtAtivo(p, k) ? vtDecorrido() : 0);
@@ -3060,7 +3060,7 @@
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
       }
-      // Peso, altura, idade, medidas e dados da nutrição: tabela só da pessoa (o config do perfil os amigos do grupo leem)
+      // Peso, altura, idade, medidas e dados da nutrição: tabela só da pessoa (o config do perfil os amigos da guilda leem)
       const priv = { perfil: S.perfil || null, medidas: (S.medidas || []).slice(-60), nutri: S.nutri || null };
       if (enviados[`${uid}|priv`] !== JSON.stringify(priv)) {
         const { error } = await sb.from("perfil_privado").upsert({ id: uid, dados: priv, atualizado_em: new Date().toISOString() });
@@ -3173,7 +3173,7 @@
     guardarEnviados();
   }
 
-  /* ---------- Métricas (servem para mim e para cada pessoa do grupo) ---------- */
+  /* ---------- Métricas (servem para mim e para cada pessoa da guilda) ---------- */
   const feitas = (rows) => rows.filter((r) => r.concluido);
   function sequencias(rows) {
     const dias = new Set(feitas(rows).map((r) => r.data));
@@ -3209,7 +3209,7 @@
       <tr class="tot"><td>Total</td>${h.map((x) => `<td>${tot(x.fit)}</td>`).join("")}</tr></tbody></table></div>
       ${h.length > 1 ? `<p class="note small">Do 1º ao último teste: ${tot(h[h.length - 1].fit) - tot(h[0].fit) >= 0 ? "+" : ""}${tot(h[h.length - 1].fit) - tot(h[0].fit)} repetições no total.</p>` : ""}`;
   }
-  // Bloco "Recordes": Max Out (melhor por vídeo) e Fit Test. Usado no meu perfil e no perfil de quem está no grupo.
+  // Bloco "Recordes": Max Out (melhor por vídeo) e Fit Test. Usado no meu perfil e no perfil de quem está na guilda.
   function recordesHtml(rows, vazio) {
     const mb = melhoresMax(rows), ft = fitTests(rows);
     if (!mb.length && !ft.length) return `<p class="note">${vazio}</p>`;
@@ -3779,7 +3779,7 @@
         <li>Recorde (Max Out, carga, repetições ou PR do Cross): +${XP.recorde} · Cardio Challenge ou Fit Test: +${XP.teste}</li>
         <li>Meta da semana (${metaSemana()} treinos de seg a dom): +${XP.semana}, e +${XP.semanaSeguida} por semana seguida (até +${XP.semanaSeguidaMax})</li>
         <li>Corrida ou esteira pelo print: ${ATIV.corrida.base} + ${ATIV.corrida.porKm} por km (até +${ATIV.corrida.max}) · Bike: ${ATIV.bike.base} + ${ATIV.bike.porKm} por km · Caminhada: ${ATIV.caminhada.base} + ${ATIV.caminhada.porKm} por km</li>
-        <li>Meta de água: +${XP.agua} · Desafio do grupo: +${XP.desafio} · 2º treino no mesmo dia vale metade</li>
+        <li>Meta de água: +${XP.agua} · Desafio da guilda: +${XP.desafio} · 2º treino no mesmo dia vale metade</li>
         <li>Formatura de cada etapa: +${XP.formatura}</li>
         <li>Classe nova a cada 5 níveis: ${CLASSES.map((c) => c[1]).join(" → ")}</li></ul></details>
       <details class="xp-regras"><summary>O que é cada coisa</summary><ul class="note small">
@@ -3787,9 +3787,9 @@
         <li><b>Classe</b>: o título do seu nível, com carta nova a cada 5 níveis (Recruta, Escudeiro…).</li>
         <li><b>Estilo</b>: como você treina: ${Object.values(ESTILOS).map((e) => `${e.ic} ${e.nome} (${LIGA_T[e.liga].nome})`).join(", ")}. Você vira Ronin com duas modalidades com 25% ou mais dos treinos, ou com 3 modalidades com 2 treinos ou mais em cada.</li>
         <li><b>Trilha</b>: o plano que o app te passa (etapas e formaturas).</li>
-        <li><b>Grupo</b>: os amigos com quem você compete no ranking e nos desafios.</li></ul></details>`;
+        <li><b>Guilda</b>: os amigos com quem você compete no ranking e nos desafios.</li></ul></details>`;
   }
-  // Selo pequeno de nível (ranking do grupo, perfil de membro)
+  // Selo pequeno de nível (ranking da guilda, perfil de membro)
   const nivelSelo = (cfg) => (cfg && cfg.nivel_xp ? `<span class="nv-selo metal-${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][2])}" title="${esc(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][1])}${ESTILOS[cfg.estilo] ? ` · ${ESTILOS[cfg.estilo].nome}` : ""}"><img src="${classeImg(CLASSES[Math.min(9, Math.floor((cfg.nivel_xp - 1) / 5))][0])}" alt="" width="16" height="16">${Number(cfg.nivel_xp) || 1}${ESTILOS[cfg.estilo] ? `<span class="nv-es">${ESTILOS[cfg.estilo].ic}</span>` : ""}</span>` : "");
 
   const CONQ = [
@@ -3816,7 +3816,7 @@
     ["fit1", "📋", "Primeiro Fit Test", (m) => [m.fits, 1]],
     ["fit50", "📈", "+50 reps no Fit Test", (m) => [m.fitEvo, 50]],
     ["fit5", "🏁", "5 Fit Tests (Insanity completo)", (m) => [m.fits, 5]],
-    ["grupo", "🤝", "Entrou num grupo", (m) => [m.grupos, 1]],
+    ["grupo", "🤝", "Entrou numa guilda", (m) => [m.grupos, 1]],
     ["desafio1", "⚔️", "Primeiro desafio", (m) => [m.desafios, 1]],
     ["desafio5", "🥋", "5 desafios", (m) => [m.desafios, 5]],
     ["desafio10", "🦾", "10 desafios", (m) => [m.desafios, 10]],
@@ -3986,7 +3986,7 @@
       if (!meus.error) { G.meusDesafios = (meus.data || []).length; if (S.desafiosN !== G.meusDesafios) { S.desafiosN = G.meusDesafios; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } }
       if (G.sel) await carregarGrupo(G.sel);
       else { G.desafios = []; G.feitos = []; }
-      // Pessoas de todos os meus grupos (para convidar para a dupla quem está em outro grupo)
+      // Pessoas de todas as minhas guildas (para convidar para a dupla quem está em outra guilda)
       const gids = G.grupos.map((g) => g.id);
       if (gids.length > 1) {
         const mm = await sb.from("membros").select("usuario_id, grupo_id").in("grupo_id", gids);
@@ -4016,7 +4016,7 @@
     const dids = (ds.data || []).map((d) => d.id);
     const fs = dids.length ? await sb.from("desafio_feitos").select("desafio_id, usuario_id, resultado, prova, feito_em").in("desafio_id", dids) : { data: [] };
     G.desafios = ds.data || []; G.feitos = fs.data || [];
-    const capas = G.desafios.filter((d) => d.capa).slice(0, 6).map((d) => d.capa); // capa do vídeo (bucket "posts", só o grupo vê)
+    const capas = G.desafios.filter((d) => d.capa).slice(0, 6).map((d) => d.capa); // capa do vídeo (bucket "posts", só a guilda vê)
     G.capas = {};
     if (capas.length) { const { data } = await sb.storage.from("posts").createSignedUrls(capas, 6 * 3600); (data || []).forEach((x) => x.signedUrl && (G.capas[x.path] = x.signedUrl)); }
     G.membros = ids;
@@ -4028,39 +4028,39 @@
   const grupoSel = () => (G.grupos || []).find((g) => g.id === G.sel) || null;
   const linhasDe = (id) => (id === uid ? linhasLocais().map((r) => ({ ...r, usuario_id: uid })) : G.linhas.filter((r) => r.usuario_id === id));
   const linhasGrupo = () => G.membros.flatMap(linhasDe);
-  // Água de cada pessoa do grupo (a minha vem do aparelho, que está sempre em dia)
+  // Água de cada pessoa da guilda (a minha vem do aparelho, que está sempre em dia)
   const aguaDe = (id) => (id === uid ? aguaLinhas().map((r) => ({ ...r, usuario_id: uid })) : G.agua.filter((r) => r.usuario_id === id));
   const aguaGrupo = () => G.membros.flatMap(aguaDe);
   const mlNoPeriodo = (lista, ini, fim = hojeKey) => soma(lista.filter((r) => r.data >= ini && r.data <= fim).map((r) => r.ml));
   async function entrarComCodigo(codigo) {
     codigo = String(codigo || "").trim().toUpperCase();
     if (!codigo) return;
-    if (!uid) { S.convite = codigo; S.logado = false; save(); toast("Entre com sua conta para participar do grupo."); location.hash = "#/login"; return; }
+    if (!uid) { S.convite = codigo; S.logado = false; save(); toast("Entre com sua conta para participar da guilda."); location.hash = "#/login"; return; }
     const { data, error } = await sb.rpc("entrar_grupo", { p_codigo: codigo });
     S.convite = null; save();
-    if (error) { toast(/codigo_invalido/.test(error.message) ? "Código não encontrado. Confira com quem te convidou." : /muitos_grupos/.test(error.message) ? "Você já está em grupos demais." : "Não consegui entrar no grupo agora."); return; }
+    if (error) { toast(/codigo_invalido/.test(error.message) ? "Código não encontrado. Confira com quem te convidou." : /muitos_grupos/.test(error.message) ? "Você já está em guildas demais." : "Não consegui entrar na guilda agora."); return; }
     G.sel = data.id; await carregarGrupos(true); verificarConquistas();
-    toast(`Você entrou no grupo ${data.nome}! 🤝`);
+    toast(`Você entrou na guilda ${data.nome}! 🤝`);
     location.hash = "#/grupo";
   }
   async function criarGrupo() {
-    const nome = (prompt("Nome do grupo (ex.: Amigos do treino):") || "").trim().slice(0, 40);
+    const nome = (prompt("Nome da guilda (ex.: Amigos do treino):") || "").trim().slice(0, 40);
     if (!nome) return;
-    const meta = parseInt(prompt("Meta de treinos do grupo por semana (somando todo mundo):", "12"), 10);
+    const meta = parseInt(prompt("Meta de treinos da guilda por semana (somando todo mundo):", "12"), 10);
     const { data, error } = await sb.rpc("criar_grupo", { p_nome: nome, p_meta: meta > 0 && meta <= 500 ? meta : 12 });
-    if (error) { toast(/muitos_grupos/.test(error.message) ? "Você já criou grupos demais." : "Não consegui criar o grupo agora."); return; }
+    if (error) { toast(/muitos_grupos/.test(error.message) ? "Você já criou guildas demais." : "Não consegui criar a guilda agora."); return; }
     G.sel = data.id; await carregarGrupos(true); verificarConquistas();
-    toast("Grupo criado! Agora convide a galera. 🔥");
+    toast("Guilda criada! Agora convide a galera. 🔥");
   }
   function convidar(g) {
     const link = `${location.origin}/#/grupo/entrar/${g.codigo}`;
-    const txt = `Bora treinar comigo no FIT.AI? 💪 Entra no grupo "${g.nome}": ${link} (código ${g.codigo})`;
+    const txt = `Bora treinar comigo no FIT.AI? 💪 Entra na guilda "${g.nome}": ${link} (código ${g.codigo})`;
     if (navigator.share && matchMedia("(pointer: coarse)").matches) navigator.share({ title: "FIT.AI", text: txt }).catch(() => {});
     else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Convite copiado. Cole no WhatsApp. 📲"), () => prompt("Copie o convite:", txt));
     else prompt("Copie o convite:", txt);
   }
 
-  // Medalhas do grupo (calculadas nas últimas 12 semanas)
+  // Medalhas da guilda (calculadas nas últimas 12 semanas)
   function medalhasGrupo(g) {
     const rows = feitas(linhasGrupo()).filter((r) => r.data >= PERIODOS.tudo[1]());
     const semanas = {}, porDia = {};
@@ -4071,7 +4071,7 @@
     const lista = [
       ["🎯", "Meta da semana", metas, 1, `${metas} ${metas === 1 ? "semana" : "semanas"}`],
       ["🙌", "Todo mundo treinou", todos, 1, `${todos} ${todos === 1 ? "dia" : "dias"}`],
-      ["🔥", "Grupo em chamas", seq, 7, seq >= 7 ? `${seq} dias seguidos` : `${seq}/7 dias seguidos`],
+      ["🔥", "Guilda em chamas", seq, 7, seq >= 7 ? `${seq} dias seguidos` : `${seq}/7 dias seguidos`],
       ["💯", "100 treinos juntos", rows.length, 100, `${Math.min(rows.length, 100)}/100`],
       ...(() => { const sem = {}, dias = {};
         aguaGrupo().filter((r) => r.data >= PERIODOS.tudo[1]()).forEach((r) => { const k = keyOf(mondayOf(parseKey(r.data))); sem[k] = (sem[k] || 0) + r.ml; if (r.ml >= r.meta) (dias[r.data] = dias[r.data] || new Set()).add(r.usuario_id); });
@@ -4093,7 +4093,7 @@
     const df = G.feitos.map((f) => { const d = G.desafios.find((x) => x.id === f.desafio_id); return d && { t: f.feito_em, id: f.usuario_id, html: `<b>${nomeDe(f.usuario_id)}</b> cumpriu o desafio <b>${esc(d.titulo)}</b>${f.resultado ? ` · ${esc(fmtRes(d, f.resultado))}` : ""} ⚔️`, k: String(f.feito_em || hojeKey).slice(0, 10) }; }).filter(Boolean);
     const ag = G.agua.filter((r) => r.data >= keyOf(addDays(hoje, -10)) && r.ml >= r.meta).map((r) => ({ t: r.atualizado_em || r.data, id: r.usuario_id, html: `<b>${nomeDe(r.usuario_id)}</b> bateu a meta de água: <b>${fmtL(r.ml)}</b> 💧`, k: r.data }));
     const itens = [...tr, ...cq, ...df, ...ag].sort((a, b) => String(b.t).localeCompare(String(a.t))).slice(0, 12);
-    if (!itens.length) return `<p class="note">Ainda sem atividade. Conclua um treino e puxe o grupo! 💪</p>`;
+    if (!itens.length) return `<p class="note">Ainda sem atividade. Conclua um treino e puxe a guilda! 💪</p>`;
     return `<ul class="feed">${itens.map((i) => `<li>${avatar(G.perfis[i.id], 32)}<p>${i.html}<small>${ddmm(i.k)}</small></p></li>`).join("")}</ul>`;
   }
   const RANKS = {
@@ -4106,7 +4106,7 @@
     agua: ["💧 Água", (k) => k.agua, (v) => (v ? fmtL(v) : "—")],
     xp: ["🛡️ XP", (k) => k.xp, (v) => (v ? `${v.toLocaleString("pt-BR")} XP` : "—")],
   };
-  // Nível de quem está no grupo: o meu é calculado aqui; o dos outros vem do que cada um sincronizou (perfis.config)
+  // Nível de quem está na guilda: o meu é calculado aqui; o dos outros vem do que cada um sincronizou (perfis.config)
   const cfgNivel = (id) => (id === uid ? (() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, estilo: estiloAtual().slug }; })() : G.perfis[id]?.config || null);
   function ranking() {
     const [, val, fmt] = RANKS[G.rank];
@@ -4124,7 +4124,7 @@
       ${G.rank === "xp" ? `<p class="note small">XP total desde o começo (vídeos, séries, recordes, sequência e metas). O de cada pessoa atualiza quando ela abre o app.</p>` : ""}
       ${G.rank === "agua" ? `<p class="note small">Litros de água anotados no período (aba Nutrição ou “Bebi” na notificação).</p>` : ""}`;
   }
-  // Hidratação do dia no grupo: quem está bebendo mais hoje e quem já bateu a meta
+  // Hidratação do dia na guilda: quem está bebendo mais hoje e quem já bateu a meta
   function hidratacaoGrupo() {
     const lista = G.membros.map((id) => { const r = aguaDe(id).find((x) => x.data === hojeKey); return { id, ml: r?.ml || 0, meta: r?.meta || (id === uid ? nutriMetas().agua : 2500) }; })
       .sort((a, b) => b.ml - a.ml);
@@ -4135,26 +4135,26 @@
         return `<li class="${x.id === uid ? "eu" : ""}"><span class="pos">${x.ml && i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>${avatar(G.perfis[x.id], 28)}
           <div class="hidra-bar"><span>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</span><div class="bar"><i style="width:${pct}%"></i></div></div>
           <strong>${fmtL(x.ml)}${pct >= 100 ? " ✓" : ""}</strong></li>`; }).join("")}</ol>
-      <div class="hidra-pe"><span>Grupo na semana: <b>${fmtL(semana)}</b></span><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
+      <div class="hidra-pe"><span>Guilda na semana: <b>${fmtL(semana)}</b></span><button class="btn btn-blue" data-agua="300">+300 ml</button></div>
     </div>`;
   }
   const evoSwitch = (on) => `<nav class="seg prog" aria-label="Evolução">
       <a href="#/evolucao" class="${on === "eu" ? "on" : ""}">Minha evolução</a>
-      <a href="#/grupo" class="${on === "grupo" ? "on" : ""}">Grupo</a></nav>`;
+      <a href="#/grupo" class="${on === "grupo" ? "on" : ""}">Guilda</a></nav>`;
   function telaGrupo(p1, p2) {
     setToolbar("evolucao");
-    if (p1 === "entrar" && p2) { setTimeout(() => entrarComCodigo(p2), 0); return `<section class="screen has-toolbar"><p class="note" style="padding:40px 20px">Entrando no grupo…</p></section>`; }
+    if (p1 === "entrar" && p2) { setTimeout(() => entrarComCodigo(p2), 0); return `<section class="screen has-toolbar"><p class="note" style="padding:40px 20px">Entrando na guilda…</p></section>`; }
     if (p1 === "membro" && p2 && uid && G.grupos) return telaMembro(p2);
     const head = `<header class="header"><span class="logo-txt dark">Fit.ai</span></header>${evoSwitch("grupo")}`;
     if (!uid) return `<section class="screen has-toolbar">${head}<div class="section">
-      <p class="note">Os grupos juntam amigos num ranking de treinos, tempo, sequência, Max Out e água. Para participar, entre com uma conta.</p>
+      <p class="note">As guildas juntam amigos num ranking de treinos, tempo, sequência, Max Out e água. Para participar, entre com uma conta.</p>
       <button class="btn btn-blue" id="ir-login" style="width:100%">Entrar ou criar conta</button></div></section>`;
     if (!G.grupos || (Date.now() - G.carregadoEm > 60000 && !G.carregando)) carregarGrupos();
-    if (!G.grupos) return `<section class="screen has-toolbar">${head}<p class="note" style="padding:20px">Carregando seus grupos…</p></section>`;
+    if (!G.grupos) return `<section class="screen has-toolbar">${head}<p class="note" style="padding:20px">Carregando suas guildas…</p></section>`;
     if (!G.grupos.length) return `<section class="screen has-toolbar">${head}<div class="section">
-      ${G.erro ? `<p class="note">Não consegui carregar os grupos agora. Confira a internet e tente de novo.</p>` : ""}
-      <div class="note-box"><p><b>Treinar junto rende mais.</b> Crie um grupo e mande o convite no WhatsApp, ou entre com o código que um amigo te mandou.</p></div>
-      <div class="row2" style="margin-top:12px"><button class="btn btn-blue" id="g-criar">Criar grupo</button><button class="btn btn-outline" id="g-codigo">Tenho um código</button></div>
+      ${G.erro ? `<p class="note">Não consegui carregar as guildas agora. Confira a internet e tente de novo.</p>` : ""}
+      <div class="note-box"><p><b>Treinar junto rende mais.</b> Crie uma guilda e mande o convite no WhatsApp, ou entre com o código que um amigo te mandou.</p></div>
+      <div class="row2" style="margin-top:12px"><button class="btn btn-blue" id="g-criar">Criar guilda</button><button class="btn btn-outline" id="g-codigo">Tenho um código</button></div>
       </div></section>`;
     if (p1 === "mural") return telaMural();
     if (p1 === "missoes") return telaProcura();
@@ -4173,7 +4173,7 @@
         <p class="ac-k">🍺 Meta da semana <span>renova na segunda</span></p>
         <div class="ac-pront tav-pront">
           <svg class="ac-anel ${nivel}" viewBox="0 0 72 72" aria-label="${pct}%"><circle cx="36" cy="36" r="${R}" class="fundo"/><circle cx="36" cy="36" r="${R}" class="valor" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/><text x="36" y="41">${pct}%</text></svg>
-          <div><b>${semana} de ${g.meta_semanal} treinos</b><small>${pct >= 100 ? "Meta do grupo batida! 🏆" : `Faltam ${g.meta_semanal - semana} para o grupo bater a meta`}</small>
+          <div><b>${semana} de ${g.meta_semanal} treinos</b><small>${pct >= 100 ? "Meta da guilda batida! 🏆" : `Faltam ${g.meta_semanal - semana} para a guilda bater a meta`}</small>
             <small>👥 ${ativosSem}/${G.membros.length} já treinaram · 💧 ${aguaOk}/${G.membros.length} bateram a água hoje</small>
             ${g.dono === uid ? `<button class="lnk-btn tav-lnk" id="g-meta">Mudar meta</button>` : ""}</div>
         </div>
@@ -4181,25 +4181,25 @@
       ${tavMissao(g)}
       ${rankingSemanaHtml()}
       <div class="section ac-extras tav-extras">
-        ${det("numeros", "📊", "Números do grupo", `${kp.treinos} treinos · ${fmtMin(kp.minutos)} · ${PERIODOS[G.periodo][0].toLowerCase()}`, `
+        ${det("numeros", "📊", "Números da guilda", `${kp.treinos} treinos · ${fmtMin(kp.minutos)} · ${PERIODOS[G.periodo][0].toLowerCase()}`, `
           <div class="seg seg3">${Object.entries(PERIODOS).map(([k, [n]]) => `<button class="${G.periodo === k ? "on" : ""}" data-g-periodo="${k}">${n}</button>`).join("")}</div>
-          <div class="stats-row" style="margin-top:12px">${stat("circle-check.svg", kp.treinos, "Treinos do grupo")}${stat("hourglass.svg", fmtMin(kp.minutos), "Tempo total")}</div>
+          <div class="stats-row" style="margin-top:12px">${stat("circle-check.svg", kp.treinos, "Treinos da guilda")}${stat("hourglass.svg", fmtMin(kp.minutos), "Tempo total")}</div>
           <div class="stats-row">${stat("user-small.svg", `${ativos}/${G.membros.length}`, "Pessoas ativas")}${stat("flame.svg", kp.maxMedio ? mmss(kp.maxMedio) : "—", "Max Out médio")}</div>
           <div class="sec-head"><h2>Ranking · ${PERIODOS[G.periodo][0]}</h2></div>
           <div class="chips">${Object.entries(RANKS).map(([k, [n]]) => `<button class="chip${G.rank === k ? " primary" : ""}" data-g-rank="${k}">${n}</button>`).join("")}</div>
           ${ranking()}
           <div class="sec-head"><h2>Treinos por semana</h2></div>
-          ${barras(porSemana(rows, 8), { meta: g.meta_semanal, aria: "Treinos do grupo nas últimas 8 semanas" })}`)}
+          ${barras(porSemana(rows, 8), { meta: g.meta_semanal, aria: "Treinos da guilda nas últimas 8 semanas" })}`)}
         ${det("agua", "💧", "Hidratação de hoje", `${aguaOk} de ${G.membros.length} bateram a meta`, hidratacaoGrupo())}
-        ${det("conq", "🏅", "Conquistas do grupo", "Medalhas que o grupo já ganhou", medalhasGrupo(g))}
+        ${det("conq", "🏅", "Conquistas da guilda", "Medalhas que a guilda já ganhou", medalhasGrupo(g))}
         ${det("ativ", "🕒", "Atividade recente", "Quem treinou e o quê", `${atividade()}<button class="lnk-btn" id="g-atualizar">Atualizar</button>`)}
-        <button class="btn btn-outline tav-sair" id="g-sair">Sair do grupo</button>
+        <button class="btn btn-outline tav-sair" id="g-sair">Sair da guilda</button>
       </div>
     </section>`;
   }
   const TAV_ABERTO = new Set();
   document.addEventListener("toggle", (e) => { const d = e.target; if (d.matches?.("details[data-tav]")) TAV_ABERTO[d.open ? "add" : "delete"](d.dataset.tav); }, true);
-  // Mural: posts de outras pessoas depois da última visita ao mural daquele grupo
+  // Mural: posts de outras pessoas depois da última visita ao mural daquela guilda
   const muralNovos = () => { const v = (S.muralVisto || {})[G.sel] || ""; return M.posts.filter((p) => p.usuario_id !== uid && p.criado_em > v).length; };
   const desafioMeuPendente = () => { const d = desafioDaSemana(); return d && !feitosDe(d).some((f) => f.usuario_id === uid); };
   function tavTopo(g) {
@@ -4207,12 +4207,12 @@
     const nm = muralNovos(), incs = (IG.lista || []).filter((i) => i.grupo_id === G.sel && !(hojeKey > i.fim)).length, pend = (desafioMeuPendente() ? 1 : 0) + incs;
     return `<div class="ac-topo tav-topo">
       <div class="ac-bg"><img src="${A("taverna-cena.webp")}" alt=""></div>
-      <div class="ac-chips tav-gs">${G.grupos.map((x) => `<button class="ac-chip${x.id === G.sel ? " on" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="ac-chip" id="g-criar" aria-label="Criar grupo">＋</button><button class="ac-chip" id="g-codigo">Código</button></div>
+      <div class="ac-chips tav-gs">${G.grupos.map((x) => `<button class="ac-chip${x.id === G.sel ? " on" : ""}" data-g-sel="${x.id}">${esc(x.nome)}</button>`).join("")}<button class="ac-chip" id="g-criar" aria-label="Criar guilda">＋</button><button class="ac-chip" id="g-codigo">Código</button></div>
       <div class="ac-hero tav-hero">
         <div class="ac-id">
           <p class="ac-oi">Taverna</p><h1>${esc(g.nome)}</h1>
           <p class="tav-sub">${G.membros.length} ${G.membros.length === 1 ? "aventureiro" : "aventureiros"} · código <b>${esc(g.codigo)}</b></p>
-          ${avatarGroup(G.membros, { max: 6, size: 36, overlap: 10, label: `Membros do grupo ${g.nome}`, link: true })}
+          ${avatarGroup(G.membros, { max: 6, size: 36, overlap: 10, label: `Membros da guilda ${g.nome}`, link: true })}
         </div>
         <nav class="ac-lado tav-lado" aria-label="Taverna">
           <a href="#/grupo/missoes" class="tav-procura"><span class="tav-cartaz">📜</span>Procura-se${pend ? `<i class="tav-bdg">${pend}</i>` : ""}</a>
@@ -4257,27 +4257,102 @@
       <div class="tav-quadro">${incSecao(G.sel)}</div>
     </section>`;
   }
-  // Perfil de alguém do grupo: números, Max Out e Fit Test (o que a pessoa sincronizou)
+  // Perfil de alguém da guilda: números, Max Out e Fit Test (o que a pessoa sincronizou)
   function telaMembro(id) {
     const p = G.perfis[id];
     if (!p || !G.membros.includes(id)) return telaGrupo();
     const rows = linhasDe(id), k = kpis(rows), sq = sequencias(rows), eu = id === uid;
     if (!eu && !G.conqDe?.[id] && sb) { G.conqDe = G.conqDe || {}; G.conqDe[id] = "carregando";
       sb.from("conquistas").select("codigo, ganha_em").eq("usuario_id", id).then(({ data }) => { G.conqDe[id] = data || []; if (location.hash === `#/grupo/membro/${id}`) render(); }); }
-    const nome1 = esc((p.nome || "Atleta").split(" ")[0]);
-    return `<section class="screen has-toolbar"><div class="list" style="gap:20px">
-      <div class="page-head"><a class="icon-btn" href="#/grupo" aria-label="Voltar">${icon("chevron-left.svg", 24)}</a><h1>Perfil</h1><span class="spacer"></span></div>
-      <div class="profile">${avatar(p, 56)}<div><strong>${esc(p.nome || "Atleta")}${eu ? " (você)" : ""} ${nivelSelo(cfgNivel(id))}</strong><span>${esc(grupoSel()?.nome || "Grupo")}</span>${membroTitulo(id)}</div></div>
-      ${cartaMembroHtml(id, rows)}
-      ${!eu && uid ? (d7Ocupado() ? "" : `<button class="btn btn-blue" data-d7-convidar="${id}">⚔️ Desafiar ${nome1} no ${esc(D7.recruta.nome)}</button>`) : ""}
-      <div class="stats-row">${stat("circle-check.svg", k.treinos, "Treinos")}${stat("hourglass.svg", fmtMin(k.minutos), "Tempo")}</div>
-      <div class="stats-row">${stat("flame.svg", `${sq.atual}`, "Sequência atual")}${stat("zap.svg", `${sq.melhor}`, "Melhor sequência")}</div>
-      <div class="stats-row">${stat("circle-check.svg", fmtL(mlNoPeriodo(aguaDe(id), keyOf(mondayOf(hoje)))), "Água na semana")}${stat("circle-percent.svg", fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0), "Água hoje")}</div>
-      ${albumMembroHtml(id)}
-      ${conquistasMembroHtml(id)}
-      ${id === uid ? ligasPerfilHtml(linhasLocais(), true, meuOpts()) : ligasPerfilHtml(rows, false, { g: G.perfis[id]?.config?.arte === "f" || (G.perfis[id]?.config?.arte !== "m" && G.perfis[id]?.config?.quiz?.sexo === "f") ? "f" : "m", peso: 0, form: G.perfis[id]?.config?.formaturas || {}, prs: [] })}
-      <div><div class="sec-head"><h2>Recordes</h2></div>${recordesHtml(rows, `${nome1} ainda não registrou Max Out nem Fit Test.`)}</div>
-      </div></section>`;
+    const nome1 = esc((p.nome || "Atleta").split(" ")[0]), c = membroCfg(id), g = membroG(id);
+    const n = eu ? meuNivel() : nivelDe(Number(c.xp) || 0, Number(c.nivel_xp) || 1), est = estiloDe(rows), E = est.slug && ESTILOS[est.slug];
+    const sp = (() => { try { return spriteDe(NIVEIS_ARTE.has(est.slug) ? est.slug : null, g, n.slug); } catch { return null; } })();
+    const carta = est.slug && NIVEIS_ARTE.has(est.slug) ? cartaDe(est.slug, n.slug, g) : `assets/classes/cartas/${n.slug}-${g}.webp`;
+    const seg = keyOf(mondayOf(hoje)), meta = Number(eu ? metaSemana() : c.meta) || 3;
+    const semana = feitas(rows).filter((r) => r.data >= seg && r.data <= hojeKey).length, pct = Math.min(100, Math.round((semana / meta) * 100));
+    const rk = G.membros.map((m) => ({ m, xp: xpSemanaDe(m) })).sort((x, y) => y.xp - x.xp), pos = rk.findIndex((x) => x.m === id) + 1, xpSem = rk[pos - 1]?.xp || 0;
+    const al = c.album || {}, nCartas = ESTILOS_ORDEM.reduce((t, e) => t + Math.min(CLASSES.length, (al[e] ?? -1) + 1), 0);
+    const nConq = eu ? null : Array.isArray(G.conqDe?.[id]) ? G.conqDe[id].filter((x) => CONQI[x.codigo]).length : null;
+    const R = 30, C = 2 * Math.PI * R, nivelCor = pct >= 100 ? "alta" : pct >= 50 ? "media" : "baixa";
+    const ultimos = feitas(rows).sort((x, y) => y.data.localeCompare(x.data)).slice(0, 5);
+    const desafiosOk = (G.feitos || []).filter((f) => f.usuario_id === id).length;
+    const golpes = (IG.golpes || []).filter((x) => x.usuario_id === id), incs = new Set(golpes.map((x) => x.incursao_id)).size;
+    const inv = (eu ? S.inventario : c.inventario) || [], itens = inv.map((i) => INV.ITENS.find((x) => x.id === i)).filter(Boolean);
+    const f = membroFicha(id, rows, c);
+    const progN = (pk) => progDe(pk)?.curto || IA[pk]?.nome || (pk === "calistenia" || pk === "plano" ? NOME_PROG : pk === "cf" ? "Cross" : pk || "");
+    return `<section class="screen has-toolbar acamp mb-pg">
+      <div class="ac-topo">
+        <div class="ac-bg"><img src="${A("banner-home-cena.jpg")}" alt=""></div>
+        <div class="ac-chips"><a class="ac-chip" href="#/grupo" aria-label="Voltar à Taverna">‹ Taverna</a><span class="ac-chip fogo">🔥 ${sq.atual} ${sq.atual === 1 ? "dia" : "dias"}</span><span class="ac-chip">🎯 ${semana}/${meta} na semana</span></div>
+        <div class="ac-hero">
+          <div class="ac-id">
+            <p class="ac-oi">${esc(grupoSel()?.nome || "Guilda")}</p><h1>${esc(p.nome || "Atleta")}${eu ? " (você)" : ""}</h1>
+            <p class="ac-nv-k">Nível</p><p class="ac-nv">${n.nivel}</p>
+            <p class="ac-classe">${esc(n.classe)}${E ? ` · ${E.ic} ${esc(E.nome)}` : ""}</p>
+            ${membroTitulo(id)}
+            <p class="ac-xp">${n.xp.toLocaleString("pt-BR")} XP</p>
+            <span class="ac-bar"><i style="width:${n.pct}%"></i></span>
+          </div>
+          <div class="ac-sprite">${sp ? `<img src="${sp}" alt="${esc(n.classe)} animado">` : `<img class="ac-av mb-carta-hero" src="${carta}" alt="">`}</div>
+          <nav class="ac-lado" aria-label="Atalhos do perfil">
+            <button type="button" data-mb-ir="mb-album"><span>🃏</span>${nCartas} cartas</button><button type="button" data-mb-ir="mb-conq"><span>🏅</span>${nConq ?? "…"}</button><button type="button" data-mb-ir="mb-rec"><span>🏆</span>Recordes</button>
+          </nav>
+        </div>
+        ${E ? `<p class="mb-lema">${g === "f" ? "Mestra" : "Mestre"} <b>${esc(E.mestre[g])}</b> · ${esc(E.lema)}</p>` : ""}
+      </div>
+      ${!eu && uid ? (d7Ocupado() ? "" : `<button class="btn btn-blue mb-desafiar" data-d7-convidar="${id}">⚔️ Desafiar ${nome1} no ${esc(D7.recruta.nome)}</button>`) : ""}
+      <div class="ac-card">
+        <p class="ac-k">⚡ Esta semana <span>${pos ? `${pos}º de ${rk.length} no ranking` : ""}</span></p>
+        <div class="ac-pront">
+          <svg class="ac-anel ${nivelCor}" viewBox="0 0 72 72" aria-label="${pct}%"><circle cx="36" cy="36" r="${R}" class="fundo"/><circle cx="36" cy="36" r="${R}" class="valor" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/><text x="36" y="41">${pct}%</text></svg>
+          <div><b>${semana} de ${meta} treinos · ${xpSem} XP</b><small>💧 ${fmtL(mlNoPeriodo(aguaDe(id), seg))} na semana · ${fmtL(aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0)} hoje</small></div>
+        </div>
+        <div class="mb-nums">
+          <span><b>${k.treinos}</b><small>treinos</small></span><span><b>${fmtMin(k.minutos)}</b><small>de treino</small></span>
+          <span><b>${sq.melhor}</b><small>melhor sequência</small></span><span><b>${desafiosOk}</b><small>desafios da guilda</small></span>
+        </div>
+      </div>
+      ${f ? `<div class="ac-card mb-ficha">
+        <p class="ac-k">📜 Ficha de herói <span>${c.ficha?.meta ? `meta ${esc(c.ficha.meta)}` : ""}</span></p>
+        <div class="mb-ficha-g"><b class="rk rk-${f.rank}">${f.rank}</b><div>${ATRIB.map(([a, r]) => `<div class="pf-attr"><b>${r}</b><span class="fc-bar"><i style="width:${f.attrs[a]}%"></i></span><strong>${f.attrs[a]}</strong></div>`).join("")}</div></div>
+      </div>` : ""}
+      ${est.treinos ? `<div class="ac-card">
+        <p class="ac-k">🧭 Estilo de treino <span>${est.treinos} treinos</span></p>
+        <span class="es-bar">${TIPOS_TREINO.map(([t, , cor]) => (est.pct[t] ? `<i style="width:${est.pct[t]}%;background:${cor}"></i>` : "")).join("")}</span>
+        <span class="es-leg">${TIPOS_TREINO.filter(([t]) => est.pct[t]).map(([t, nm, cor]) => `<span><i style="background:${cor}"></i>${esc(nm)} ${est.pct[t]}%</span>`).join("")}</span>
+        ${E ? `<p class="mb-desc">${esc(E.desc || "")}</p>` : ""}
+      </div>` : ""}
+      <div class="ac-card">
+        <p class="ac-k">🗓️ Últimos treinos <span>${c.principal ? esc(progN(c.principal)) : ""}</span></p>
+        ${ultimos.length ? `<ul class="mb-ult">${ultimos.map((r) => `<li><span class="mb-dia">${r.data === hojeKey ? "Hoje" : ddmm(r.data)}</span><span class="mb-tt"><b>${esc(r.titulo || "Treino")}</b><small>${esc(progN(r.programa))}</small></span><em>${r.minutos ? fmtMin(r.minutos) : "✓"}</em></li>`).join("")}</ul>` : `<p class="note small">Nenhum treino registrado ainda.</p>`}
+        <p class="ac-k mb-sub">Treinos por semana</p>
+        ${barras(porSemana(rows, 8), { meta, aria: `Treinos de ${nome1} nas últimas 8 semanas` })}
+      </div>
+      ${incs || itens.length ? `<div class="ac-card">
+        ${incs ? `<p class="ac-k">👹 Incursões <span>${incs} ${incs === 1 ? "incursão" : "incursões"}</span></p><p class="mb-desc">Somou golpes em ${incs} ${incs === 1 ? "chefe" : "chefes"} da guilda nas últimas semanas.</p>` : ""}
+        ${itens.length ? `<p class="ac-k${incs ? " mb-sub" : ""}">🎒 Arsenal <span>${itens.length} ${itens.length === 1 ? "item" : "itens"}</span></p><div class="mb-inv">${itens.slice(0, 12).map((it) => `<span title="${esc(it.nome)}">${INV.icone(it.id)}<small>${esc(it.curto || it.nome)}</small></span>`).join("")}</div>` : ""}
+      </div>` : ""}
+      <div class="section mb-resto">
+        <div id="mb-album">${albumMembroHtml(id)}</div>
+        <div id="mb-conq">${conquistasMembroHtml(id)}</div>
+        ${eu ? ligasPerfilHtml(linhasLocais(), true, meuOpts()) : ligasPerfilHtml(rows, false, { g, peso: 0, form: c.formaturas || {}, prs: [] })}
+        <div id="mb-rec"><div class="sec-head"><h2>Recordes</h2></div>${recordesHtml(rows, `${nome1} ainda não registrou Max Out nem Fit Test.`)}</div>
+      </div>
+    </section>`;
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-mb-ir]"); if (b) document.getElementById(b.dataset.mbIr)?.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  // Ficha de outra pessoa: a base do quiz dela misturada com o que ela treinou nas últimas 4 semanas
+  function membroFicha(id, rows, c) {
+    if (id === uid) return S.ficha ? fichaAtual() : null;
+    if (!c.ficha && !c.quiz) return null;
+    try {
+      const base = c.ficha?.base || fichaBase(c.quiz || {}), ini = keyOf(addDays(hoje, -27)), r28 = rows.filter((r) => r.data >= ini && r.data <= hojeKey), fe = feitas(r28);
+      const dias = new Set(fe.map((r) => r.data)).size, v = volumePadroes(r28), metcon = fe.filter((r) => r.programa === "cf" || VP[r.programa]).length;
+      const nota = (x, alvo) => 100 * Math.sqrt(Math.min(1, x / alvo)), meta = Number(c.meta) || 3;
+      const real = { for: nota(v.empurrar + v.puxar + v.pernas, 360), agi: nota(v.core + metcon * 6 + v.cardio * 0.3, 150), res: nota(v.cardio, 150), dis: 85 * Math.min(1, dias / (meta * 4)) + Math.min(15, sequencias(rows).atual * 2) };
+      const w = Math.min(1, dias / 8), attrs = Object.fromEntries(ATRIB.map(([a]) => [a, clampA(base[a] * (1 - w) + real[a] * w)]));
+      return { attrs, rank: rankDe(Math.round(soma(Object.values(attrs)) / ATRIB.length)) };
+    } catch { return null; }
   }
   // Perfil de outra pessoa: a carta e o álbum saem do que ela sincronizou (perfis.config) e dos treinos dela
   const membroCfg = (id) => (id === uid ? { xp: meuNivel().xp, arte: sexoArte(), album: S.album, d7Feito: S.d7Feito } : G.perfis[id]?.config || {});
@@ -4311,7 +4386,7 @@
     const d = desafioDaSemana();
     if (!d) return `<a class="emerg" href="#/grupo/missoes"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>`;
     const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa];
-    return `<div class="sec-head"><h2>Desafio do grupo</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
+    return `<div class="sec-head"><h2>Desafio da guilda</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
       <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo/missoes">
         ${capa ? `<img src="${esc(capa)}" alt="" loading="lazy">` : ""}
         <div class="dh-txt"><span class="dh-tag">⚔️ ${esc(MEDIDAS[d.medida].split(" (")[0])}${eu ? " · ✓ você cumpriu" : ""}</span>
@@ -4321,20 +4396,20 @@
     if (!uid) return "";
     if (!G.grupos) { carregarGrupos(); return ""; }
     const g = grupoSel();
-    if (!g) return `<a class="emerg" href="#/grupo"><span>${icon("user-small.svg", 20)}</span><div><strong>Treine com os amigos</strong><small>Crie um grupo ou entre com um código</small></div></a>`;
+    if (!g) return `<a class="emerg" href="#/grupo"><span>${icon("user-small.svg", 20)}</span><div><strong>Treine com os amigos</strong><small>Crie uma guilda ou entre com um código</small></div></a>`;
     const semana = feitas(linhasGrupo()).filter((r) => r.data >= keyOf(mondayOf(hoje)) && r.data <= hojeKey).length;
     const pct = Math.min(100, Math.round((semana / g.meta_semanal) * 100));
     return `<a class="g-card" href="#/grupo"><div class="sec-head"><h2>${esc(g.nome)}</h2><span>${semana}/${g.meta_semanal} na semana</span></div>
       <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
       ${(() => { const top = G.membros.map((id) => ({ id, ml: aguaDe(id).find((x) => x.data === hojeKey)?.ml || 0 })).sort((a, b) => b.ml - a.ml)[0];
         return `<p class="d-mini">💧 ${top?.ml ? `${top.id === uid ? "Você lidera" : `${esc((G.perfis[top.id]?.nome || "Alguém").split(" ")[0])} lidera`} a água de hoje com ${fmtL(top.ml)}` : "Ninguém anotou água hoje ainda"}</p>`; })()}
-      ${avatarGroup(G.membros, { max: 6, size: 34, overlap: 12, label: "Membros do grupo", estatico: true })}</a>`;
+      ${avatarGroup(G.membros, { max: 6, size: 34, overlap: 12, label: "Membros da guilda", estatico: true })}</a>`;
   }
 
   /* ==========================================================
-     Mural do grupo (rede social entre amigos): post com texto, foto e o treino do dia; reações e comentários.
+     Mural da guilda (rede social entre amigos): post com texto, foto e o treino do dia; reações e comentários.
      Supabase: posts, post_reacoes, post_comentarios; fotos no bucket privado "posts" (grupo/usuario/arquivo.jpg),
-     mostradas por link assinado. Só quem está no grupo vê.
+     mostradas por link assinado. Só quem está na guilda vê.
      ========================================================== */
   const REACOES = ["🔥", "💪", "👏", "😂", "❤️"];
   const M = { posts: [], reacoes: [], coments: [], urls: {}, abertos: new Set() };
@@ -4379,7 +4454,7 @@
       <form class="coment-form" data-comentar="${p.id}" autocomplete="off"><input name="t" maxlength="300" placeholder="Comente…" aria-label="Escreva um comentário"><button type="submit" class="btn btn-blue">Enviar</button></form>
     </article>`;
   }
-  // Conquistas viram post no mural de todos os grupos (recorde, chefe derrotado, nova classe). Uma vez por chave;
+  // Conquistas viram post no mural de todas as guildas (recorde, chefe derrotado, nova classe). Uma vez por chave;
   // dá para desligar no mural.
   async function autoPost(chave, texto) {
     if (!uid || !sb || S.autoPost === false || !(G.grupos || []).length) return;
@@ -4390,12 +4465,12 @@
     save();
     let ok = 0;
     for (const g of G.grupos) { try { const { error } = await sb.from("posts").insert({ grupo_id: g.id, usuario_id: uid, texto, foto: null, treino: { auto: true } }); if (!error) ok++; } catch {} }
-    if (ok) { toast("📣 Conquista postada no mural do grupo", 2600); G.carregadoEm = 0; }
+    if (ok) { toast("📣 Conquista postada no mural da guilda", 2600); G.carregadoEm = 0; }
     else { delete S.autoPostados[chave]; save(); }
   }
   function muralHtml() {
     return `<div class="section mural">
-      <div class="sec-head"><h2>📣 Mural do grupo</h2><button class="lnk-btn" data-mural-atualizar>Atualizar</button></div>
+      <div class="sec-head"><h2>📣 Mural da guilda</h2><button class="lnk-btn" data-mural-atualizar>Atualizar</button></div>
       <button class="mural-auto${S.autoPost === false ? "" : " on"}" data-autopost aria-pressed="${S.autoPost !== false}"><span class="tg"><i></i></span><span><b>Postar minhas conquistas</b><small>Recorde, chefe derrotado e nova classe aparecem aqui sozinhos</small></span></button>
       <button class="mural-novo" data-post-novo>${avatar(G.perfis[uid] || { nome: nomeCompleto(), foto_url: S.user?.foto }, 32)}<span>Como foi o treino? Poste uma foto ou um comentário…</span><b>📸</b></button>
       ${M.posts.length ? M.posts.map(postHtml).join("") : `<p class="note">Ninguém postou ainda. Depois do treino, mostre para a galera! 💪</p>`}
@@ -4424,16 +4499,16 @@
     });
   }
   function abrirNovoPost(msg = "") {
-    if (!uid || !sb) { toast("Entre com uma conta para postar no grupo."); return; }
-    if (!(G.grupos || []).length) { toast("Entre num grupo para postar."); location.hash = "#/grupo"; return; }
+    if (!uid || !sb) { toast("Entre com uma conta para postar na guilda."); return; }
+    if (!(G.grupos || []).length) { toast("Entre numa guilda para postar."); location.hash = "#/grupo"; return; }
     postFoto = null;
     const tr = treinosParaPost();
     let dlg = $("#post-dlg");
     if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "post-dlg"; dlg.className = "post-dlg"; $(".device").appendChild(dlg); }
     dlg.innerHTML = `<form class="post-form" id="post-form">
-      <div class="post-form-head"><strong>${G.grupos.length > 1 ? "Postar nos grupos" : "Postar no grupo"}</strong><button type="button" class="icon-btn" data-post-fechar aria-label="Fechar">${icon("x.svg", 22)}</button></div>
+      <div class="post-form-head"><strong>${G.grupos.length > 1 ? "Postar nas guildas" : "Postar na guilda"}</strong><button type="button" class="icon-btn" data-post-fechar aria-label="Fechar">${icon("x.svg", 22)}</button></div>
       ${msg ? `<p class="note">${msg}</p>` : ""}
-      ${G.grupos.length > 1 ? `<label>Grupo<select name="grupo"><option value="*"${S.postTodos ? " selected" : ""}>Todos os meus grupos (${G.grupos.length})</option>${G.grupos.map((g) => `<option value="${g.id}"${!S.postTodos && g.id === G.sel ? " selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>` : `<input type="hidden" name="grupo" value="${G.grupos[0].id}">`}
+      ${G.grupos.length > 1 ? `<label>Guilda<select name="grupo"><option value="*"${S.postTodos ? " selected" : ""}>Todas as minhas guildas (${G.grupos.length})</option>${G.grupos.map((g) => `<option value="${g.id}"${!S.postTodos && g.id === G.sel ? " selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>` : `<input type="hidden" name="grupo" value="${G.grupos[0].id}">`}
       <label>Treino<select name="treino"><option value="">Sem treino</option>${tr.map((r, i) => `<option value="${i}"${i === 0 ? " selected" : ""}>${r.data === hojeKey ? "Hoje" : "Ontem"} · ${esc(r.titulo)}${r.concluido ? "" : " (em andamento)"}</option>`).join("")}</select></label>
       <textarea name="texto" maxlength="500" rows="3" placeholder="Como foi? Bateu recorde? Sofreu? 😅"></textarea>
       <div class="post-foto-prev" id="post-prev"></div>
@@ -4452,7 +4527,7 @@
       const r = d.treino !== "" ? $("#post-dlg")._treinos[Number(d.treino)] : null;
       const treino = r ? { data: r.data, programa: r.programa, titulo: r.titulo, minutos: r.minutos, concluido: r.concluido } : null;
       if ((G.grupos || []).length > 1 && !!S.postTodos !== todos) { S.postTodos = todos; save(); } // lembra a escolha para a próxima
-      // Um post por grupo; a foto vai para a pasta de cada grupo (só os membros de um grupo veem as fotos dele)
+      // Um post por guilda; a foto vai para a pasta de cada guilda (só os membros de uma guilda veem as fotos dele)
       let ok = 0, primeiro = null;
       for (const gid of alvos) {
         try {
@@ -4467,19 +4542,19 @@
           ok++; primeiro = primeiro || gid;
         } catch (e) { console.error("post", gid, e); }
       }
-      if (!ok) throw new Error("nenhum grupo");
+      if (!ok) throw new Error("nenhuma guilda");
       $("#post-dlg").close(); postFoto = null;
       G.sel = alvos.includes(G.sel) ? G.sel : primeiro; G.carregadoEm = 0; await carregarGrupos(true);
-      toast(!todos ? "Postado no grupo! 📣" : ok === alvos.length ? `Postado nos ${ok} grupos! 📣` : `Postado em ${ok} de ${alvos.length} grupos. Os outros falharam; tente de novo neles.`, 4000);
+      toast(!todos ? "Postado na guilda! 📣" : ok === alvos.length ? `Postado nas ${ok} guildas! 📣` : `Postado em ${ok} de ${alvos.length} guildas. As outras falharam; tente de novo nelas.`, 4000);
       if (location.hash !== "#/grupo/mural") location.hash = "#/grupo/mural";
     } catch (e) { console.error("post", e); toast("Não consegui postar agora. Tente de novo."); btn.disabled = false; btn.textContent = "Postar"; }
   }
-  // Depois de concluir um treino: convida a postar no grupo
+  // Depois de concluir um treino: convida a postar na guilda
   function convidarPost() {
     if (!uid || !(G.grupos || []).length) return;
     setTimeout(() => {
       if ($("#post-dlg")?.open) return;
-      abrirNovoPost("Treino concluído! 🔥 Quer contar para o grupo? Pode mandar uma foto também.");
+      abrirNovoPost("Treino concluído! 🔥 Quer contar para a guilda? Pode mandar uma foto também.");
     }, 1400);
   }
 
@@ -4538,7 +4613,7 @@
     M.coments.push(data); M.abertos.add(pid); refazerPost(pid);
   });
 
-  /* ---------- Desafio da semana (por grupo) ---------- */
+  /* ---------- Desafio da semana (por guilda) ---------- */
   // medida: feito (só cumprir) | reps (mais é melhor) | tempo (completar no menor tempo) | duracao (aguentar mais tempo)
   const MEDIDAS = { feito: "Só cumprir", reps: "Repetições (mais é melhor)", tempo: "Tempo para completar (menor é melhor)", duracao: "Tempo aguentando (mais é melhor)" };
   const MODELOS = [
@@ -4565,7 +4640,7 @@
   let desafioRascunho = null; // { titulo, descricao, medida, link, nota, duvida }
   const LINK_VIDEO = /(?:https?:\/\/)?(?:www\.|m\.|vm\.)?(?:instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+|tiktok\.com\/\S+|youtube\.com\/(?:shorts\/|watch\?v=)[\w-]+|youtu\.be\/[\w-]+)\S*/i;
   const linkCompleto = (l) => (/^https?:\/\//i.test(l) ? l.replace(/^http:/i, "https:") : `https://${l}`);
-  // Capa do vídeo: vira JPEG (até 720 px de largura) e vai para o bucket "posts" na pasta do grupo
+  // Capa do vídeo: vira JPEG (até 720 px de largura) e vai para o bucket "posts" na pasta da guilda
   async function subirCapa(dataUrl, gid) {
     try {
       const img = await new Promise((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = erro; i.src = dataUrl; });
@@ -4608,13 +4683,13 @@
         <label>Como medir<select name="medida">${Object.entries(MEDIDAS).map(([k, n]) => `<option value="${k}"${k === m.medida ? " selected" : ""}>${n}</option>`).join("")}</select></label>
         <label>Tempo para cumprir<select name="prazo">${ed ? `<option value="manter" selected>Manter: até ${ddmm(fimDesafio(m))}</option>` : ""}${PRAZOS.map(([v, n]) => `<option value="${v}"${!ed && v === "dom" ? " selected" : ""}>${n} · até ${ddmm(prazoDe(v))}</option>`).join("")}</select></label>
         ${ed && G.feitos.some((f) => f.desafio_id === m.id) ? `<p class="note small">Já tem gente que cumpriu: trocar a forma de medir pode deixar os resultados antigos sem sentido.</p>` : ""}
-        ${outros ? `<label class="dsf-todos"><input type="checkbox" name="todos" value="1"> Lançar em todos os meus grupos (${G.grupos.length})</label>` : ""}
-        ${ed && m.criado_por === uid && (G.grupos || []).length > 1 ? `<label class="dsf-todos"><input type="checkbox" name="todos" value="1" checked> Aplicar também nos outros grupos onde lancei este desafio</label>` : ""}
+        ${outros ? `<label class="dsf-todos"><input type="checkbox" name="todos" value="1"> Lançar em todas as minhas guildas (${G.grupos.length})</label>` : ""}
+        ${ed && m.criado_por === uid && (G.grupos || []).length > 1 ? `<label class="dsf-todos"><input type="checkbox" name="todos" value="1" checked> Aplicar também nos outras guildas onde lancei este desafio</label>` : ""}
         <div class="row2"><button type="button" class="btn btn-outline" id="desafio-cancelar">Cancelar</button><button type="submit" class="btn btn-blue">${ed ? "Salvar" : "Lançar"}</button></div>
       </form>`;
     }
     if (!d) return `<div class="desafio vazio"><div class="sec-head"><h2>⚔️ Desafio da semana</h2><span>${prazo}</span></div>
-      <p class="note">Ninguém lançou o desafio desta semana. Basta <b>uma pessoa</b> cumprir para o grupo ganhar a conquista da semana.</p>
+      <p class="note">Ninguém lançou o desafio desta semana. Basta <b>uma pessoa</b> cumprir para a guilda ganhar a conquista da semana.</p>
       <button class="btn btn-blue" id="desafio-novo">Lançar desafio</button></div>`;
     const fs = feitosDe(d), eu = fs.find((f) => f.usuario_id === uid), med = ["🥇", "🥈", "🥉"];
     const podeApagar = d.criado_por === uid || g.dono === uid;
@@ -4661,7 +4736,7 @@
     const primeiro = !G.feitos.some((f) => f.desafio_id === id);
     G.meusDesafios = (G.meusDesafios || 0) + 1;
     await carregarGrupos(true); verificarConquistas(); setTimeout(() => conferirXp(), 2700); // +XP depois do aviso do desafio
-    toast(primeiro ? "🏅 Conquista da semana garantida para o grupo!" : "Desafio cumprido! 🔥");
+    toast(primeiro ? "🏅 Conquista da semana garantida para a guilda!" : "Desafio cumprido! 🔥");
   }
 
   /* ---------- Tema claro, escuro ou automático (segue o sistema). O <head> do app.html já aplica antes de pintar. ---------- */
@@ -5060,8 +5135,8 @@
     dl.innerHTML = `<form class="exc-box" method="dialog">
       <h2>Excluir sua conta?</h2>
       <p class="note">Isso não tem volta. Vamos apagar:</p>
-      <ul><li>treinos, recordes, XP, cartas e conquistas</li><li>peso, medidas e fotos de evolução</li><li>posts, comentários e reações nos grupos</li><li>a conexão com o bot do Telegram e os lembretes de água</li></ul>
-      <p class="note small">Grupo que você criou passa para o membro mais antigo. Se você está sozinho nele, o grupo some. Quer guardar seus treinos antes? Use “Exportar backup”.</p>
+      <ul><li>treinos, recordes, XP, cartas e conquistas</li><li>peso, medidas e fotos de evolução</li><li>posts, comentários e reações nas guildas</li><li>a conexão com o bot do Telegram e os lembretes de água</li></ul>
+      <p class="note small">Guilda que você criou passa para o membro mais antigo. Se você está sozinho nela, a guilda some. Quer guardar seus treinos antes? Use “Exportar backup”.</p>
       <label class="field"><span class="field-lbl">Para confirmar, digite EXCLUIR</span><input name="conf" autocomplete="off" autocapitalize="characters"></label>
       <div class="exc-acoes"><button type="button" class="btn btn-outline" data-exc-cancelar>Cancelar</button><button type="button" class="btn btn-perigo" data-exc-ok disabled>Excluir para sempre</button></div>
     </form>`;
@@ -5073,7 +5148,7 @@
       try {
         const token = await tokenSB();
         await fetch("/api/conta", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ acao: "excluir" }) }).catch(() => {});
-        // Fotos: perfil e evolução ficam na pasta da pessoa; as dos posts, em cada grupo
+        // Fotos: perfil e evolução ficam na pasta da pessoa; as dos posts, em cada guilda
         const tirar = async (bucket, pasta) => { const { data } = await sb.storage.from(bucket).list(pasta, { limit: 1000 }); const nomes = (data || []).filter((f) => f.id).map((f) => `${pasta}/${f.name}`); if (nomes.length) await sb.storage.from(bucket).remove(nomes); };
         await tirar("fotos", uid).catch(() => {}); await tirar("evolucao", uid).catch(() => {});
         const { data: gs } = await sb.from("membros").select("grupo_id").eq("usuario_id", uid);
@@ -5524,7 +5599,7 @@
       const capaDel = G.desafios.find((x) => x.id === t.dataset.id)?.capa;
       sb.from("desafios").delete().eq("id", t.dataset.id).then(({ error }) => { if (error) toast("Não consegui apagar."); else { if (capaDel) sb.storage.from("posts").remove([capaDel]); carregarGrupos(true); } });
     }
-    else if (t.id === "g-codigo") entrarComCodigo(prompt("Código do grupo:") || "");
+    else if (t.id === "g-codigo") entrarComCodigo(prompt("Código da guilda:") || "");
     else if (t.dataset.gSel) { G.sel = t.dataset.gSel; G.carregadoEm = 0; carregarGrupos(true); }
     else if (t.id === "g-convidar") convidar(grupoSel());
     else if (t.dataset.gPeriodo) { G.periodo = t.dataset.gPeriodo; render(); }
@@ -5555,12 +5630,12 @@
     }
     else if (t.id === "g-atualizar") { carregarGrupos(true); toast("Atualizando…"); }
     else if (t.id === "g-meta") {
-      const g = grupoSel(), n = parseInt(prompt("Meta de treinos do grupo por semana:", g.meta_semanal), 10);
+      const g = grupoSel(), n = parseInt(prompt("Meta de treinos da guilda por semana:", g.meta_semanal), 10);
       if (n > 0 && n <= 500) sb.from("grupos").update({ meta_semanal: n }).eq("id", g.id).then(({ error }) => { if (error) toast("Não consegui mudar a meta."); else { g.meta_semanal = n; render(); } });
     } else if (t.id === "g-sair") {
       const g = grupoSel();
-      if (!confirm(`Sair do grupo ${g.nome}?${g.dono === uid ? " Você criou este grupo; ele continua para os outros." : ""}`)) return;
-      sb.from("membros").delete().eq("grupo_id", g.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui sair do grupo."); else { G.sel = null; carregarGrupos(true); toast("Você saiu do grupo."); } });
+      if (!confirm(`Sair da guilda ${g.nome}?${g.dono === uid ? " Você criou esta guilda; ela continua para os outros." : ""}`)) return;
+      sb.from("membros").delete().eq("grupo_id", g.id).eq("usuario_id", uid).then(({ error }) => { if (error) toast("Não consegui sair da guilda."); else { G.sel = null; carregarGrupos(true); toast("Você saiu da guilda."); } });
     } else if (t.dataset.evoMax) { evoMax = t.dataset.evoMax; $("#max-box").innerHTML = cartaoMaxOut(); }
     else if (t.id === "excluir-conta") excluirConta();
     else if (t.id === "sair") { if (sb && uid) sb.auth.signOut(); uid = null; S.logado = false; S.user = null; S.sessao = null; save(); chatLog = []; location.hash = "#/login"; }
@@ -5757,7 +5832,7 @@
     if (!texto || busy) return;
     const coach = chatPapel === "coach";
     if (coach && iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
-    if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar no grupo|lançar em todos os grupos|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
+    if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar na guilda|lançar em todas as guildas|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
     if (coach && atalhoHoje(texto)) return;
     busy = true;
     addMsg(msgsEl, esc(texto), true, chatLog);
@@ -5800,17 +5875,17 @@
     else desistir();
     setChips(chipsEl, CHIPS_HOJE); busy = false;
   }
-  // Link de reel no chat do Coach: monta o desafio do grupo e oferece lançar ou editar
+  // Link de reel no chat do Coach: monta o desafio da guilda e oferece lançar ou editar
   async function desafioNoChat(texto) {
     busy = true;
     addMsg(msgsEl, esc(texto), true, chatLog);
     const fala = async (html, chips = CHIPS_PADRAO) => { const stop = typing(msgsEl); await wait(500); stop(); addMsg(msgsEl, html, false, chatLog); setChips(chipsEl, chips); busy = false; };
-    if (!uid) return fala("Desafio é coisa de grupo: entre na sua conta e entre num grupo para lançar. 🤝");
+    if (!uid) return fala("Desafio é coisa de guilda: entre na sua conta e entre numa guilda para lançar. 🤝");
     if (!G.grupos) await carregarGrupos(true);
     const g = grupoSel();
-    if (!g) return fala("Você ainda não está em nenhum grupo. Crie um ou entre com um código na aba <b>Grupo</b> e me mande o link de novo. 🤝", ["Abrir o grupo"]);
+    if (!g) return fala("Você ainda não está em nenhuma guilda. Crie um ou entre com um código na aba <b>Guilda</b> e me mande o link de novo. 🤝", ["Abrir a guilda"]);
     if (/^editar antes de lançar$/i.test(texto)) { formDesafio = "link"; busy = false; closeChat(); location.hash = "#/grupo/missoes"; render(); return; }
-    if (/^lançar (no grupo|em todos os grupos)$/i.test(texto)) {
+    if (/^lançar (na guilda|em todas as guildas)$/i.test(texto)) {
       const d = desafioRascunho, todos = /todos/i.test(texto), alvos = todos ? G.grupos : [g];
       let ok = 0, ja = 0;
       for (const gr of alvos) {
@@ -5818,9 +5893,9 @@
         const { error } = await sb.from("desafios").insert({ grupo_id: gr.id, semana: semanaAtual(), titulo: d.titulo, descricao: d.descricao, link: d.link, medida: d.medida, prazo: prazoDe("dom"), criado_por: uid, ...(capa ? { capa } : {}) });
         if (!error) ok++; else if (/duplicate|unique/i.test(error.message)) ja++;
       }
-      if (!ok) return fala(ja ? `${todos ? "Todos os grupos já têm" : "O grupo já tem"} o desafio desta semana. Ele fica guardado: toque em <b>Editar antes de lançar</b> na semana que vem.` : "Não consegui lançar agora. Tente de novo.");
+      if (!ok) return fala(ja ? `${todos ? "Todas as guildas já têm" : "A guilda já tem"} o desafio desta semana. Ele fica guardado: toque em <b>Editar antes de lançar</b> na semana que vem.` : "Não consegui lançar agora. Tente de novo.");
       desafioRascunho = null; formDesafio = null; carregarGrupos(true);
-      return fala(todos ? `Desafio lançado em <b>${ok} ${ok === 1 ? "grupo" : "grupos"}</b>${ja ? ` (${ja} já ${ja === 1 ? "tinha" : "tinham"} o desta semana)` : ""}! ⚔️ Vale até domingo; para mudar o prazo, toque em <b>Editar desafio</b> no grupo.` : `Desafio lançado no grupo <b>${esc(g.nome)}</b>! ⚔️ Vale até domingo; para mudar o prazo, toque em <b>Editar desafio</b> no grupo.`, ["Abrir o grupo"]);
+      return fala(todos ? `Desafio lançado em <b>${ok} ${ok === 1 ? "guilda" : "guildas"}</b>${ja ? ` (${ja} já ${ja === 1 ? "tinha" : "tinham"} o desta semana)` : ""}! ⚔️ Vale até domingo; para mudar o prazo, toque em <b>Editar desafio</b> na guilda.` : `Desafio lançado na guilda <b>${esc(g.nome)}</b>! ⚔️ Vale até domingo; para mudar o prazo, toque em <b>Editar desafio</b> na guilda.`, ["Abrir a guilda"]);
     }
     const bruto = texto.match(LINK_VIDEO)[0], link = linkCompleto(bruto), nota = texto.replace(bruto, "").trim();
     const stop = typing(msgsEl);
@@ -5829,8 +5904,8 @@
       stop();
       desafioRascunho = { ...j.desafio, link, nota, duvida: j.duvida, capa: j.capa || "" };
       const ja = desafioDaSemana();
-      addMsg(msgsEl, `${j.capa ? `<img class="dsf-capa-chat" src="${esc(j.capa)}" alt="Capa do vídeo">` : ""}Montei o desafio a partir do vídeo${j.fonte?.leu ? "" : " (não consegui ler a legenda, usei a capa e o que você escreveu)"}:<br><br><b>${esc(j.desafio.titulo)}</b><br>${esc(j.desafio.descricao)}<br><small>Como medir: ${esc(MEDIDAS[j.desafio.medida])}</small>${j.duvida ? `<br><br>⚠️ ${esc(j.duvida)}` : ""}${ja ? `<br><br>O grupo <b>${esc(g.nome)}</b> já tem o desafio desta semana (<b>${esc(ja.titulo)}</b>).` : ""}`, false, chatLog);
-      setChips(chipsEl, ja ? ["Editar antes de lançar", ...(G.grupos.length > 1 ? ["Lançar em todos os grupos"] : [])] : ["Lançar no grupo", ...(G.grupos.length > 1 ? ["Lançar em todos os grupos"] : []), "Editar antes de lançar"], true);
+      addMsg(msgsEl, `${j.capa ? `<img class="dsf-capa-chat" src="${esc(j.capa)}" alt="Capa do vídeo">` : ""}Montei o desafio a partir do vídeo${j.fonte?.leu ? "" : " (não consegui ler a legenda, usei a capa e o que você escreveu)"}:<br><br><b>${esc(j.desafio.titulo)}</b><br>${esc(j.desafio.descricao)}<br><small>Como medir: ${esc(MEDIDAS[j.desafio.medida])}</small>${j.duvida ? `<br><br>⚠️ ${esc(j.duvida)}` : ""}${ja ? `<br><br>A guilda <b>${esc(g.nome)}</b> já tem o desafio desta semana (<b>${esc(ja.titulo)}</b>).` : ""}`, false, chatLog);
+      setChips(chipsEl, ja ? ["Editar antes de lançar", ...(G.grupos.length > 1 ? ["Lançar em todas as guildas"] : [])] : ["Lançar na guilda", ...(G.grupos.length > 1 ? ["Lançar em todas as guildas"] : []), "Editar antes de lançar"], true);
     } catch (e) { stop(); addMsg(msgsEl, esc(e.message), false, chatLog); setChips(chipsEl, CHIPS_PADRAO); }
     busy = false;
   }
@@ -5839,7 +5914,7 @@
     const t = norm(texto);
     const fera = norm(NOME_PROG);
     if (t === "nutricao") { openChat(null, "nutri"); return true; }
-    if (t === "abrir o grupo") { closeChat(); location.hash = "#/grupo"; return true; }
+    if (t === "abrir a guilda") { closeChat(); location.hash = "#/grupo"; return true; }
     if (t === "evolucao por foto" || t === "ver ultima analise" || t === "apagar minhas fotos") { evoChip(t, texto); return true; }
     if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", "corrida", "corrida e hibrido", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);
@@ -5882,7 +5957,7 @@
 
   /* ---------- Evolução por foto (check-in de frente e de lado a cada 15 dias, só a pessoa vê) ---------- */
   // Fotos no bucket privado "evolucao" (<uid>/<data>-frente.jpg); a tabela "evolucao" guarda data, peso e a análise.
-  // As regras do Supabase só deixam a própria pessoa ler, enviar e apagar. Nada disso aparece no grupo.
+  // As regras do Supabase só deixam a própria pessoa ler, enviar e apagar. Nada disso aparece na guilda.
   const EVO_DIAS = 15;
   let evoRows = null, evoArq = {}, evoOcupado = false;
   const evoData = (k) => parseKey(k).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -5933,7 +6008,7 @@
     const pode = !ult || falta <= 0 || (ult.data === hojeKey && !ult.analise);
     const urls = rows.length ? await evoUrls(rows.slice(-3)).catch(() => ({})) : {};
     const intro = !rows.length
-      ? `<p>Vamos acompanhar sua evolução por foto! 📸 Mande uma foto <b>de frente</b> e uma <b>de lado</b>; a cada ${EVO_DIAS} dias você manda outras e eu comparo.</p><p>🔒 As fotos são <b>só suas</b>: ficam guardadas na sua conta e <b>não aparecem no grupo</b>. Você pode apagar quando quiser.</p>`
+      ? `<p>Vamos acompanhar sua evolução por foto! 📸 Mande uma foto <b>de frente</b> e uma <b>de lado</b>; a cada ${EVO_DIAS} dias você manda outras e eu comparo.</p><p>🔒 As fotos são <b>só suas</b>: ficam guardadas na sua conta e <b>não aparecem na guilda</b>. Você pode apagar quando quiser.</p>`
       : `<p>Seus check-ins (${rows.length}):</p>${evoFotosHtml(rows.slice(-3), urls)}`;
     const chips = rows.some((r) => r.analise) ? ["Ver última análise", "Apagar minhas fotos"] : rows.length ? ["Apagar minhas fotos"] : CHIPS_PADRAO;
     if (pode) {
@@ -6484,8 +6559,8 @@
   }
 
   /* ==========================================================
-     Ranking da semana no grupo: XP ganho de segunda até hoje (zera toda segunda, justo para quem entra depois).
-     Conta treinos, recordes, meta da semana, água, desafio do grupo e o desafio de 7 dias. O dos outros sai
+     Ranking da semana na guilda: XP ganho de segunda até hoje (zera toda segunda, justo para quem entra depois).
+     Conta treinos, recordes, meta da semana, água, desafio da guilda e o desafio de 7 dias. O dos outros sai
      das linhas de treino e do que cada um sincronizou (perfis.config).
      ========================================================== */
   const MOD_DE = (pr) => (pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
@@ -6513,21 +6588,21 @@
     const q = LIGAS_CHEFES && chefes().find((c) => c.k === "sr-q");
     return `<div class="section tp-box">
       <div class="tp-head"><span class="tp-ic">⚡</span><div><span class="tp-k">Ranking da semana</span><b>XP de segunda até hoje</b><small>${faltam ? `zera em ${faltam} ${faltam === 1 ? "dia" : "dias"} (segunda)` : "último dia: zera amanhã"}</small></div></div>
-      ${q ? `<a class="tp-srq" href="#/chefes"><img src="${q.img}" alt=""><span><b>Sr. Q · desafios do grupo</b><span class="ch-hp"><i style="width:${q.hp}%"></i></span></span><em>${q.melhor}/8</em></a>` : ""}
+      ${q ? `<a class="tp-srq" href="#/chefes"><img src="${q.img}" alt=""><span><b>Sr. Q · desafios da guilda</b><span class="ch-hp"><i style="width:${q.hp}%"></i></span></span><em>${q.melhor}/8</em></a>` : ""}
       <ol class="tp-rank">${lista.map((x, i) => `<li class="${x.id === uid ? "eu" : ""}" data-membro="${x.id}" role="link" tabindex="0"><span class="tp-pos">${i + 1}º</span>${avatar(G.perfis[x.id], 32)}<span class="tp-nome"><b>${esc((G.perfis[x.id]?.nome || "Atleta").split(" ")[0])}${x.id === uid ? " (você)" : ""}</b><small>${esc(cfgNivel(x.id)?.nivel_xp ? `Nível ${cfgNivel(x.id).nivel_xp}` : "")}</small></span><strong>${x.xp}<small> XP</small></strong></li>`).join("")}</ol>
       <details class="xp-regras"><summary>Como funciona</summary><ul class="note small">
-        <li>Vale o XP ganho na semana: treinos, recordes, meta da semana batida, água, desafio do grupo e o ${esc(D7.recruta.nome)}.</li>
+        <li>Vale o XP ganho na semana: treinos, recordes, meta da semana batida, água, desafio da guilda e o ${esc(D7.recruta.nome)}.</li>
         <li>Zera toda segunda, então quem chegou agora disputa de igual para igual.</li>
         <li>O XP de cada pessoa atualiza quando ela abre o app.</li></ul></details>
     </div>`;
   }
-  // Contexto para o Coach: ranking da semana, Sr. Q, desafio do grupo e desafio de 7 dias
+  // Contexto para o Coach: ranking da semana, Sr. Q, desafio da guilda e desafio de 7 dias
   function semanaContexto() {
     const out = [];
     if (uid && G.membros?.length) { const l = G.membros.map((id) => ({ id, xp: xpSemanaDe(id) })).sort((a, b) => b.xp - a.xp), i = l.findIndex((x) => x.id === uid);
-      if (i >= 0) out.push(`Ranking da semana do grupo (XP de segunda até hoje): ${i + 1}º de ${l.length} com ${l[i].xp} XP${i > 0 ? `, ${l[i - 1].xp - l[i].xp} XP atrás de quem está na frente` : ""}.`); }
+      if (i >= 0) out.push(`Ranking da semana da guilda (XP de segunda até hoje): ${i + 1}º de ${l.length} com ${l[i].xp} XP${i > 0 ? `, ${l[i - 1].xp - l[i].xp} XP atrás de quem está na frente` : ""}.`); }
     const q = LIGAS_CHEFES && chefes().find((c) => c.k === "sr-q"), d = uid && desafioDaSemana();
-    if (q) out.push(`Sr. Q (chefe dos desafios do grupo): ${q.melhor}/8 desafios cumpridos.${d ? ` Desafio desta semana: "${d.titulo}" (${(G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid) ? "já cumprido" : `ainda não cumprido, ${faltaDesafio(d)}`}).` : ""}`);
+    if (q) out.push(`Sr. Q (chefe dos desafios da guilda): ${q.melhor}/8 desafios cumpridos.${d ? ` Desafio desta semana: "${d.titulo}" (${(G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid) ? "já cumprido" : `ainda não cumprido, ${faltaDesafio(d)}`}).` : ""}`);
     out.push(d7Contexto());
     out.push("Quando fizer sentido, dê 1 ou 2 dicas concretas tiradas daqui (desafio pendente, o que falta no desafio de 7 dias). Sem inventar números que não estão aqui.");
     return out.filter(Boolean).join("\n");
@@ -6545,7 +6620,7 @@
   /* ==========================================================
      Desafios de 7 dias (dinâmicas curtas, no lugar da temporada). O primeiro é o Desafio do Recruta:
      Despertar (dias 1-2), Dungeon (3-5) e Chefe final (6-7). Um dia por data: as missões do dia
-     cumpridas fecham o dia e o próximo abre amanhã. Dá para chamar alguém do grupo para a dupla:
+     cumpridas fecham o dia e o próximo abre amanhã. Dá para chamar alguém da guilda para a dupla:
      quem completar os 7 dias primeiro vence. S.d7 = execução atual; S.d7Feito = a primeira concluída
      (o XP vale uma vez; refazer é só pelo desafio).
      ========================================================== */
@@ -6587,7 +6662,7 @@
   }
   const d7Nome = (id) => esc((pfDe(id)?.nome || "Atleta").split(" ")[0]);
   const pfDe = (id) => G.perfis[id] || G.perfisT?.[id] || null;
-  // Todo mundo dos meus grupos, menos eu
+  // Todo mundo dos minhas guildas, menos eu
   const d7Ids = () => [...new Set([...(G.todosMembros || []).map((m) => m.usuario_id), ...(G.membros || [])])].filter((id) => id !== uid);
   const d7Cfg = (id) => pfDe(id)?.config || {};
   // Aviso para a dupla (Telegram e push, pelo servidor); falha em silêncio
@@ -6619,7 +6694,7 @@
     dl.addEventListener("cancel", () => setTimeout(() => dl.remove(), 0));
     dl.showModal();
   }
-  // Convites que chegaram para mim: alguém do grupo me marcou e está esperando
+  // Convites que chegaram para mim: alguém da guilda me marcou e está esperando
   function d7Convites() {
     if (!uid || !G.membros) return [];
     return d7Ids().filter((id) => { const o = d7Cfg(id).d7; return id !== uid && o?.espera && o.dupla === uid && !o.fim && S.d7Recusa?.[id] !== o.convidou && !(S.d7?.dupla === id && !S.d7.espera && S.d7.ini >= o.convidou); });
@@ -6652,12 +6727,12 @@
   }
   function d7Contexto() {
     const e = d7Estado(), D = D7.recruta, du = d7Dupla();
-    if (!e) return `${D.nome} (${D.sub}): ainda não começou. Dá para sugerir quando a pessoa quiser algo curto e sem equipamento, sozinha ou em dupla com alguém do grupo.`;
+    if (!e) return `${D.nome} (${D.sub}): ainda não começou. Dá para sugerir quando a pessoa quiser algo curto e sem equipamento, sozinha ou em dupla com alguém da guilda.`;
     if (S.d7.espera) return `${D.nome}: esperando ${(pfDe(S.d7.dupla)?.nome || "a dupla").split(" ")[0]} aceitar o convite.`;
     if (e.fim) return `${D.nome}: concluído em ${ddmm(S.d7.fim)}, título ${D.titulo}.`;
     return `${D.nome}: dia ${e.dia} de 7 (${e.fase.nome})${du ? `, em dupla com ${(pfDe(du.id)?.nome || "").split(" ")[0]} (${du.n}/7)` : ""}${e.hojeOk ? ", o de hoje já foi feito" : `; missões de hoje: ${e.fase.itens.map((x) => x[2]).join(", ")}`}.`;
   }
-  // Chips de quem dá para chamar, separados por grupo quando a pessoa tem mais de um (cada um aparece uma vez)
+  // Chips de quem dá para chamar, separados por guilda quando a pessoa tem mais de um (cada um aparece uma vez)
   const d7Chips = (attr) => {
     const chip = (id) => `<button class="chip" ${attr}="${id}">${avatar(pfDe(id), 22)} ${d7Nome(id)}</button>`;
     const gs = G.grupos || [];
@@ -6681,7 +6756,7 @@
     if (!e) return `<section class="screen quiz d7-tela">${volta}${capa}${conviteHtml}${trilhaFases}
       <p class="d7-txt">Uma missão por dia, sem equipamento. Fechou as missões do dia, o próximo abre amanhã. Nos dias 6 e 7 você enfrenta o <b>${esc(D.chefe.nome)}</b>. Completou os 7 dias: <b>+${D.bonus} XP</b> e o título <b>${esc(D.titulo)}</b>.</p>
       <button class="btn btn-blue fc-btn grande" data-d7-comecar>Começar sozinho 🎯</button>
-      ${temGrupo ? `<div class="d7-dupla"><span class="qz-kicker">Ou desafie alguém ${(G.grupos || []).length > 1 ? "dos seus grupos" : "do grupo"}</span><p class="note small">A pessoa recebe o convite no app (e no Telegram ou notificação, se tiver ligado). Vocês largam juntos no dia em que ela aceitar.</p>${d7Chips("data-d7-convidar")}</div>` : uid ? "" : `<p class="note small">Entre com uma conta e participe de um grupo para desafiar um amigo.</p>`}</section>`;
+      ${temGrupo ? `<div class="d7-dupla"><span class="qz-kicker">Ou desafie alguém ${(G.grupos || []).length > 1 ? "dos suas guildas" : "da guilda"}</span><p class="note small">A pessoa recebe o convite no app (e no Telegram ou notificação, se tiver ligado). Vocês largam juntos no dia em que ela aceitar.</p>${d7Chips("data-d7-convidar")}</div>` : uid ? "" : `<p class="note small">Entre com uma conta e participe de uma guilda para desafiar um amigo.</p>`}</section>`;
     if (S.d7.espera) return `<section class="screen quiz d7-tela">${volta}${capa}${trilhaFases}
       <div class="d7-dupla d7-espera"><span class="qz-kicker">Convite enviado</span><div class="d7-cv-top">${avatar(pfDe(S.d7.dupla), 44)}<p>Esperando <b>${d7Nome(S.d7.dupla)}</b> aceitar. Vocês começam juntos no dia do aceite.</p></div>
         <button class="lnk-btn" data-d7-cancelar>Cancelar convite</button></div></section>`;
@@ -6831,9 +6906,9 @@
       desc: "Cada sessão do Insanity é um golpe; o golpe final é o último Fit Test", meta: () => 1,
       calc: () => canguruCalc("insanity60", () => { const ft = fitTests(linhasLocais()).filter((x) => x.p === "insanity60");
         return ft.length >= 2 && ft[ft.length - 1].total > ft[0].total ? `Fit Test: ${ft[0].total} → ${ft[ft.length - 1].total} repetições` : null; }) },
-    // Sr. Q: chefe dos desafios do grupo. Cada desafio semanal cumprido é um golpe; cai com 8
-    { k: "sr-q", nome: "Sr. Q", tag: "Chefe dos desafios do grupo", img: "assets/chefes/sr-q-rosto.webp", banner: "assets/chefes/sr-q.webp", met: "ins",
-      desc: "Cumprir 8 desafios semanais do grupo", vis: () => !!(uid && G.grupos?.length),
+    // Sr. Q: chefe dos desafios da guilda. Cada desafio semanal cumprido é um golpe; cai com 8
+    { k: "sr-q", nome: "Sr. Q", tag: "Chefe dos desafios da guilda", img: "assets/chefes/sr-q-rosto.webp", banner: "assets/chefes/sr-q.webp", met: "ins",
+      desc: "Cumprir 8 desafios semanais da guilda", vis: () => !!(uid && G.grupos?.length),
       meta: () => 8, calc: () => { const ds = G.desafios || [];
         const meus = ds.filter((d) => (G.feitos || []).some((f) => f.desafio_id === d.id && f.usuario_id === uid)).map((d) => d.semana).sort();
         const n = new Set(meus).size; return { tem: n > 0, melhor: n, meta: 8, em: n >= 8 ? meus[meus.length - 1] : null }; } },
@@ -6944,7 +7019,7 @@
   const seriesDia = (k) => soma(Object.values(S.logs[k]?.sets || {}).map((s) => s.length)) + soma(IAK.map((pk) => soma(Object.values(S[pk].logs[k]?.sets || {}).map((s) => (s || []).filter(Boolean).length))));
   // Vídeos marcados no calendário de hoje (programa principal ou o de vídeo do híbrido); dia de descanso conta 1 (vale um avulso)
   const absDia = (k) => soma(VKEYS.map((p) => [...(S[p].logs[k]?.feitos || []), ...(S[p].logs[k]?.avulso || [])].filter((id) => INSV[id]?.tipo === "Abdômen").length));
-  // Desafio da semana do grupo: pendente (ainda não cumprido) e cumprido naquele dia (para a missão não valer todo dia)
+  // Desafio da semana da guilda: pendente (ainda não cumprido) e cumprido naquele dia (para a missão não valer todo dia)
   const meuFeito = (d) => (G.feitos || []).find((f) => f.desafio_id === d.id && f.usuario_id === uid);
   function desafioPendente(k) { const d = uid && desafioDaSemana(); if (!d) return false; const f = meuFeito(d); return !f || (f.feito_em || "").slice(0, 10) === k || keyOf(new Date(f.feito_em)) === k; }
   function desafioCumpridoEm(k) { const d = uid && desafioDaSemana(), f = d && meuFeito(d); return f && f.feito_em && keyOf(new Date(f.feito_em)) === k ? 1 : 0; }
@@ -7471,7 +7546,7 @@
     { id: "arena", nome: "Arena", sub: "Chefes e Desafio do Recruta", href: "#/arena", x: 66, y: 26.5, w: 34, h: 22 },
     { id: "praca", nome: "Praça", sub: "Álbum de cartas", href: "#/album", x: 37, y: 36, w: 27, h: 26 },
     { id: "mercado", nome: "Mercado", sub: "Equipamentos", href: "#/mercado", x: 0.5, y: 59, w: 37, h: 20 },
-    { id: "taverna", nome: "Taverna", sub: "Grupos e ranking", href: "#/grupo", x: 66, y: 53, w: 34, h: 24 },
+    { id: "taverna", nome: "Taverna", sub: "Guildas e ranking", href: "#/grupo", x: 66, y: 53, w: 34, h: 24 },
   ];
   telas.vilarejo = () => {
     setToolbar("vilarejo");
@@ -7745,8 +7820,8 @@
       ${N ? `<span class="ar-selo n${c.nivel}" title="${N[1]}">${N[2]}</span>` : ""}</button>`;
   }
   /* ==========================================================
-     Incursões: um chefe da Arena enfrentado em grupo (aberta: quem quiser do grupo contribui) ou em dupla, por 3 a 7 dias.
-     A vida do chefe é a meta coletiva: aberta = meta por pessoa × metade do grupo (mínimo 2); dupla = meta × 2.
+     Incursões: um chefe da Arena enfrentado em guilda (aberta: quem quiser da guilda contribui) ou em dupla, por 3 a 7 dias.
+     A vida do chefe é a meta coletiva: aberta = meta por pessoa × metade da guilda (mínimo 2); dupla = meta × 2.
      O que cada um soma vem dos treinos registrados no período (auto) e do que lançar à mão (manual, com limite por lançamento).
      XP: chefe derrotado = 100 para quem contribuiu e +50 para o top 1; não derrotado = 25 para quem contribuiu.
      Tabelas: incursoes e incursao_golpes (migração 20261127_incursoes).
@@ -7835,9 +7910,9 @@
     const status = e.caiu ? "⚔️ Chefe derrotado!" : e.acabou ? "O chefe escapou" : e.diasRest === 1 ? "Último dia" : `${e.diasRest} dias restantes`;
     const posso = incPosso(i) && incAtiva(i) && !e.caiu;
     return `<article class="inc-card${e.caiu ? " caiu" : ""}${e.acabou && !e.caiu ? " fugiu" : ""}">
-      <div class="inc-banner"><img src="${arCarta(i.chefe)}" alt="" loading="lazy"><span class="inc-modo">${i.modo === "dupla" ? "👥 Dupla" : "🛡️ Grupo aberto"}</span>${x.dificil ? `<span class="inc-dif">Difícil</span>` : ""}</div>
+      <div class="inc-banner"><img src="${arCarta(i.chefe)}" alt="" loading="lazy"><span class="inc-modo">${i.modo === "dupla" ? "👥 Dupla" : "🛡️ Guilda aberta"}</span>${x.dificil ? `<span class="inc-dif">Difícil</span>` : ""}</div>
       <div class="inc-corpo">
-        <p class="inc-k">${esc(g?.nome || "Grupo")} · ${status}</p>
+        <p class="inc-k">${esc(g?.nome || "Guilda")} · ${status}</p>
         <h3>${esc(x.nome)}</h3>
         <div class="inc-hp"><i style="width:${e.hpPct}%"></i><span>HP ${e.hpPct}% · ${incFmt(x, Math.min(e.dano, i.hp))} de ${incFmt(x, i.hp)}</span></div>
         <ol class="inc-rank">${e.gs.filter((gg) => gg.tot > 0).slice(0, 5).map((gg, n) => `<li><b>${n === 0 ? "👑" : n + 1}</b><span>${nome(gg.usuario_id)}</span><em>${incFmt(x, gg.tot)}</em></li>`).join("") || `<li class="vazio">Ninguém atacou ainda.</li>`}</ol>
@@ -7847,30 +7922,30 @@
       </div></article>`;
   }
   function incSecao(gid) {
-    if (!uid) return `<div class="inc-sec"><h2 class="inc-h">⚔️ Incursões</h2><p class="inc-vazio">Entre com uma conta e participe de um grupo para enfrentar chefes junto com os amigos.</p></div>`;
+    if (!uid) return `<div class="inc-sec"><h2 class="inc-h">⚔️ Incursões</h2><p class="inc-vazio">Entre com uma conta e participe de uma guilda para enfrentar chefes junto com os amigos.</p></div>`;
     incCarregar(); incXpAtualizar();
     const lista = (IG.lista || []).filter((i) => !gid || i.grupo_id === gid);
     const ativas = lista.filter((i) => !(hojeKey > i.fim)), antigas = lista.filter((i) => hojeKey > i.fim).slice(0, 3);
     return `<div class="inc-sec"><div class="inc-topo"><h2 class="inc-h">⚔️ Incursões</h2>${G.grupos?.length ? `<button type="button" class="btn btn-outline inc-nova" data-inc-nova>+ Lançar</button>` : ""}</div>
-      <p class="inc-d">Um chefe, todo o grupo atacando. A vida dele cai com o que cada um soma nos treinos.</p>
-      ${!IG.lista ? `<p class="inc-vazio">Carregando…</p>` : ativas.length ? ativas.map(incCard).join("") : `<p class="inc-vazio">${G.grupos?.length ? "Nenhuma incursão aberta. Lance uma e chame o grupo!" : "Entre num grupo na Taverna para lançar incursões."}</p>`}
+      <p class="inc-d">Um chefe, toda a guilda atacando. A vida dele cai com o que cada um soma nos treinos.</p>
+      ${!IG.lista ? `<p class="inc-vazio">Carregando…</p>` : ativas.length ? ativas.map(incCard).join("") : `<p class="inc-vazio">${G.grupos?.length ? "Nenhuma incursão aberta. Lance uma e chame a guilda!" : "Entre numa guilda na Taverna para lançar incursões."}</p>`}
       ${antigas.length ? `<details class="inc-antigas"><summary>Incursões anteriores</summary>${antigas.map(incCard).join("")}</details>` : ""}</div>`;
   }
-  // Lançar: escolher o grupo, o chefe e (na dupla) a parceria
+  // Lançar: escolher a guilda, o chefe e (na dupla) a parceria
   function incNova(gsel, ksel) {
     const grupos = G.grupos || []; if (!grupos.length) return;
     const gid = gsel || G.sel || grupos[0].id, x = INC_DE[ksel];
     const membros = (G.todosMembros || []).filter((m) => m.grupo_id === gid).map((m) => m.usuario_id);
     const nMem = Math.max(membros.length, gid === G.sel ? (G.membros || []).length : 0, 2);
-    // Uma incursão aberta de grupo por vez em cada grupo; dupla: uma por pessoa em cada grupo
+    // Uma incursão aberta de guilda por vez em cada guilda; dupla: uma por pessoa em cada guilda
     const ocupado = x && (IG.lista || []).some((i) => i.grupo_id === gid && !(hojeKey > i.fim) && i.modo === x.modo && (x.modo === "grupo" || i.criado_por === uid || i.dupla === uid));
     dlgGami(`<div class="inc-lanc"><p class="gami-k">Nova incursão</p><h2>${x ? esc(x.nome) : "Escolha o chefe"}</h2>
       ${grupos.length > 1 ? `<div class="seg inc-gs">${grupos.map((g) => `<button type="button" class="${g.id === gid ? "on" : ""}" data-inc-g="${g.id}|${ksel || ""}">${esc(g.nome)}</button>`).join("")}</div>` : ""}
       ${!x
-        ? `<div class="inc-esc">${INC.map((c) => `<button type="button" class="inc-op" data-inc-esc="${gid}|${c.k}"><img src="${arCarta(c.k)}" alt=""><span><b>${esc(c.nome)}</b><small>${c.meta} ${esc(c.un)} por pessoa · ${c.dias} dias · ${c.modo === "dupla" ? "dupla" : "grupo aberto"}${c.dificil ? " · difícil" : ""}</small></span></button>`).join("")}</div>`
+        ? `<div class="inc-esc">${INC.map((c) => `<button type="button" class="inc-op" data-inc-esc="${gid}|${c.k}"><img src="${arCarta(c.k)}" alt=""><span><b>${esc(c.nome)}</b><small>${c.meta} ${esc(c.un)} por pessoa · ${c.dias} dias · ${c.modo === "dupla" ? "dupla" : "guilda aberta"}${c.dificil ? " · difícil" : ""}</small></span></button>`).join("")}</div>`
         : `<div class="ar-carta t0 inc-prev" style="filter:none"><img src="${arCarta(x.k)}" alt="" style="filter:none;opacity:1"></div>
-          ${ocupado ? `<p class="note">${x.modo === "dupla" ? "Você já está numa incursão em dupla nesse grupo. Termine ela primeiro." : "Esse grupo já tem uma incursão aberta. Termine ela primeiro."}</p>` : `<p class="note">${x.modo === "dupla" ? `Você e mais uma pessoa somam <b>${incFmt(x, incHp(x, 2))}</b> em ${x.dias} dias.` : `Quem quiser do grupo entra. Juntos, somem <b>${incFmt(x, incHp(x, nMem))}</b> em ${x.dias} dias.`} Começa hoje.</p>
-          ${x.modo === "dupla" ? `<div class="inc-dupla">${membros.filter((id) => id !== uid).map((id) => `<button type="button" class="btn btn-outline" data-inc-criar="${gid}|${x.k}|${id}">${esc((pfDe(id)?.nome || "Alguém").split(" ")[0])}</button>`).join("") || `<p class="note">Ninguém mais no grupo ainda.</p>`}</div>`
+          ${ocupado ? `<p class="note">${x.modo === "dupla" ? "Você já está numa incursão em dupla nessa guilda. Termine ela primeiro." : "Essa guilda já tem uma incursão aberta. Termine ela primeiro."}</p>` : `<p class="note">${x.modo === "dupla" ? `Você e mais uma pessoa somam <b>${incFmt(x, incHp(x, 2))}</b> em ${x.dias} dias.` : `Quem quiser da guilda entra. Juntos, somem <b>${incFmt(x, incHp(x, nMem))}</b> em ${x.dias} dias.`} Começa hoje.</p>
+          ${x.modo === "dupla" ? `<div class="inc-dupla">${membros.filter((id) => id !== uid).map((id) => `<button type="button" class="btn btn-outline" data-inc-criar="${gid}|${x.k}|${id}">${esc((pfDe(id)?.nome || "Alguém").split(" ")[0])}</button>`).join("") || `<p class="note">Ninguém mais na guilda ainda.</p>`}</div>`
             : `<button type="button" class="btn btn-blue" data-inc-criar="${gid}|${x.k}|">Lançar ${esc(x.nome)}</button>`}`}
           <button type="button" class="btn btn-outline" data-inc-g="${gid}|">← outros chefes</button>`}
     </div>`, "Fechar");
@@ -7881,7 +7956,7 @@
     const { error } = await sb.from("incursoes").insert({ grupo_id: gid, chefe: k, modo: x.modo, dupla: dupla || null, hp: incHp(x, membros), inicio: hojeKey, fim: keyOf(addDays(hoje, x.dias - 1)) });
     document.getElementById("gami-dlg")?.close();
     if (error) { toast("Não consegui lançar a incursão. Tente de novo."); return; }
-    toast(`${x.nome} lançada! Chame o grupo. ⚔️`, 3500);
+    toast(`${x.nome} lançada! Chame a guilda. ⚔️`, 3500);
     await incCarregar(true);
     const nova = (IG.lista || []).find((i) => i.grupo_id === gid && i.chefe === k && i.criado_por === uid);
     if (nova) await incEntrar(nova.id, true);
@@ -7913,7 +7988,7 @@
     document.getElementById("gami-dlg")?.close();
     await incCarregar(true);
     const e = incEstado(i);
-    if (e.caiu) dlgGami(`<div class="ar-dlg"><div class="ar-carta t3"><img src="${arCarta(i.chefe)}" alt=""></div><p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">O grupo venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}.</p></div>`, "Bora!");
+    if (e.caiu) dlgGami(`<div class="ar-dlg"><div class="ar-carta t3"><img src="${arCarta(i.chefe)}" alt=""></div><p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">A guilda venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}.</p></div>`, "Bora!");
     else toast(`Golpe de ${incFmt(x, v)}! HP do chefe: ${e.hpPct}%.`, 3000);
   }
   document.addEventListener("click", (e) => {
@@ -8154,7 +8229,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     const s = senseiDe(), a = (() => { try { return tgDia(hoje); } catch { return null; } })(), pk = principal();
     const xpT = pk === "cf" ? XP.cf : VP[pk] ? XP.video : XP.sessao;
     let titulo, txt, href, botao;
-    if (feito(hojeKey)) { titulo = "Treino de hoje concluído ✓"; txt = desafioPendente(hojeKey) ? "Agora o desafio da semana do grupo." : "Hidrate, alongue e volte amanhã."; href = desafioPendente(hojeKey) ? "#/grupo/missoes" : "#/dojo"; botao = desafioPendente(hojeKey) ? "Desafio" : "Dojo"; }
+    if (feito(hojeKey)) { titulo = "Treino de hoje concluído ✓"; txt = desafioPendente(hojeKey) ? "Agora o desafio da semana da guilda." : "Hidrate, alongue e volte amanhã."; href = desafioPendente(hojeKey) ? "#/grupo/missoes" : "#/dojo"; botao = desafioPendente(hojeKey) ? "Desafio" : "Dojo"; }
     else if (a?.descanso) { titulo = "Dia de descanso"; txt = "Recuperar também é treino. Beba água e solte o corpo."; href = "#/dojo"; botao = "Dojo"; }
     else { titulo = a?.titulo || "Treino de hoje"; txt = `${a?.prog ? `${esc(a.prog)} · ` : ""}${a?.itens?.length ? (VP[pk] ? `${a.itens.length} ${a.itens.length === 1 ? "vídeo" : "vídeos"}` : `${a.itens.length} ${a.itens.length === 1 ? "exercício" : "exercícios"}`) : "o treino do seu caminho"}`; href = linkBora(w, d); botao = "Bora!"; }
     return `<a class="ac-card ac-prox" href="${href}">
