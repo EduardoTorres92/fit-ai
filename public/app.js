@@ -700,6 +700,7 @@
       const parado = ult && diffDays(parseKey(ult), hoje) > 7 && !parcial(hojeKey);
       return `<section class="screen has-toolbar acamp">
         ${acampTopo()}
+        ${aguaRapida()}
         ${acampEnergia()}
         ${acampProximo(w, d)}
         ${parado ? `<p class="note retomada ac-pad"><b>Voltou? 💪 Protocolo de retomada:</b> nem do zero, nem do máximo. Faça o treino de hoje dentro da sua capacidade atual e recupere o ritmo nos próximos dias.</p>` : ""}
@@ -710,7 +711,6 @@
           ${desafioHome()}
           ${pesagemPendente() ? `<details class="ac-linha ac-det"><summary><span class="ac-li-ic">⚖️</span><span><b>Pesagem da semana</b><small>Anote o peso e veja a evolução · +${XP.pesagem} XP</small></span><em>Anotar</em></summary><div class="ac-pz">${pesagemForm(true)}</div></details>` : ""}
           ${ativHome()}
-          ${staminaHome()}
           ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
         </div></section>`;
     },
@@ -2347,6 +2347,65 @@
       <small class="st-pe">💧 ${fmtL(tot)} de ${fmtL(meta)} hoje · cai ao longo do dia, sobe quando você bebe${S.aguaLembrete?.on ? "" : ` · <a href="#/nutricao" class="lnk">lembrete</a>`}</small>
     </div>`;
   }
+  /* ---------- HP: cai ao longo do dia e sobe com as missões do dia ----------
+     Acorda com 80%. Na janela do dia (a mesma da água) perde 6% por hora. Cada treino concluído: +30% e 4 horas de
+     proteção (não cai). Dois treinos com até 2 horas entre eles: Modo Lendário (HP cheio e sem queda até o fim do dia).
+     Cada outra missão do dia cumprida: +15%. Os horários dos treinos ficam em S.hpTreinos[dia]. */
+  const HP_QUEDA = 6 / 60, HP_TREINO = 30, HP_MISSAO = 15, HP_PROTECAO = 240, HP_COMBO = 120;
+  function hpTreinosHoje() { try { return feitas(linhasLocais()).filter((r) => r.data === hojeKey).length; } catch { return 0; } }
+  function hpRegistrarTreinos() {
+    const n = hpTreinosHoje(), l = (S.hpTreinos = S.hpTreinos || {})[hojeKey] || [];
+    if (n <= l.length) return;
+    const d = new Date(), agora = d.getHours() * 60 + d.getMinutes();
+    S.hpTreinos[hojeKey] = [...l, ...Array(n - l.length).fill(agora)];
+    for (const k of Object.keys(S.hpTreinos)) if (k < keyOf(addDays(hoje, -7))) delete S.hpTreinos[k];
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {}
+    const e = hpEstado();
+    if (e.lendario && !l.some((t, i) => i > 0 && t - l[i - 1] <= HP_COMBO)) setTimeout(() => dlgGami(`<div class="hp-dlg"><p class="gami-k">Dois treinos seguidos</p><h2>✨ Modo Lendário</h2><span class="hbar hp lendario"><i style="width:100%"></i></span><p class="note">HP cheio e sem queda até o fim do dia. Lenda!</p></div>`, "Bora!"), 900);
+    else if (l.length < n) toast(`❤️ +${HP_TREINO}% de HP e ${HP_PROTECAO / 60}h de proteção`, 2800);
+    if (location.hash.startsWith("#/home") || !location.hash) render();
+  }
+  function hpEstado(agora = new Date()) {
+    const [ini, fim] = staminaJanela(), now = agora.getHours() * 60 + agora.getMinutes();
+    const ts = [...((S.hpTreinos || {})[hojeKey] || [])].filter((t) => t <= now).sort((a, b) => a - b);
+    const lendario = ts.some((t, i) => i > 0 && t - ts[i - 1] <= HP_COMBO);
+    const cai = (a, b) => Math.max(0, Math.min(b, fim) - Math.max(a, ini)) * HP_QUEDA;
+    let v = 80, t = 0, protegeAte = -1;
+    for (const x of ts) { v = Math.max(0, v - cai(Math.max(t, protegeAte), x)); v = Math.min(100, v + HP_TREINO); protegeAte = Math.max(protegeAte, x + HP_PROTECAO); t = x; }
+    v = Math.max(0, v - cai(Math.max(t, protegeAte), Math.max(now, Math.max(t, protegeAte))));
+    let extra = 0; try { extra = missoesDe(hojeKey).filter((m) => m.ok && m.id !== "treino" && m.id !== "minutos" && m.id !== "series").length * HP_MISSAO; } catch {}
+    v = Math.min(100, v + extra);
+    if (lendario) v = 100;
+    const protegido = !lendario && protegeAte > now ? protegeAte - now : 0;
+    return { v: Math.round(v), lendario, protegido, treinos: ts.length };
+  }
+  function hudBarras(n) {
+    const hp = hpEstado(), st = minhaStamina();
+    const prot = hp.lendario ? "✨ Lendário" : hp.protegido ? `🛡️ ${Math.floor(hp.protegido / 60)}h${String(hp.protegido % 60).padStart(2, "0")}` : "";
+    return `<button type="button" class="hud" data-hud-info aria-label="HP ${hp.v}%, Stamina ${st}%, XP ${n.pct}%">
+      <span class="hud-l"><b>HP</b><span class="hbar hp${hp.lendario ? " lendario" : hp.v < 30 ? " baixo" : ""}"><i style="width:${hp.v}%"></i></span><em>${prot || `${hp.v}%`}</em></span>
+      <span class="hud-l"><b>ST</b><span class="hbar st${st < 30 ? " baixo" : ""}"><i style="width:${st}%"></i></span><em>${st}%</em></span>
+      <span class="hud-l"><b>XP</b><span class="hbar xp"><i style="width:${n.pct}%"></i></span><em>${n.pct}%</em></span>
+    </button>`;
+  }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-hud-info]")) return;
+    const hp = hpEstado(), st = minhaStamina(), n = meuNivel();
+    dlgGami(`<div class="hp-dlg"><p class="gami-k">Seu herói</p>
+      <div class="hud-info"><b>❤️ HP ${hp.v}%</b><span class="hbar hp${hp.lendario ? " lendario" : ""}"><i style="width:${hp.v}%"></i></span>
+        <small>Cai ao longo do dia e sobe com as missões. Treino concluído: +${HP_TREINO}% e ${HP_PROTECAO / 60}h sem queda. Dois treinos com até 2h de intervalo: <b>Modo Lendário</b>, HP cheio até o fim do dia.${hp.lendario ? " <b>Você está no Modo Lendário!</b>" : hp.protegido ? ` Protegido por mais ${Math.floor(hp.protegido / 60)}h${String(hp.protegido % 60).padStart(2, "0")}.` : ""}</small></div>
+      <div class="hud-info"><b>💧 Stamina ${st}%</b><span class="hbar st"><i style="width:${st}%"></i></span>
+        <small>É a sua água: cai ao longo do dia e sobe quando você bebe. Antes de treinar, 300 ml.</small></div>
+      <div class="hud-info"><b>⭐ XP ${n.xp.toLocaleString("pt-BR")} / ${n.fim.toLocaleString("pt-BR")}</b><span class="hbar xp"><i style="width:${n.pct}%"></i></span>
+        <small>Faltam ${(n.fim - n.xp).toLocaleString("pt-BR")} XP para o nível ${n.nivel + 1}.</small></div></div>`, "Entendi");
+  });
+  // Atalho de água logo acima da Energia do dia
+  function aguaRapida() {
+    const tot = aguaHoje(), meta = nutriMetas().agua, st = minhaStamina(), falta = tot < STAMINA_TREINO;
+    return `<div class="ac-card agua-rapida${falta ? " falta" : ""}"><span class="ar-ic">💧</span>
+      <div><b>${fmtL(tot)} de ${fmtL(meta)}</b><small>${falta ? `Beba ${STAMINA_TREINO - tot} ml para liberar o treino` : `Stamina ${st}%${st < 30 ? " · beba água para recuperar" : ""}`}</small></div>
+      <button class="btn btn-outline" data-agua="200">+200</button><button class="btn btn-blue" data-agua="300">+300 ml</button></div>`;
+  }
   // Antes de treinar: pelo menos 300 ml no dia
   let staminaPend = null;
   function staminaPedir(refazer) {
@@ -3071,7 +3130,7 @@
   let syncTimer = null, sincronizando = false, deNovo = false;
   function agendarSync() {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { verificarConquistas(); if (registrarMissoes()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) { sincronizar(); if (typeof incSincronizar === "function" && IG.lista) incSincronizar(); } }, 1200);
+    syncTimer = setTimeout(() => { hpRegistrarTreinos(); verificarConquistas(); if (registrarMissoes()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) { sincronizar(); if (typeof incSincronizar === "function" && IG.lista) incSincronizar(); } }, 1200);
   }
   async function sincronizar() {
     if (!uid || !sb) return;
@@ -8290,9 +8349,8 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
           <p class="ac-oi">${saudacao()},</p><h1>${esc(primeiroNome())}</h1>
           <p class="ac-nv-k">Nível</p><p class="ac-nv">${n.nivel}</p>
           <p class="ac-classe">${esc(n.classe)}</p>
-          <p class="ac-xp">${n.xp.toLocaleString("pt-BR")} / ${n.fim.toLocaleString("pt-BR")} XP</p>
-          <span class="ac-bar"><i style="width:${n.pct}%"></i></span>
-          <p class="ac-xp-k">para o nível ${n.nivel + 1}</p>
+          ${hudBarras(n)}
+          <p class="ac-xp-k">${n.xp.toLocaleString("pt-BR")} / ${n.fim.toLocaleString("pt-BR")} XP para o nível ${n.nivel + 1}</p>
         </div>
         <div class="ac-sprite">${sp ? `<img src="${sp}" alt="${esc(n.classe)} animado">` : `<img class="ac-av" src="${avatarClasse(n.slug)}" alt="">`}</div>
         <nav class="ac-lado" aria-label="Atalhos">

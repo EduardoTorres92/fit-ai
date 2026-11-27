@@ -2452,3 +2452,33 @@ button.alb-it:active { transform: scale(0.96); }
 .inc-hm.cla { border-color: rgba(255, 210, 63, .35); }
 @media (min-width: 768px) { .cla-pg { padding-inline: max(0px, calc((100% - 820px) / 2)); } }
 .cla-pg .cla-lock-bar { display: block; max-width: none; height: 10px; margin-top: 14px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; } .cla-pg .cla-lock-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffb800, #ffd23f); }
+
+/* HUD do herói (HP, Stamina, XP) no topo da home e atalho de água */
+.acamp .hud { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 190px; margin: 8px 0 2px; padding: 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.hud-l { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.hud-l b { font: 800 10px/1 "Pixelify Sans", system-ui, sans-serif; letter-spacing: .04em; opacity: .85; }
+.hud-l em { font-style: normal; font-size: 10.5px; font-weight: 700; opacity: .85; min-width: 30px; text-align: right; }
+.hbar { position: relative; display: block; height: 8px; border-radius: 2px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.28); box-shadow: 0 0 0 1px rgba(0,0,0,.5); overflow: hidden; }
+.hbar i { display: block; height: 100%; transition: width .6s; }
+.hbar.hp i { background: linear-gradient(180deg, #ff6b6b, #b3261e); }
+.hbar.st i { background: linear-gradient(180deg, #6fb6ff, #1f5fd1); }
+.hbar.xp i { background: linear-gradient(180deg, #ffe07a, #e0a800); }
+.hbar.baixo i { animation: hb-pisca 1.2s ease-in-out infinite; }
+.hbar.lendario { border-color: #ffd23f; box-shadow: 0 0 8px rgba(255, 210, 63, .7); }
+.hbar.lendario i { background: linear-gradient(90deg, #ff6b6b, #ffd23f, #ff6b6b); background-size: 200% 100%; animation: hb-brilho 1.6s linear infinite; }
+@keyframes hb-pisca { 50% { opacity: .45; } }
+@keyframes hb-brilho { to { background-position: -200% 0; } }
+.acamp .ac-xp-k { margin-top: 4px !important; font-size: 10.5px; }
+.hp-dlg { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.hp-dlg h2 { margin: 0; text-align: center; }
+.hp-dlg .gami-k { text-align: center; }
+.hud-info { display: flex; flex-direction: column; gap: 6px; }
+.hud-info .hbar { height: 10px; }
+.hud-info small { font-size: 12.5px; line-height: 1.4; opacity: .8; }
+.acamp .agua-rapida { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.acamp .agua-rapida .ar-ic { font-size: 22px; }
+.acamp .agua-rapida > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.acamp .agua-rapida b { font-size: 15px; } .acamp .agua-rapida small { font-size: 12px; opacity: .75; }
+.acamp .agua-rapida .btn { flex: none; height: 34px; padding: 0 10px; font-size: 13px; }
+.acamp .agua-rapida.falta { border-color: rgba(111, 182, 255, .55); box-shadow: 0 0 0 3px rgba(111, 182, 255, .12); }
+.acamp .agua-rapida .btn { width: auto; min-width: 0; margin: 0; } .acamp .agua-rapida b { white-space: nowrap; } .acamp .agua-rapida small { line-height: 1.3; }
