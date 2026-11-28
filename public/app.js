@@ -4743,7 +4743,7 @@
     } catch { return null; }
   }
   // Perfil de outra pessoa: a carta e o álbum saem do que ela sincronizou (perfis.config) e dos treinos dela
-  const membroCfg = (id) => (id === uid ? { xp: meuNivel().xp, arte: sexoArte(), album: S.album, d7Feito: S.d7Feito } : pfDe(id)?.config || {});
+  const membroCfg = (id) => (id === uid ? { xp: meuNivel().xp, arte: sexoArte(), album: S.album, incCartas: S.incCartas, d7Feito: S.d7Feito } : pfDe(id)?.config || {});
   const membroG = (id) => { const c = membroCfg(id); return id === uid ? sexoArte() : c.arte === "f" || (c.arte !== "m" && c.quiz?.sexo === "f") ? "f" : "m"; };
   function membroTitulo(id) { const f = membroCfg(id).d7Feito; return f && D7[f.k] ? `<span class="pf-titulo">🎖️ ${esc(D7[f.k].titulo)}</span>` : ""; }
   function cartaMembroHtml(id, rows) {
@@ -4755,10 +4755,13 @@
         ${E ? `<small class="mb-mestre">${g === "f" ? "Mestra" : "Mestre"}: <b>${esc(E.mestre[g])}</b> · ${esc(E.lema)}</small>` : `<small class="mb-mestre">Estilo aparece no primeiro treino</small>`}</div></div>`;
   }
   function albumMembroHtml(id) {
-    const al = membroCfg(id).album || {}, g = membroG(id);
+    const cfg = membroCfg(id), al = cfg.album || {}, g = membroG(id), incC = cfg.incCartas || {};
     const cartas = ESTILOS_ORDEM.flatMap((e) => CLASSES.slice(0, Math.min(CLASSES.length, (al[e] ?? -1) + 1)).map(([slug, nome]) => ({ e, slug, nome })));
+    const incOk = (k) => !!incC[k] || INC_CLA.some((c) => c.img === k && incC[c.k]);
+    const incDesbloq = INC_ARTE.filter((x) => incOk(x.k));
     return `<div><div class="sec-head"><h2>Álbum de cartas</h2><span>${cartas.length}/${albumTotal()}</span></div>
-      ${cartas.length ? `<div class="mb-album">${cartas.map((x) => `<img src="${cartaDe(x.e, x.slug, g)}" alt="${esc(ESTILOS[x.e].nome)} ${esc(x.nome)}" title="${esc(ESTILOS[x.e].nome)} ${esc(x.nome)}" loading="lazy">`).join("")}</div>` : `<p class="note small">Nenhuma carta ainda.</p>`}</div>`;
+      ${cartas.length ? `<div class="mb-album">${cartas.map((x) => `<img src="${cartaDe(x.e, x.slug, g)}" alt="${esc(ESTILOS[x.e].nome)} ${esc(x.nome)}" title="${esc(ESTILOS[x.e].nome)} ${esc(x.nome)}" loading="lazy">`).join("")}</div>` : `<p class="note small">Nenhuma carta ainda.</p>`}
+      ${incDesbloq.length ? `<div class="sec-head mb-sub"><h2>Cartas de incursão</h2><span>${incDesbloq.length}</span></div><div class="mb-album mb-inc">${incDesbloq.map((x) => `<img src="${incArte(x.k)}" alt="${esc(x.nome)}" title="${esc(x.nome)}" loading="lazy">`).join("")}</div>` : ""}</div>`;
   }
   function conquistasMembroHtml(id) {
     if (id === uid) return "";
@@ -7379,7 +7382,7 @@
         <p class="alb-d">Cada nível vencido muda a cor da carta: Bronze, Prata, Ouro e Diamante holográfico.</p>
         <div class="alb-grade">${arena().map((c) => `<button type="button" class="alb-it ar-alb" data-ar="${c.k}" aria-label="${esc(c.nome)}">${arCartaHtml(c)}</button>`).join("")}</div></div>
       ${INC_ARTE.length ? `<div class="alb-sec"><div class="alb-h"><span>🛡️ Cartas de incursão</span><small>${INC_ARTE.filter((x) => incCartaTem(x.k)).length}/${INC_ARTE.length}</small></div>
-        <p class="alb-d">Ajude a guilda a derrubar o chefe de uma incursão e leve a carta dela.</p>
+        <p class="alb-d">Ajude a guilda ou o clã a derrubar o chefe de uma incursão e leve a carta dela.</p>
         <div class="alb-grade">${INC_ARTE.map((x) => incCartaTem(x.k)
           ? `<button type="button" class="alb-it" data-inc-carta="${x.k}" aria-label="Abrir a carta ${esc(x.nome)}"><img src="${incArte(x.k)}" alt="" loading="lazy"></button>`
           : `<div class="alb-it off" title="Ajude a derrubar o chefe da incursão ${esc(x.nome)}"><img src="${incArte(x.k)}" alt="" loading="lazy"><span class="carta-lock">🔒</span><small>${esc(x.nome)}</small></div>`).join("")}</div></div>` : ""}
@@ -8256,16 +8259,23 @@
     { k: "cla-cross", img: "valquiria", nome: "Valquíria Furiosa", meta: 90, un: "min de cross", dias: 7, modo: "cla", f: "min:cross" },
   ];
   const INC_DE = Object.fromEntries([...INC, ...INC_CLA].map((x) => [x.k, x]));
+  // Chave da arte em assets/incursoes (incursão da guilda com arte, ou img da incursão de clã)
+  const incArteKey = (k) => { const x = INC_DE[k]; if (!x) return null; if (x.arte) return k; const img = x.img; return img && INC_DE[img]?.arte ? img : null; };
   const incImg = (i) => incArte(i.chefe) || arCarta(INC_DE[i.chefe]?.img || i.chefe); // a carta da incursão, quando existe; senão a carta do chefe
+  const incEscolhaImg = (c) => incArte(c.k) || arCarta(c.img || c.k);
   /* Cartas de incursão: arte bônus (assets/incursoes/<k>.webp) para quem causou dano numa incursão em que o chefe caiu.
-     S.incCartas = { <chefe>: data em que ganhou } (sincroniza em perfis.config.incCartas). */
+     S.incCartas = { <arteKey>: data em que ganhou } (sincroniza em perfis.config.incCartas). */
   const INC_ARTE = INC.filter((x) => x.arte);
-  const incArte = (k) => (INC_DE[k]?.arte ? `assets/incursoes/${k}.webp` : null);
-  const incCartaTem = (k) => !!S.incCartas?.[k];
-  const incCartaHtml = (k) => `<div class="gami-carta alb-grande inc-carta"><img src="${incArte(k)}" alt="Carta da incursão ${esc(INC_DE[k]?.nome || "")}"></div>`;
+  const incArte = (k) => { const ak = incArteKey(k); return ak ? `assets/incursoes/${ak}.webp` : null; };
+  const incCartaChave = (k) => incArteKey(k) || (S.incCartas?.[k] ? k : null);
+  const incCartaTem = (k) => { const ak = incArteKey(k); return !!(ak && S.incCartas?.[ak]) || !!S.incCartas?.[k]; };
+  const incCartaHtml = (k) => { const ak = incArteKey(k) || k; return `<div class="gami-carta alb-grande inc-carta"><img src="${incArte(k)}" alt="Carta da incursão ${esc(INC_DE[ak]?.nome || "")}"></div>`; };
   function incAbrirCarta(k) {
-    const x = INC_DE[k]; if (!x || !incArte(k)) return;
-    dlgGami(`${incCartaHtml(k)}<p class="gami-k">Carta de incursão</p><h2>${esc(x.nome)}</h2><p class="note">Conquistada ao derrubar o chefe com a guilda${S.incCartas?.[k] ? ` em ${ddmm(S.incCartas[k])}` : ""}.</p>`, "Fechar");
+    const ak = incArteKey(k) || k, x = INC_DE[ak] || INC_DE[k]; if (!x || !incArte(k)) return;
+    const deCla = INC_CLA.some((c) => c.k === k || c.img === ak);
+    const data = S.incCartas?.[ak] || S.incCartas?.[k];
+    const onde = deCla && !INC_DE[k]?.arte ? "com o clã" : deCla ? "numa incursão com a guilda ou o clã" : "com a guilda";
+    dlgGami(`${incCartaHtml(k)}<p class="gami-k">Carta de incursão</p><h2>${esc(x.nome)}</h2><p class="note">Conquistada ao derrubar o chefe ${onde}${data ? ` em ${ddmm(data)}` : ""}.</p>`, "Fechar");
   }
   const incHp = (x, membros) => Math.round(x.meta * (x.modo === "dupla" ? 2 : Math.max(2, Math.ceil(membros / 2))));
   const incFmt = (x, v) => `${String(Math.round(v * 10) / 10).replace(".", ",")} ${x.un}`;
@@ -8326,7 +8336,8 @@
       const e = incEstado(i); if (!e.meu || e.meu.tot <= 0 || (!e.caiu && !e.acabou)) continue;
       const xp = e.caiu ? 100 + (e.gs[0]?.usuario_id === uid ? 50 : 0) : 25;
       if ((S.incXp?.[i.id] || 0) !== xp) { S.incXp = { ...(S.incXp || {}), [i.id]: xp }; mud = true; }
-      if (e.caiu && incArte(i.chefe) && !incCartaTem(i.chefe)) { S.incCartas = { ...(S.incCartas || {}), [i.chefe]: i.fim < hojeKey ? i.fim : hojeKey }; mud = true; nova = i.chefe; }
+      const ck = incArteKey(i.chefe);
+      if (e.caiu && ck && !incCartaTem(ck)) { S.incCartas = { ...(S.incCartas || {}), [ck]: i.fim < hojeKey ? i.fim : hojeKey }; mud = true; nova = ck; }
     }
     if (mud) save();
     if (nova && !document.getElementById("gami-dlg")?.open) dlgGami(`${incCartaHtml(nova)}<p class="gami-k">🃏 Nova carta de incursão!</p><h2>${esc(INC_DE[nova].nome)}</h2><p class="note">Você ajudou a derrubar o chefe e ganhou esta carta. Ela fica no seu álbum.</p>`, "Bora!");
@@ -8347,7 +8358,7 @@
         ${i.modo === "dupla" ? `<p class="inc-sub">${nome(i.criado_por)} + ${nome(i.dupla)}</p>` : ""}
         ${posso ? `<div class="inc-acoes">${!e.meu && i.modo === "grupo" ? `<button type="button" class="btn btn-blue" data-inc-entrar="${i.id}">Entrar na incursão</button>` : `<button type="button" class="btn btn-blue" data-inc-golpe="${i.id}">Lançar golpe</button>`}</div>` : ""}
         ${incAtiva(i) && !e.caiu ? (incPrepArquivo(i.chefe), `<button type="button" class="lnk-btn inc-compart" data-inc-compart="${i.id}">📲 Compartilhar incursão</button>`) : ""}
-        ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b>${e.caiu && incCartaTem(i.chefe) ? ` e a <button type="button" class="lnk-btn" data-inc-carta="${i.chefe}">🃏 carta da incursão</button>` : ""}</p>` : ""}
+        ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b>${e.caiu && incCartaTem(i.chefe) ? ` e a <button type="button" class="lnk-btn" data-inc-carta="${incCartaChave(i.chefe) || i.chefe}">🃏 carta da incursão</button>` : ""}</p>` : ""}
       </div></article>`;
   }
   // A carta da incursão como arquivo JPEG para compartilhar (null quando não há arte ou o navegador não converte)
@@ -8362,7 +8373,7 @@
     } catch { return null; }
   }
   const INC_ARQ = {};
-  function incPrepArquivo(k) { if (k in INC_ARQ || !incArte(k) || !matchMedia("(pointer: coarse)").matches) return; INC_ARQ[k] = null; incArquivoCarta(k).then((f) => { INC_ARQ[k] = f; }); }
+  function incPrepArquivo(k) { const ak = incArteKey(k) || k; if (ak in INC_ARQ || !incArte(k) || !matchMedia("(pointer: coarse)").matches) return; INC_ARQ[ak] = null; incArquivoCarta(k).then((f) => { INC_ARQ[ak] = f; }); }
   function incCompartilhar(id) {
     const i = (IG.lista || []).find((x) => x.id === id); if (!i) return;
     const e = incEstado(i), x = e.x, g = i.cla ? null : (G.grupos || []).find((gg) => gg.id === i.grupo_id);
@@ -8371,7 +8382,7 @@
     const txt = `👹 ${x.nome} invadiu ${i.cla ? `o ${CLAS[i.cla]?.nome || "clã"}` : `a guilda${g ? ` "${g.nome}"` : ""}`}! Faltam ${incFmt(x, falta)} para derrubar o chefe e ${e.diasRest === 1 ? "hoje é o último dia" : `restam ${e.diasRest} dias`}. ${i.modo === "dupla" ? "Bora fechar essa dupla" : "Entra e ataca comigo"} no FIT.AI ⚔️ ${link}${g ? `\nAinda não está na guilda? Código ${g.codigo}` : ""}`;
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
       // Com arte: manda a carta junto (em JPEG, que o WhatsApp aceita sempre); sem suporte a arquivo, só o texto
-      const f = INC_ARQ[i.chefe]; // preparado quando o card apareceu: o Safari só abre o compartilhar logo depois do toque
+      const f = INC_ARQ[incArteKey(i.chefe) || i.chefe]; // preparado quando o card apareceu: o Safari só abre o compartilhar logo depois do toque
       navigator.share(f && navigator.canShare?.({ files: [f] }) ? { title: x.nome, text: txt, files: [f] } : { title: x.nome, text: txt }).catch(() => {});
     } else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Incursão copiada. Cole no WhatsApp. 📲"), () => prompt("Copie a mensagem:", txt));
     else prompt("Copie a mensagem:", txt);
@@ -8411,8 +8422,8 @@
     dlgGami(`<div class="inc-lanc"><p class="gami-k">Nova incursão</p><h2>${x ? esc(x.nome) : "Escolha o chefe"}</h2>
       ${grupos.length > 1 ? `<div class="seg inc-gs">${grupos.map((g) => `<button type="button" class="${g.id === gid ? "on" : ""}" data-inc-g="${g.id}|${ksel || ""}">${esc(g.nome)}</button>`).join("")}</div>` : ""}
       ${!x
-        ? `<div class="inc-esc">${INC.map((c) => `<button type="button" class="inc-op" data-inc-esc="${gid}|${c.k}"><img src="${arCarta(c.k)}" alt=""><span><b>${esc(c.nome)}</b><small>${c.meta} ${esc(c.un)} por pessoa · ${c.dias} dias · ${c.modo === "dupla" ? "dupla" : "guilda aberta"}${c.dificil ? " · difícil" : ""}</small></span></button>`).join("")}</div>`
-        : `<div class="ar-carta t0 inc-prev" style="filter:none"><img src="${arCarta(x.k)}" alt="" style="filter:none;opacity:1"></div>
+        ? `<div class="inc-esc">${INC.map((c) => `<button type="button" class="inc-op" data-inc-esc="${gid}|${c.k}"><img src="${incEscolhaImg(c)}" alt=""><span><b>${esc(c.nome)}</b><small>${c.meta} ${esc(c.un)} por pessoa · ${c.dias} dias · ${c.modo === "dupla" ? "dupla" : "guilda aberta"}${c.dificil ? " · difícil" : ""}</small></span></button>`).join("")}</div>`
+        : `<div class="ar-carta t0 inc-prev" style="filter:none"><img src="${incEscolhaImg(x)}" alt="" style="filter:none;opacity:1"></div>
           ${ocupado ? `<p class="note">${x.modo === "dupla" ? "Você já está numa incursão em dupla nessa guilda. Termine ela primeiro." : "Essa guilda já tem uma incursão aberta. Termine ela primeiro."}</p>` : `<p class="note">${x.modo === "dupla" ? `Você e mais uma pessoa somam <b>${incFmt(x, incHp(x, 2))}</b> em ${x.dias} dias.` : `Quem quiser da guilda entra. Juntos, somem <b>${incFmt(x, incHp(x, nMem))}</b> em ${x.dias} dias.`} Começa hoje.</p>
           ${x.modo === "dupla" ? `<div class="inc-dupla">${membros.filter((id) => id !== uid).map((id) => `<button type="button" class="btn btn-outline" data-inc-criar="${gid}|${x.k}|${id}">${esc((pfDe(id)?.nome || "Alguém").split(" ")[0])}</button>`).join("") || `<p class="note">Ninguém mais na guilda ainda.</p>`}</div>`
             : `<button type="button" class="btn btn-blue" data-inc-criar="${gid}|${x.k}|">Lançar ${esc(x.nome)}</button>`}`}
@@ -8457,7 +8468,7 @@
     document.getElementById("gami-dlg")?.close();
     await incCarregar(true);
     const e = incEstado(i);
-    if (e.caiu) { incXpAtualizar(); dlgGami(`<div class="ar-dlg">${incArte(i.chefe) ? incCartaHtml(i.chefe) : `<div class="ar-carta t3"><img src="${incImg(i)}" alt=""></div>`}<p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">A guilda venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}${incArte(i.chefe) ? " e a <b>carta da incursão</b> para o álbum" : ""}.</p></div>`, "Bora!"); }
+    if (e.caiu) { incXpAtualizar(); const venceu = i.cla ? "O clã venceu a incursão" : "A guilda venceu a incursão"; dlgGami(`<div class="ar-dlg">${incArte(i.chefe) ? incCartaHtml(i.chefe) : `<div class="ar-carta t3"><img src="${incImg(i)}" alt=""></div>`}<p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">${venceu}. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}${incArte(i.chefe) ? " e a <b>carta da incursão</b> para o álbum" : ""}.</p></div>`, "Bora!"); }
     else toast(`Golpe de ${incFmt(x, v)}! HP do chefe: ${e.hpPct}%.`, 3000);
   }
   document.addEventListener("click", (e) => {
