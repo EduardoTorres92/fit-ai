@@ -4777,13 +4777,14 @@
   function desafioHome() {
     if (!uid || !G.grupos || !grupoSel()) return "";
     const d = desafioDaSemana();
-    if (!d) return `<div class="sec-head"><h2>Desafios da guilda</h2></div><a class="emerg" href="#/grupo/missoes"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>${incHome()}`;
+    const inc = incHome();
+    if (!d) return `<div class="ac-guilda-painel"><div class="sec-head"><h2>Desafios da guilda</h2></div><a class="emerg" href="#/grupo/missoes"><span>⚔️</span><div><strong>Desafio da semana</strong><small>Ninguém lançou ainda. Cole o link de um reel e o Coach monta.</small></div></a>${inc}</div>`;
     const fs = feitosDe(d), eu = fs.some((f) => f.usuario_id === uid), capa = d.capa && G.capas?.[d.capa];
-    return `<div class="sec-head"><h2>Desafios da guilda</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
+    return `<div class="ac-guilda-painel"><div class="sec-head"><h2>Desafios da guilda</h2><a href="#/grupo/missoes">${faltaDesafio(d, true)}</a></div>
       <a class="dsf-home${capa ? " com-capa" : ""}" href="#/grupo/missoes">
         ${capa ? `<img src="${esc(capa)}" alt="" loading="lazy">` : ""}
         <div class="dh-txt"><span class="dh-tag">⚔️ ${esc(MEDIDAS[d.medida].split(" (")[0])}${eu ? " · ✓ você cumpriu" : ""}</span>
-          <strong>${esc(d.titulo)}</strong><small>${fs.length ? `🏅 ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}` : "Ninguém cumpriu ainda. Seja o primeiro!"}</small></div></a>${incHome()}`;
+          <strong>${esc(d.titulo)}</strong><small>${fs.length ? `🏅 ${fs.length} ${fs.length === 1 ? "pessoa cumpriu" : "pessoas cumpriram"}` : "Ninguém cumpriu ainda. Seja o primeiro!"}</small></div></a>${inc}</div>`;
   }
   function grupoHome() {
     if (!uid) return "";
@@ -8399,7 +8400,7 @@
     if (!uid || (!G.grupos?.length && !CL.meu)) return "";
     incCarregar();
     const ativas = (IG.lista || []).filter((i) => incAtiva(i) && ((i.cla && i.cla === CL.meu) || ((G.grupos || []).some((g) => g.id === i.grupo_id) && (i.modo === "grupo" || i.criado_por === uid || i.dupla === uid))));
-    if (!ativas.length) return "";
+    if (!ativas.length) return `<p class="ac-inc-vazio">Nenhuma incursão aberta. <a href="#/grupo/missoes">Lançar incursão contra um chefe ›</a></p>`;
     return `<div class="inc-home">${ativas.map((i) => { const e = incEstado(i), g = i.cla ? { nome: CLAS[i.cla]?.nome } : G.grupos.find((gg) => gg.id === i.grupo_id);
       return `<a class="inc-hm${e.caiu ? " caiu" : ""}${i.cla ? " cla" : ""}" href="${i.cla ? "#/cla" : `#/grupo/missoes/${i.grupo_id}`}"><img src="${incImg(i)}" alt="" loading="lazy">
         <span class="inc-hm-t"><small>👹 Incursão · ${esc(g?.nome || "Guilda")} · ${e.caiu ? "derrotado!" : e.diasRest === 1 ? "último dia" : `${e.diasRest} dias`}</small><b>${esc(e.x.nome)}</b>
