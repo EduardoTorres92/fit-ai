@@ -1403,6 +1403,12 @@
       ${lista.length ? `<p class="exx-res">Fora do card: ${lista.map((x, i) => `<span>${esc(x.nome)} ${x.sets.length}×${x.sets[0]?.r}${x.un === "s" ? "s" : ""}${x.sets[0]?.kg ? ` ${String(x.sets[0].kg).replace(".", ",")}kg` : ""} <button type="button" class="lnk-btn" data-exx-del="${alvo}|${i}" aria-label="Apagar ${esc(x.nome)}">✕</button></span>`).join("")}</p>` : ""}</div>`;
   }
   let exxChat = null;
+  // Treinos livres salvos antes do leitor novo: relê o texto (ex.: "100 flexões, sendo 20…" tinha virado uma série de 100)
+  function livresReler() {
+    if (S.livresLidos === 2 || !S.livres) return;
+    for (const l of Object.values(S.livres)) for (const t of l || []) if (t.texto) { const corpo = t.texto.includes(":") ? t.texto.slice(t.texto.indexOf(":") + 1) : t.texto; const xs = exxParse(corpo.replace(/\b\d+\s*(?:h(?:oras?)?|min(?:utos)?)\b/gi, " ").replace(/\d+\s*km\b/gi, " ")); if (xs.length) t.exs = xs; }
+    S.livresLidos = 2; save(); CACHE_ARENA = null;
+  }
   /* ---------- Treino livre: a pessoa conta ao Sensei o treino que fez e ele vira treino do dia ----------
      S.livres[dia] = [{ titulo, min, mod, texto, exs: [{ nome, un, sets }] }]. Conta XP, sequência, meta da semana,
      missões (treino, minutos, séries), HP, recordes, chefes, incursões e o estilo (pela modalidade). */
@@ -1423,7 +1429,7 @@
     m = n.match(/(?:durou|foram|em)\s*(\d+)\s*min/); return m ? Math.min(600, +m[1]) : 0;
   }
   function livreResumo(r) {
-    return `${r.exs.length ? r.exs.map((x) => `• <b>${esc(x.nome)}</b>: ${x.sets.length}×${x.sets[0].r}${x.un === "s" ? "s" : ""}${x.sets[0].kg ? ` com ${String(x.sets[0].kg).replace(".", ",")} kg` : ""}`).join("<br>") + "<br>" : ""}⏱️ ${r.min} min${r.minEst ? " (estimei pelas séries)" : ""} · ${esc(LIVRE_MOD[r.mod] || "escolha a modalidade")}`;
+    return `${r.exs.length ? r.exs.map((x) => `• <b>${esc(x.nome)}</b>: ${x.sets[0].tot ? `${x.sets[0].r} no total` : `${x.sets.length}×${x.sets[0].r}${x.un === "s" ? "s" : ""}`}${x.sets[0].kg ? ` com ${String(x.sets[0].kg).replace(".", ",")} kg` : ""}`).join("<br>") + "<br>" : ""}⏱️ ${r.min} min${r.minEst ? " (estimei pelas séries)" : ""} · ${esc(LIVRE_MOD[r.mod] || "escolha a modalidade")}`;
   }
   const livreChips = (r) => [...(r.mod ? ["Salvar treino"] : []), ...Object.entries(LIVRE_MOD).filter(([k]) => k !== r.mod).map(([, n]) => `É ${n.toLowerCase()}`), "Cancelar"];
   function livreAbrirChat() {
@@ -1459,18 +1465,46 @@
     addMsg(msgsEl, `Entendi assim:<br>${livreResumo(r)}<br>${r.mod ? "Está certo? Toque em <b>Salvar treino</b>, troque a modalidade ou me corrija o tempo (ex.: <b>foram 50 min</b>)." : "Qual foi a modalidade?"}`, false, chatLog);
     setChips(chipsEl, livreChips(r));
   }
+  /* Lê séries escritas do jeito da pessoa:
+     "3x15 flexão", "2x60s prancha", "4x10 supino 40kg", "4 séries de 10 agachamento", "100 flexões em séries de 20",
+     "100 flexões, sendo 20 tradicional, 20 diamante, 20 pike" (cada parte vira uma série da variação).
+     Um número solto sem séries ("100 abdominais") é o total do dia: conta volume (incursões, missões), não recorde de série. */
+  function exxUma(p, base = "") {
+    p = ` ${p.trim()} `;
+    let kg = 0, n = 1, r = 0, un = "reps", tot = false;
+    p = p.replace(/(\d+(?:[.,]\d+)?)\s*(kg|quilos?)\b/i, (m, v) => { kg = Number(v.replace(",", ".")); return " "; });
+    let m = p.match(/(\d+)\s*(?:x|×|s[ée]ries?\s+de)\s*(\d+)\s*(s\b|seg\w*|min\w*|")?/i);
+    if (m) { n = +m[1]; r = +m[2]; if (m[3]) { un = "s"; if (/^min/i.test(m[3])) r *= 60; } p = p.replace(m[0], " "); }
+    else {
+      m = p.match(/(\d+)\s*(s\b|seg\w*|min\w*|")?/i); if (!m) return null;
+      r = +m[1]; if (m[2]) { un = "s"; if (/^min/i.test(m[2])) r *= 60; } p = p.replace(m[0], " ");
+      const em = p.match(/(?:em|divididas?|divididos?|nas?)\s*s[ée]ries?\s*de\s*(\d+)/i);
+      if (em && un === "reps" && +em[1] > 0 && +em[1] < r) { const k = +em[1]; n = Math.max(1, Math.round(r / k)); r = k; p = p.replace(em[0], " "); }
+      else if (un === "reps") tot = true;
+    }
+    let nome = p.replace(/\b(de|repeti[çc][õo]es|reps?|s[ée]ries?|com|fiz|fazendo|sendo)\b/gi, " ").replace(/\s+/g, " ").trim();
+    if (base) nome = nome ? `${base} ${nome}` : base;
+    if (!nome || !(r > 0)) return null;
+    return { nome: (nome[0].toUpperCase() + nome.slice(1)).slice(0, 60), un, sets: Array.from({ length: Math.min(20, Math.max(1, n)) }, () => ({ r: Math.min(999, r), ...(kg ? { kg: Math.min(500, kg) } : {}), ...(tot ? { tot: 1 } : {}) })) };
+  }
   function exxParse(t) {
     const out = [];
-    for (let p of String(t).split(/[,;\n+]|\s+e\s+/i)) {
-      p = ` ${p.trim()} `; if (!p.trim()) continue;
-      let kg = 0, n = 1, r = 0, un = "reps";
-      p = p.replace(/(\d+(?:[.,]\d+)?)\s*(kg|quilos?)\b/i, (m, v) => { kg = Number(v.replace(",", ".")); return " "; });
-      let m = p.match(/(\d+)\s*(?:x|×|s[ée]ries?\s+de)\s*(\d+)\s*(s\b|seg\w*|min\w*|")?/i);
-      if (m) { n = +m[1]; r = +m[2]; if (m[3]) { un = "s"; if (/^min/i.test(m[3])) r *= 60; } p = p.replace(m[0], " "); }
-      else { m = p.match(/(\d+)\s*(s\b|seg\w*|min\w*|")?/i); if (!m) continue; r = +m[1]; if (m[2]) { un = "s"; if (/^min/i.test(m[2])) r *= 60; } p = p.replace(m[0], " "); }
-      const nome = p.replace(/\b(de|repeti[çc][õo]es|reps?|s[ée]ries?|com|fiz|fazendo)\b/gi, " ").replace(/\s+/g, " ").trim();
-      if (!nome || !(r > 0)) continue;
-      out.push({ nome: (nome[0].toUpperCase() + nome.slice(1)).slice(0, 60), un, sets: Array.from({ length: Math.min(20, Math.max(1, n)) }, () => ({ r: Math.min(999, r), ...(kg ? { kg: Math.min(500, kg) } : {}) })) });
+    for (const frase of String(t).split(/[.;\n]+(?!\d)/)) {
+      // "100 flexões, sendo 20 tradicional, 20 diamante…": as partes são séries da variação
+      const q = frase.match(/^\s*(\d+)\s+([^,]+?)\s*,?\s*(?:sendo|divididos? em|divididas? em|entre)\s+(.+)$/i);
+      if (q) {
+        const base = q[2].replace(/\b(de|com)\b/gi, " ").replace(/\s+/g, " ").trim();
+        const partes = q[3].split(/,|\s+e\s+/i).map((x) => x.trim()).filter(Boolean);
+        const total = +q[1], xs = []; let soma_ = 0, i = 0;
+        for (; i < partes.length && soma_ < total; i++) { // as partes da divisão vão até somar o total; o resto é outro exercício
+          const e = exxUma(partes[i], base); if (!e) continue;
+          soma_ += e.sets.reduce((t, v) => t + v.r, 0);
+          if (e.sets.length === 1 && e.sets[0].r > 50) e.sets[0].tot = 1; else e.sets.forEach((v) => delete v.tot);
+          xs.push(e);
+        }
+        if (xs.length) { out.push(...xs); for (const p of partes.slice(i)) { const e = exxUma(p); if (e) out.push(e); } continue; }
+      }
+      for (const p of frase.split(/[,+]|\s+e\s+/i)) { if (!p.trim()) continue; const e = exxUma(p); if (e) out.push(e); }
     }
     return out;
   }
@@ -1482,7 +1516,7 @@
     const l = exxGarantir(alvo); (l.extra = l.extra || []).push(...xs);
     exxChat = null; save();
     const w = document.querySelector(`[data-exx-wrap="${alvo}"]`); if (w) w.outerHTML = exxHtml(alvo); // sem render(): o chat continua aberto
-    addMsg(msgsEl, `Anotado no treino de hoje ✅<br>${xs.map((x) => `• <b>${esc(x.nome)}</b>: ${x.sets.length}×${x.sets[0].r}${x.un === "s" ? "s" : ""}${x.sets[0].kg ? ` com ${String(x.sets[0].kg).replace(".", ",")} kg` : ""}`).join("<br>")}<br>Conta para os recordes, chefes e incursões. 💪`, false, chatLog);
+    addMsg(msgsEl, `Anotado no treino de hoje ✅<br>${xs.map((x) => `• <b>${esc(x.nome)}</b>: ${x.sets[0].tot ? `${x.sets[0].r} no total` : `${x.sets.length}×${x.sets[0].r}${x.un === "s" ? "s" : ""}`}${x.sets[0].kg ? ` com ${String(x.sets[0].kg).replace(".", ",")} kg` : ""}`).join("<br>")}<br>Conta para os recordes, chefes e incursões. 💪`, false, chatLog);
     setChips(chipsEl, ["Exercício extra", ...CHIPS_PADRAO.slice(0, 3)]);
   }
   function exxAbrirChat(alvo) {
@@ -7189,8 +7223,8 @@
       const un = e.med === "s" ? "s" : unDe(pk, e);
       for (const x of s || []) { if (!x) continue; out.push({ data: k, nome: e.nome, kg: x.kg || 0, ...(un === "s" ? { s: x.r || 0 } : un === "reps" ? { reps: x.r || 0 } : {}) }); }
     }
-    for (const [k, l] of [...Object.entries(S.logs), ...IAK.flatMap((pk) => Object.entries(S[pk].logs))]) for (const x of l.extra || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
-    for (const [k, l] of Object.entries(S.livres || {})) for (const t of l || []) for (const x of t.exs || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
+    for (const [k, l] of [...Object.entries(S.logs), ...IAK.flatMap((pk) => Object.entries(S[pk].logs))]) for (const x of l.extra || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(v.tot ? { tot: 1 } : {}), ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
+    for (const [k, l] of Object.entries(S.livres || {})) for (const t of l || []) for (const x of t.exs || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(v.tot ? { tot: 1 } : {}), ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
     for (const pr of S.cf?.prs || []) out.push({ data: pr.k || hojeKey, nome: pr.mov || "", kg: pr.kg || 0, reps: pr.reps || 0 });
     for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (ehCorrida(a.tipo) && a.km) out.push({ data: k, nome: "corrida", km: a.km });
     return out;
@@ -7249,7 +7283,7 @@
   let CACHE_RECORDES = null;
   function recordes() { // os antigos chefes de recorde, calculados como antes (valem XP)
     if (CACHE_RECORDES && CACHE_RECORDES.v === CACHE_CHEFES) return CACHE_RECORDES.l;
-    const regs = registrosEx().sort((a, b) => a.data.localeCompare(b.data));
+    const regs = registrosEx().filter((r) => !r.tot).sort((a, b) => a.data.localeCompare(b.data));
     const l = RECORDES.map((c) => {
       const meta = c.meta(), mine = regs.filter((r) => c.re.test(norm(r.nome)) && !(c.nao && c.nao.test(norm(r.nome))) && (r[c.met] || 0) > 0);
       let melhor = 0, em = null;
@@ -8101,7 +8135,7 @@
     }
     if (!c.auto) return 0;
     const campo = c.met === "s" ? "s" : c.met === "kg" ? "kg" : "reps";
-    return Math.max(0, ...registrosEx().filter((r) => c.auto(r) && (r[campo] || 0) > 0).map((r) => r[campo]));
+    return Math.max(0, ...registrosEx().filter((r) => !r.tot && c.auto(r) && (r[campo] || 0) > 0).map((r) => r[campo]));
   }
   function arena() {
     if (CACHE_ARENA && CACHE_ARENA.v === S) return CACHE_ARENA.l;
@@ -8799,6 +8833,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     toast("Postado no clã! 📣"); carregarCla(true);
   });
 
+  try { livresReler(); } catch (e) { console.error("livres", e); }
   if (S.logado && !S.user) aplicarTrava(); // visitante: só o MAX:30 (e a Fera de apoio)
   conferirXp(true);
   render();
