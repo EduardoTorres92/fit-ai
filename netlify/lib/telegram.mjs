@@ -567,7 +567,7 @@ async function ferramentaAdmin(nome, entrada) {
     return "Ferramenta desconhecida.";
   } catch (e) { return e.codigo === "sem_chave" ? "O painel ainda não está liberado: o dono precisa abrir o app uma vez." : `Erro ao consultar: ${e.message}`; }
 }
-const NOME_PROG = { insanity: "MAX:30", insanity60: "Insanity", calistenia: "Calistenia", plano: "Calistenia", hiper: "Hipertrofia", c21: "Calistenia 21", cf: "CrossFit" };
+const NOME_PROG = { insanity: "MAX:30", insanity60: "Insanity", calistenia: "Calistenia", plano: "Calistenia", hiper: "Hipertrofia", c21: "Calistenia 21", xt: "xTreme Workout", run: "Corrida", cf: "CrossFit" };
 const quando = (iso) => (iso ? `${String(iso).slice(8, 10)}/${String(iso).slice(5, 7)}` : "—");
 async function editarOuEnviar(chat, id, m) {
   if (id) { try { await api("editMessageText", { chat_id: chat, message_id: id, parse_mode: "HTML", disable_web_page_preview: true, ...m }); return; } catch {} }

@@ -153,7 +153,7 @@
   const VKEYS = VPROGS.map((p) => p.k);
   const vazioVP = () => ({ inicio: null, logs: {} });
   const vazioIA = () => ({ perfil: {}, etapa: 0, plano: null, inicio: null, logs: {}, checkins: [], msgs: [] });
-  const IA_KEYS = ["hiper", "c21", "run"]; // programas montados pelo Coach AI (o motor fica mais abaixo)
+  const IA_KEYS = ["hiper", "c21", "run", "xt"]; // programas montados pelo Coach AI (o motor fica mais abaixo)
   // Catálogo em ordem de nível: o caminho natural é do primeiro ao último (MAX:30 → Insanity → calistenia)
   // Hipertrofia (academia) é um programa à parte: entra no catálogo (dá para escolher como principal), mas não no caminho de níveis
   const HIPER = { k: "hiper", nome: "Hipertrofia", curto: "Hipertrofia", nivel: "Academia", ordem: 99, extra: true,
@@ -164,7 +164,9 @@
     sobre: "Corrida do primeiro trote à meia maratona, ou treino híbrido: o Coach AI mistura corrida (rodagem, tiros, longão) com força na academia ou com o peso do corpo, no seu nível e nos seus dias." };
   const CF = { k: "cf", nome: "CrossFit", curto: "CrossFit", nivel: "Box ou garagem", ordem: 97, extra: true,
     sobre: "O WOD do dia do seu box: tire uma foto do quadro e a IA lança o treino (blocos, formato, movimentos e cargas); cronômetro de For Time, AMRAP, EMOM e Tabata, resultado RX/Scaled e recordes nos WODs repetidos. Sem box, o Coach monta um WOD." };
-  const CATALOGO = [...VPROGS, CALI, ...(window.FITAI_CAL21 ? [C21] : []), ...(window.FITAI_ACADEMIA ? [HIPER] : []), ...(window.FITAI_CORRIDA ? [RUNP] : []), CF].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
+  const XT = { k: "xt", nome: "xTreme Workout", curto: "xTreme", nivel: "Montado pelo Coach", ordem: 95, extra: true,
+    sobre: "HIIT e circuitos do estilo Ninja com halteres leves e barra fixa (caixa e tapete opcionais), montados pelo Coach AI a partir das 21 fichas do treinador: ciclos repetidos em voltas, máximos e intervalos de 20 s. Libera com halteres e barra fixa no Arsenal, ou com o Passe da Academia." };
+  const CATALOGO = [...VPROGS, CALI, ...(window.FITAI_CAL21 ? [C21] : []), ...(window.FITAI_XTREME ? [XT] : []), ...(window.FITAI_ACADEMIA ? [HIPER] : []), ...(window.FITAI_CORRIDA ? [RUNP] : []), CF].sort((a, b) => (a.ordem || 9) - (b.ordem || 9));
   const TRILHA = CATALOGO.filter((x) => !x.extra); // caminho natural de níveis
   const progDe = (k) => CATALOGO.find((x) => x.k === k) || null;
   const NIVEIS = [
@@ -916,6 +918,28 @@
       { k: "extra", q: "Quer me contar mais alguma coisa? Se não, é só tocar no botão.", op: ["Não, pode montar!"], livre: true },
     ],
   };
+  // xTreme Workout (estilo Ninja): ciclos em voltas e HIIT com halteres leves e barra fixa (xtreme.js)
+  const XTC = window.FITAI_XTREME || [];
+  if (XTC.length) IA.xt = {
+    k: "xt", nome: "xTreme Workout", rotulo: "xTreme", cat: XTC, banner: "cards/cross-1.jpg", semanas: 0, carga: false,
+    cargaEx: (c) => c?.equip === "halter", // anota a carga só nos exercícios com halter (leves, até 3 kg no material)
+    convite: "xTreme Workout: HIIT com halteres e barra, montado para você", resumoConvite: "O Coach AI faz {n} perguntas (nível, objetivo, dias, tempo…) e monta a sua semana com base nas 21 fichas do treinador: ciclos repetidos em voltas, máximos e HIIT de 20 s, com halteres leves e barra fixa. Sem caixa ou paralelas, ele troca pelo equivalente. Você marca cada volta e o descanso começa sozinho.",
+    intro: "Bora montar seu xTreme Workout", oQue: "sua semana de ciclos e HIIT com halteres e barra",
+    passos: [
+      { k: "nivel", q: "Como está o seu condicionamento hoje?", op: ["Iniciante: estou começando ou voltando", "Intermediário: treino com regularidade", "Avançado: aguento HIIT puxado e faço algumas barras"] },
+      { k: "objetivo", q: "Qual é o seu objetivo?", op: ["Perder gordura", "Definir e ganhar resistência", "Ganhar força", "Condicionamento e saúde"] },
+      { k: "dias", q: "Quantos dias por semana você vai treinar? (o treinador usa 3)", op: ["3", "4", "5"], fmt: (v) => `${v} dias por semana` },
+      { k: "diasSemana", q: "Quais dias ficam melhores?", multi: true },
+      { k: "tempo", q: "Quanto tempo você tem por treino?", op: ["20 min", "30 min", "45 min", "1 hora"] },
+      { k: "foco", q: "Quer dar prioridade a alguma parte?", op: ["Corpo todo", "Peito e braços", "Costas e ombros", "Pernas e glúteos", "Abdômen"] },
+      { k: "sexo", q: "Para calibrar o volume: qual o seu sexo?", op: ["Masculino", "Feminino", "Prefiro não dizer"] },
+      { k: "idade", q: "Qual a sua idade?", num: [14, 99], un: "anos", perfil: "idade" },
+      { k: "peso", q: "Qual o seu peso hoje, em kg?", num: [30, 300], un: "kg", perfil: "peso" },
+      { k: "altura", q: "E a sua altura, em cm?", num: [120, 230], un: "cm", perfil: "altura" },
+      { k: "limitacoes", q: "Tem alguma dor ou lesão (punho, ombro, joelho, lombar…)? Se tiver, escreva no campo abaixo.", op: ["Nenhuma"], livre: true },
+      { k: "extra", q: "Quer me contar mais alguma coisa? Se não, é só tocar no botão.", op: ["Não, pode montar!"], livre: true },
+    ],
+  };
   // Corrida e Híbrido: sessões de corrida + força do corredor + academia e calistenia (o Coach mistura os estilos)
   const RUNC = window.FITAI_CORRIDA || [];
   if (RUNC.length) {
@@ -957,6 +981,12 @@
       flexao: "flexao", barra: "barra-fixa", "barra-australiana": "barra-australiana", dips: "paralelas", "triceps-banco": "triceps-banco", crunch: "abdominal-supra" },
   };
   ANIM.c21 = ANIM._c21; delete ANIM._c21;
+  ANIM.xt = { "xt-polichinelo": "cal-polichinelo", "xt-burpee": "cal-burpee", "xt-agachamento": "cal-agachamento", "xt-agachamento-salto": "cal-agachamento-salto",
+    "xt-prancha-estatica": "cal-prancha", "xt-prancha-lateral": "cal-prancha-lateral", "xt-joelho-cotovelo-prancha": "cal-prancha-joelho-cotovelo", "xt-corrida-prancha": "cal-mountain-climbers",
+    "xt-apoio-regular": "flexao", "xt-apoio-diamante": "cal-flexao-diamante", "xt-apoio-declinado": "cal-flexao-declinada", "xt-apoio-plyo": "cal-flexao-explosiva",
+    "xt-apoio-quadril-alto": "cal-flexao-pike", "xt-apoio-bananeira": "cal-flexao-handstand", "xt-barra": "barra-fixa", "xt-barra-isometrica": "cal-isometria-topo-barra",
+    "xt-abs-crunch": "abdominal-supra", "xt-abs-tapa-pe": "cal-canivete", "xt-triceps-cadeira": "triceps-banco", "xt-triceps-paralela": "paralelas", "xt-joelho-alto": "cal-skipping",
+    "xt-remada-halteres": "remada-unilateral", "xt-triceps-testa": "triceps-testa", "xt-stiff": "stiff", "xt-supino-halteres": "supino-reto-halteres", "xt-passada-halteres": "afundo" };
   ANIM.run = { ...ANIM.hiper, ...ANIM.c21, // no Corrida e Híbrido, a calistenia tem prioridade nos ids repetidos (o catálogo também)
     ...Object.fromEntries("regenerativo rodagem longao progressivo tempo fartlek tiro-100 tiro-200 tiro-400 tiro-800 tiro-1000 teste-5k strides".split(" ").map((x) => [`run-${x}`, "corr-corrida"])),
     "run-aquecimento": "corr-corrida-estacionaria", "run-caminhada-corrida": "corr-caminhada-rapida", "run-educativos": "corr-joelhos-altos", "run-wall-ball": "corr-wall-ball",
@@ -979,9 +1009,12 @@
   const maxKg = (sets) => Math.max(0, ...sets.map((s) => s.kg || 0));
   // Duração de um tiro: "400 m" (≈ 3,5 m/s), "1 km", "45 s" ou "2 min"
   const segTiro = (r) => { const t = String(r).toLowerCase(), [a] = faixa(t); return /km/.test(t) ? a * 290 : /min/.test(t) ? a * 60 : /\d\s*m\b/.test(t) ? Math.round(a / 3.5) : a || 30; };
+  // xTreme: o dia é feito em ciclos ({ voltas, descanso }); cada exercício diz o seu ciclo (índice)
+  const emVoltas = (t) => !!(t?.rodadas || t?.ciclos?.length);
+  const cicloDo = (t, ex) => (t?.ciclos?.length ? t.ciclos[Math.min(t.ciclos.length - 1, ex?.ciclo || 0)] : null);
   const minSess = (pk, t) => Math.round(soma(t.exercicios.map((e) => { const u = unDe(pk, e), [a] = faixa(e.reps);
     if (exDe(pk, e.id)?.equip === "tiro") return e.series * (segTiro(e.reps) + (e.descanso ?? 90));
-    return u === "min" ? (a || 10) * 60 : e.series * ((u === "s" ? a || 30 : 40) + (e.descanso ?? 60)); })) / 60 + (t.rodadas ? ((t.rodadas - 1) * (t.descansoRodada || 60)) / 60 : 0));
+    return u === "min" ? (a || 10) * 60 : e.series * ((u === "s" ? a || 30 : 40) + (e.descanso ?? 60)); })) / 60 + (t.rodadas ? ((t.rodadas - 1) * (t.descansoRodada || 60)) / 60 : 0) + soma((t.ciclos || []).map((c) => (c.voltas * (c.descanso || 0)) / 60)));
   const gruposDe = (pk, t) => [...new Set(t.exercicios.map((e) => exDe(pk, e.id)?.grupo).filter((g) => g && g !== "Cardio"))];
 
   // Semana do programa (0 = primeira), contada das segundas a partir do início do plano
@@ -1059,7 +1092,7 @@
       <img class="cover" src="${iaImg(t.foco + " " + t.titulo, pk)}" alt="" loading="lazy">
       <span class="pill glass">${icon("calendar-14.svg")}${quando} · ${esc(t.foco)}${ok ? " · ✓" : ""}</span>
       <div class="bottom"><div class="info"><h3>${esc(t.titulo)}</h3><div class="meta"><span>${icon("timer.svg")}~${minSess(pk, t)} min</span>
-        <span>${icon("zap.svg")}${t.rodadas ? `${t.rodadas} voltas · ` : ""}${n} ${n === 1 ? "exercício" : "exercícios"}</span></div></div></div></${tag}>`;
+        <span>${icon("zap.svg")}${t.rodadas ? `${t.rodadas} voltas · ` : t.ciclos?.length > 1 ? `${t.ciclos.length} ciclos · ` : t.ciclos?.length ? `${t.ciclos[0].voltas} voltas · ` : ""}${n} ${n === 1 ? "exercício" : "exercícios"}</span></div></div></div></${tag}>`;
   }
   const iaBanner = (pk, titulo, selo) => `<div class="banner" style="--grad: linear-gradient(238.09deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.8) 100%)">
       <div class="banner-bg"><img class="plano-img" src="${A(IA[pk].banner)}" alt=""></div>
@@ -1269,7 +1302,7 @@
         <div class="sec-head"><h2>Acompanhamento</h2></div>
         ${revisar && !acabou ? `<div class="note-box"><p><b>Hora da revisão!</b> Você fez ${novos} treinos desde a última análise. O Coach olha seus números e ajusta o plano.</p></div>` : ""}
         <div class="stats-row">
-          ${stat("circle-check.svg", total, I.semanas ? "Treinos feitos" : "Treinos na academia")}
+          ${stat("circle-check.svg", total, pk === "hiper" ? "Treinos na academia" : "Treinos feitos")}
           ${stat("weight.svg", ckUlt ? `${fmtKg(Number(ckUlt.peso))}` : "—", ckUlt && ck0 && ck.length > 1 ? `kg (${Number(ckUlt.peso) - Number(ck0.peso) >= 0 ? "+" : ""}${fmtKg(Number(ckUlt.peso) - Number(ck0.peso))})` : "kg · peso")}
         </div>
         <p class="note hx-graf">${I.carga ? "Volume por semana (toneladas: carga × repetições)" : "Repetições por semana"}</p>
@@ -1353,7 +1386,7 @@
     const [a, b] = faixa(ex.reps);
     const rSug = ult ? ult.r : un === "min" ? a || 10 : b || (ehMax(ex.reps) ? iaRecorde(pk, ex.id) || "" : 10);
     const q = encodeURIComponent(`${c.nome} execução correta`), feitoTudo = sets.length >= ex.series;
-    const nome = sess?.rodadas ? "Volta" : c.equip === "tiro" ? "Tiro" : "Série", plural = { Volta: "voltas", Tiro: "tiros", "Série": "séries" }[nome];
+    const nome = emVoltas(sess) ? "Volta" : c.equip === "tiro" ? "Tiro" : "Série", plural = { Volta: "voltas", Tiro: "tiros", "Série": "séries" }[nome];
     return `<div class="ex hx${feitoTudo ? " done" : ""}" data-hx-ex="${ex.id}" data-pk="${pk}">
       <div class="ex-top"><span class="ex-name"><span class="ex-check">${check}</span>${esc(c.nome)}</span>
         <button class="ask" data-ia-ask="${ex.id}" data-pk="${pk}" aria-label="Perguntar ao Coach AI sobre ${esc(c.nome)}">${icon("circle-question.svg", 20)}</button></div>
@@ -1543,9 +1576,12 @@
       ${iaCard(pk, t, { link: false })}
       ${grupos.length ? `<p class="ia-grupos">💪 <b>Grupos musculares:</b> ${grupos.map(esc).join(" · ")}</p>` : ""}
       ${t.rodadas ? `<div class="note-box"><p><b>Circuito de ${t.rodadas} voltas:</b> faça os exercícios em sequência${t.exercicios.some((e) => e.descanso) ? " com a pausa indicada entre eles" : ""} e descanse <b>${fmtDesc(t.descansoRodada || 60)}</b> ao fim de cada volta. Marque cada exercício a cada volta.</p></div>` : ""}
-      ${ehHoje ? `<div class="note-box"><p>${dicaReg}. O contador mostra em qual ${t.rodadas ? "volta" : "série"} você está e o descanso começa sozinho. Na próxima vez, o app compara com hoje.</p></div>`
+      ${t.ciclos?.length ? `<div class="note-box"><p><b>${t.ciclos.length > 1 ? `${t.ciclos.length} ciclos` : "Um ciclo"}:</b> faça os exercícios do ciclo em sequência e descanse ao fim de cada volta; repita o ciclo todas as voltas antes de passar para o próximo. Marque cada exercício a cada volta.</p></div>` : ""}
+      ${ehHoje ? `<div class="note-box"><p>${dicaReg}. O contador mostra em qual ${emVoltas(t) ? "volta" : "série"} você está e o descanso começa sozinho. Na próxima vez, o app compara com hoje.</p></div>`
         : `<button class="btn btn-outline" data-ia-hoje="${d}" data-w="${w}" data-pk="${pk}">Fazer este treino hoje</button>`}
-      <div class="ex-list">${t.exercicios.map((ex) => iaExCard(pk, ex, ehHoje, t)).join("")}</div>
+      ${t.ciclos?.length ? t.ciclos.map((c, i) => `<div class="sec-head"><h2>Ciclo ${i + 1}</h2><span class="pill gray">${c.voltas}x · ${c.descanso ? `${fmtDesc(c.descanso)} no fim da volta` : "sem descanso"}</span></div>
+        <div class="ex-list">${t.exercicios.filter((ex) => (ex.ciclo || 0) === i).map((ex) => iaExCard(pk, ex, ehHoje, t)).join("")}</div>`).join("")
+        : `<div class="ex-list">${t.exercicios.map((ex) => iaExCard(pk, ex, ehHoje, t)).join("")}</div>`}
       ${ehHoje ? exxHtml(pk) : ""}
       ${ehHoje ? `<button class="btn btn-outline${done ? " done" : ""}" data-ia-concluir="${pk}">${done ? "Treino concluído ✓" : "Marcar como concluído"}</button>` : ""}
       </div></section>`;
@@ -1579,8 +1615,11 @@
     }
     const tudo = t ? t.exercicios.every((e) => (l.sets[e.id] || []).length >= e.series) : false;
     // Descanso: entre séries (academia) ou até o próximo exercício / fim da volta (circuito)
-    const ultimoDaVolta = t?.rodadas && t.exercicios[t.exercicios.length - 1].id === id;
-    const desc = tudo ? 0 : ultimoDaVolta ? t.descansoRodada || 60 : (l.sets[id].length < (ex?.series || 0) || t?.rodadas) ? ex?.descanso || 0 : 0;
+    const ci = cicloDo(t, ex), doCiclo = ci ? t.exercicios.filter((e) => (e.ciclo || 0) === (ex.ciclo || 0)) : null;
+    const ultimoDaVolta = (t?.rodadas && t.exercicios[t.exercicios.length - 1].id === id) || (ci && doCiclo[doCiclo.length - 1].id === id);
+    const cicloAcabou = ci && doCiclo.every((e) => (l.sets[e.id] || []).length >= e.series);
+    const desc = tudo ? 0 : ci ? (ultimoDaVolta ? ci.descanso : cicloAcabou ? 0 : ex?.descanso || 0)
+      : ultimoDaVolta ? t.descansoRodada || 60 : (l.sets[id].length < (ex?.series || 0) || t?.rodadas) ? ex?.descanso || 0 : 0;
     if (desc > 0) iaTimerIniciar(pk, id, "desc", desc); else { if (iaTm?.pk === pk && iaTm.id === id) iaTimerParar(); iaRefazerCard(pk, id); }
     if (tudo && !l.done) toast("Todas as séries anotadas! Toque em Marcar como concluído. 💪", 3500);
   }
@@ -1588,7 +1627,7 @@
   /* ---------- Tela inicial e Coach ---------- */
   function iaHome(pk, principalAqui) {
     const I = IA[pk], St = S[pk], titulo = principalAqui ? "Treino de Hoje" : I.rotulo;
-    if (!St.plano) return `<div class="sec-head"><h2>${esc(titulo)}</h2><a href="#/${pk}">${esc(I.nome)}</a></div><a class="emerg" href="#/${pk}" data-ia-chat="${pk}"><span>${icon("sparkles-blue.svg", 20)}</span><div><strong>${pk === "hiper" ? "Monte seu treino de academia" : `Monte sua ${esc(I.nome)}`}</strong><small>${St.etapa ? "Continue a conversa com o Coach AI" : "O Coach AI faz umas perguntas e monta seu plano"}</small></div></a>`;
+    if (!St.plano) return `<div class="sec-head"><h2>${esc(titulo)}</h2><a href="#/${pk}">${esc(I.nome)}</a></div><a class="emerg" href="#/${pk}" data-ia-chat="${pk}"><span>${icon("sparkles-blue.svg", 20)}</span><div><strong>${pk === "hiper" ? "Monte seu treino de academia" : pk === "xt" ? "Monte seu xTreme Workout" : `Monte sua ${esc(I.nome)}`}</strong><small>${St.etapa ? "Continue a conversa com o Coach AI" : "O Coach AI faz umas perguntas e monta seu plano"}</small></div></a>`;
     const head = `<div class="sec-head"><h2>${esc(titulo)}</h2><a href="#/${pk}">${esc(St.plano.nome)}</a></div>`;
     if (iaAcabou(pk)) return head + `<a class="emerg" href="#/${pk}"><span>${icon("flame.svg", 20)}</span><div><strong>21 dias concluídos! 🏆</strong><small>Toque para o Coach montar o próximo ciclo</small></div></a>`;
     const h = iaHoje(pk);
@@ -1599,9 +1638,9 @@
   }
   function iaProgramaTexto(pk) {
     const I = IA[pk], St = S[pk], pl = St.plano;
-    if (!pl) return `# Programa extra: ${I.nome}\n${I.convite}. A pessoa ainda não montou o plano: para começar, toque no botão do Coach e escolha ${pk === "hiper" ? "Hipertrofia" : pk === "run" ? "Corrida" : "Calistenia → Calistenia 21 dias"}.`;
+    if (!pl) return `# Programa extra: ${I.nome}\n${I.convite}. A pessoa ainda não montou o plano: para começar, toque no botão do Coach e escolha ${pk === "hiper" ? "Hipertrofia" : pk === "run" ? "Corrida" : pk === "xt" ? "xTreme Workout" : "Calistenia → Calistenia 21 dias"}.`;
     return [`# Programa extra: ${I.nome} — plano "${pl.nome}" (${pl.divisao}), montado pelo Coach AI${I.semanas ? `; começou em ${St.inicio}, 3 semanas` : ""}`, pl.resumo, `Progressão: ${pl.progressao}`, pl.cardio && `Cardio: ${pl.cardio}`, pl.alimentacao && `Alimentação: ${pl.alimentacao}`,
-      ...pl.dias.map((t) => `## ${t.semana != null ? `Semana ${t.semana + 1} · ` : ""}${DIAS[t.dia]} · ${t.titulo}${t.rodadas ? ` (circuito, ${t.rodadas} voltas, ${t.descansoRodada}s entre voltas)` : ""}\n${t.exercicios.map((e) => `- ${exDe(pk, e.id)?.nome || e.id} [${e.id}] (${exDe(pk, e.id)?.musculos || ""}): ${e.series}×${e.reps}, descanso ${e.descanso}s${e.obs ? ` — ${e.obs}` : ""}`).join("\n")}`),
+      ...pl.dias.map((t) => `## ${t.semana != null ? `Semana ${t.semana + 1} · ` : ""}${DIAS[t.dia]} · ${t.titulo}${t.rodadas ? ` (circuito, ${t.rodadas} voltas, ${t.descansoRodada}s entre voltas)` : ""}${t.ciclos?.length ? ` (${t.ciclos.map((c, i) => `ciclo ${i + 1}: ${c.voltas} voltas, ${c.descanso}s no fim da volta`).join("; ")})` : ""}\n${t.exercicios.map((e) => `- ${t.ciclos?.length ? `[ciclo ${(e.ciclo || 0) + 1}] ` : ""}${exDe(pk, e.id)?.nome || e.id} [${e.id}] (${exDe(pk, e.id)?.musculos || ""}): ${e.series}×${e.reps}, descanso ${e.descanso}s${e.obs ? ` — ${e.obs}` : ""}`).join("\n")}`),
       `Entrevista: ${I.passos.map((p) => `${p.k}: ${iaResp(p, St.perfil[p.k])}`).join("; ")}`,
       `Para mudar o plano, oriente a pessoa a tocar em "Revisar meu treino com o Coach" na aba ${I.nome} e escrever o pedido.`].filter(Boolean).join("\n");
   }
@@ -3894,7 +3933,7 @@
      O XP é um só (troca de trilha mantém o XP e as formaturas). O Treino da Fera ("plano") fica sempre liberado como apoio.
      ========================================================== */
   const TRILHAS = {
-    insanos: { nome: "Insanos", ic: "🔥", desc: "MAX:30 e depois o Insanity: treinos em vídeo, em casa" },
+    insanos: { nome: "Insanos", ic: "🔥", desc: "MAX:30 e depois o Insanity: treinos em vídeo, em casa (com halteres e barra fixa, também o xTreme Workout)" },
     academia: { nome: "Academia", ic: "🏋️", desc: "Hipertrofia: o Coach monta a ficha (adaptação e depois hipertrofia)" },
     calistenia: { nome: "Calistenia", ic: "🤸", desc: "Calistenia 21 dias no seu nível e depois o Treino da Fera" },
     cross: { nome: "Cross", ic: "⏱️", desc: "O WOD do seu box: tire uma foto do quadro e eu lanço o treino" },
@@ -3966,14 +4005,21 @@
   const graduado = () => !!formaturas().max30; // formado no MAX:30 (emblema)
   // O dono pode ver o app como um usuário comum (Perfil → "Ver como usuário comum")
   function donoAtivo() { return !!S.dono && !S.verComoMembro; }
+  // xTreme Workout: extra do Ninja, liberado com halteres + barra fixa (ou o Passe da Academia) no Arsenal
+  function xtArsenal() {
+    const inv = Array.isArray(S.inventario) ? S.inventario : ({ barra: ["barra"], halteres: ["halteres"], academia: ["passe"] }[S.quiz?.local] || []);
+    return inv.includes("passe") || ((inv.includes("halteres") || inv.includes("kettlebell")) && inv.includes("barra"));
+  }
+  const xtLiberado = () => !!IA.xt && ["insanos", "hibrido"].includes(trilha()) && xtArsenal();
   function liberado(k) {
     if (k === "plano" || donoAtivo()) return true;
+    if (k === "xt") return xtLiberado();
     const es = etapasDe(), at = etapaAtual();
     if (es.slice(0, at.i + 1).some((e) => e.prog === k)) return true;
     return trilha() === "hibrido" && k === forcaHibrido();
   }
   const travado = (k) => !liberado(k);
-  const motivoTrava = (k) => (etapasDe().some((e) => e.prog === k) ? `libera na formatura de ${etapaAtual().nome}` : `fora da trilha ${TRILHAS[trilha()].nome}`);
+  const motivoTrava = (k) => k === "xt" ? (["insanos", "hibrido"].includes(trilha()) ? "precisa de halteres e barra fixa no Arsenal (ou o Passe da Academia)" : "é do estilo Ninja (trilha Insanos ou Híbridos)") : (etapasDe().some((e) => e.prog === k) ? `libera na formatura de ${etapaAtual().nome}` : `fora da trilha ${TRILHAS[trilha()].nome}`);
   function aplicarTrava() {
     if (donoAtivo() || liberado(principal())) return;
     escolherPrograma(etapaAtual().prog);
@@ -6091,7 +6137,7 @@
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
   const CHIPS_PADRAO = ["Treino livre", "Anotar meu treino", "Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
-  const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Minha evolução", "Evolução por foto"];
+  const CHIPS_HOJE = ["Insanity", ...(window.FITAI_XTREME ? ["xTreme"] : []), "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Minha evolução", "Evolução por foto"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
   const chatLogs = { coach: chatLog, nutri: [] };
@@ -6262,7 +6308,7 @@
     if (t === "nutricao") { if (NUTRI_AI) openChat(null, "nutri"); else { closeChat(); location.hash = "#/nutricao"; } return true; }
     if (t === "abrir a guilda") { closeChat(); location.hash = "#/grupo"; return true; }
     if (t === "evolucao por foto" || t === "ver ultima analise" || t === "apagar minhas fotos") { evoChip(t, texto); return true; }
-    if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", "corrida", "corrida e hibrido", fera].includes(t)) return false;
+    if (!["insanity", "calistenia", "hipertrofia", "academia", "crossfit", "ver meu treino", "calistenia 21 dias", "corrida", "corrida e hibrido", "xtreme", "xtreme workout", fera].includes(t)) return false;
     addMsg(msgsEl, esc(texto), true, chatLog);
     const ir = async (msg, hash) => {
       const stop = typing(msgsEl); await wait(450); stop();
@@ -6295,6 +6341,9 @@
     } else if (t === "crossfit") {
       const l = cfLog();
       ir(l?.wod ? `Bora de <b>CrossFit</b>! Hoje é <b>${esc(l.wod.titulo)}</b>. Abrindo… 🔥` : `Bora de <b>CrossFit</b>! Tire uma foto do quadro do box e eu lanço o WOD para você. 📷`, "#/cf");
+    } else if ((t === "xtreme" || t === "xtreme workout") && IA.xt) {
+      if (liberado("xt")) irIA("xt");
+      else ir(`O <b>xTreme Workout</b> é o HIIT do Ninja com halteres e barra fixa: ${esc(motivoTrava("xt"))}. Marque os itens que você tem na Guilda (Arsenal). Abrindo… 🥷`, "#/arsenal");
     } else if ((t === "corrida" || t === "corrida e hibrido") && IA.run) irIA("run");
     else if (t === "ver meu treino") irIA(iaUltimo || "hiper");
     else irIA("hiper");
@@ -6909,7 +6958,7 @@
      Conta treinos, recordes, meta da semana, água, desafio da guilda e o desafio de 7 dias. O dos outros sai
      das linhas de treino e do que cada um sincronizou (perfis.config).
      ========================================================== */
-  const MOD_DE = (pr) => (/^livre-/.test(pr) ? (pr.slice(6) === "cardio" ? "insanity" : pr.slice(6)) : pr === "extra-cardio" ? "insanity" : pr === "extra-coletivo" ? "cross" : pr === "extra-individual" ? "hibrido" : pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
+  const MOD_DE = (pr) => (/^livre-/.test(pr) ? (pr.slice(6) === "cardio" ? "insanity" : pr.slice(6)) : pr === "extra-cardio" ? "insanity" : pr === "extra-coletivo" ? "cross" : pr === "extra-individual" ? "hibrido" : pr === "cf" ? "cross" : VP[pr] || pr === "xt" ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
   const LIGA_T = {
     insanity: { nome: "Insanity", rot: "Canguru", img: "assets/chefes/canguru-rosto.webp" },
     cross: { nome: "Cross", rot: "Loba", img: "assets/chefes/loba-rosto.webp" },
@@ -7872,7 +7921,7 @@
     [/barra fixa|\bbarra-|core.?barra|na barra|chin.?up|pull.?up|australiana|toes.?to.?bar|chest.?to.?bar|muscle.?up|knees.?to.?elbow|pendurad|hanging|\bdrop-|remada-(aberta|fechada|uma-mao)/i, "barra"],
     [/paralela|mergulho|\bdips?\b|\bl-?sit/i, "paralelas"]];
   const NA_ACADEMIA = new Set(["barra", "paralelas", "halteres", "kettlebell", "banco", "caixa", "slamball", "argolas", "corda", "roda", "miniband", "elasticos"]);
-  const origemEx = (pk, id) => pk === "hiper" ? "ac" : (window.FITAI_CORRIDA || []).some((e) => e.id === id) ? "run"
+  const origemEx = (pk, id) => pk === "hiper" ? "ac" : pk === "xt" ? "xt" : (window.FITAI_CORRIDA || []).some((e) => e.id === id) ? "run"
     : pk === "c21" || (window.FITAI_CAL21 || []).some((e) => e.id === id) ? "cal" : "ac";
   function equipDoEx(texto, origem, ex) {
     const ids = new Set();
@@ -7910,7 +7959,7 @@
   // Quantos exercícios do catálogo cada item (ou o arsenal todo) libera
   const invLiberados = (ids) => {
     const lib = new Set(), tot = new Set();
-    for (const o of ["ac", "cal", "run"]) for (const e of { ac: window.FITAI_ACADEMIA, cal: window.FITAI_CAL21, run: window.FITAI_CORRIDA }[o] || []) {
+    for (const o of ["ac", "cal", "run", "xt"]) for (const e of { ac: window.FITAI_ACADEMIA, cal: window.FITAI_CAL21, run: window.FITAI_CORRIDA, xt: window.FITAI_XTREME }[o] || []) {
       const r = INV.exige(e, o); if (!r) continue; tot.add(e.id); if (r.some((x) => ids.includes(x))) lib.add(e.id);
     }
     return { lib: lib.size, tot: tot.size };

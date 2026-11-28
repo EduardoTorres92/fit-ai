@@ -24,7 +24,7 @@
     { id: "roda", img: "assets/itens/roda.webp", nome: "Roda abdominal", curto: "Roda abs", cat: "armas", eq: true, txt: "Abdômen mais forte: combina com a missão do vídeo de abdômen.", link: "https://meli.la/2DH1qj8" },
     { id: "argolas", img: "assets/itens/argolas.webp", nome: "Argolas de ginástica", curto: "Argolas", cat: "armas", eq: true, txt: "Calistenia avançada: remada, mergulho e muscle-up nas argolas.", link: "https://meli.la/226kqZs" },
     { id: "miniband", img: "assets/itens/miniband.webp", nome: "Mini band", curto: "Mini band", cat: "armas", eq: true, txt: "Faixa curta para glúteos e aquecimento.", link: "https://meli.la/2k5mezm" },
-    { id: "caixa", img: "assets/itens/caixa.webp", nome: "Caixa de salto", curto: "Caixa", cat: "armas", eq: true, txt: "Box jump e step-up do CrossFit.", link: "https://meli.la/2ww1qZj" },
+    { id: "caixa", img: "assets/itens/caixa.webp", nome: "Caixa de salto", curto: "Caixa", cat: "armas", eq: true, txt: "Box jump e step-up do CrossFit, e os exercícios na caixa do xTreme Workout.", link: "https://meli.la/2ww1qZj" },
     { id: "slamball", img: "assets/itens/slamball.webp", nome: "Slam ball", curto: "Slam ball", cat: "armas", eq: true, txt: "Slam e wall ball do CrossFit.", link: "https://meli.la/2U4T2zk" },
     { id: "colete", img: "assets/itens/colete.webp", nome: "Colete de peso", curto: "Colete", cat: "armaduras", eq: true, txt: "Carga extra na calistenia e na corrida.", link: "https://meli.la/2fGnivQ" },
     { id: "luva", img: "assets/itens/luva.webp", nome: "Luva de treino", curto: "Luva", cat: "armaduras", eq: false, txt: "Pegada firme na barra e no kettlebell. Não muda o treino.", link: "https://meli.la/1iaJsoR" },
@@ -41,8 +41,8 @@
   ];
 
   // Que item a pessoa precisa ter para fazer o exercício (qualquer um da lista serve). null = só o corpo.
-  // origem: "ac" (academia.js), "cal" (calistenia21.js) ou "run" (corrida.js). Na academia, equip "barra" é a
-  // barra olímpica; na calistenia, é a barra fixa.
+  // origem: "ac" (academia.js), "cal" (calistenia21.js), "run" (corrida.js) ou "xt" (xtreme.js). Na academia, equip
+  // "barra" é a barra olímpica; na calistenia e no xTreme, é a barra fixa.
   function exige(e, origem) {
     if (!e) return null;
     const q = e.equip, id = String(e.id || "");
@@ -57,13 +57,14 @@
     if (q === "barra") return ["barra", "passe"];
     if (q === "paralela") return ["paralelas", "passe"];
     if (q === "halter") return ["halteres", "kettlebell", "passe"];
+    if (q === "caixa") return ["caixa", "passe"]; // xTreme Workout (xtreme.js)
     return null;
   }
   const pode = (e, origem, inv) => { const r = exige(e, origem); return !r || r.some((x) => inv.includes(x)); };
 
   // Exercícios de cada catálogo que o item libera (para mostrar "+N exercícios")
   function liberados(itemId) {
-    const g = globalThis, fontes = [["ac", g.FITAI_ACADEMIA], ["cal", g.FITAI_CAL21], ["run", g.FITAI_CORRIDA]];
+    const g = globalThis, fontes = [["ac", g.FITAI_ACADEMIA], ["cal", g.FITAI_CAL21], ["run", g.FITAI_CORRIDA], ["xt", g.FITAI_XTREME]];
     const ids = new Set();
     for (const [o, cat] of fontes) for (const e of cat || []) { const r = exige(e, o); if (r && r.includes(itemId)) ids.add(e.id); }
     return ids.size;

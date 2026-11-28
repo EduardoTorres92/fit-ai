@@ -1,5 +1,5 @@
-// Programas montados pelo Coach AI: Hipertrofia (academia) e Calistenia 21 dias.
-// POST /api/hiper  { programa: "hiper" | "c21" | "run", acao: "plano" | "revisao", perfil, plano?, historico?, checkins?, feedback? }
+// Programas montados pelo Coach AI: Hipertrofia (academia), Calistenia 21 dias, Corrida e Híbrido e xTreme Workout.
+// POST /api/hiper  { programa: "hiper" | "c21" | "run" | "xt", acao: "plano" | "revisao", perfil, plano?, historico?, checkins?, feedback? }
 // Resposta: { mensagem, plano }. O plano usa só exercícios do catálogo do programa (public/academia.js ou
 // public/calistenia21.js) e é conferido aqui antes de voltar para o app.
 // Gerar ou revisar um plano conta como 3 perguntas do limite diário do Coach (é uma chamada maior).
@@ -9,9 +9,11 @@ import { ehEmailDono, donoNaReq } from "../lib/sessao.mjs";
 import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/limite.mjs";
 import { REFERENCIA, LEGENDA } from "../lib/ref-calistenia21.mjs";
 import { ROTEIRO_FORTALECIMENTO, CALENDARIO_CALISTENICO } from "../lib/ref-calistenia-base.mjs";
+import { COMO_TREINAR as XT_COMO, REFERENCIA as XT_REF } from "../lib/ref-xtreme.mjs";
 import "../../public/academia.js";
 import "../../public/calistenia21.js";
 import "../../public/corrida.js";
+import "../../public/xtreme.js";
 import "../../public/inventario.js";
 
 const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -34,7 +36,7 @@ const RUN_CAT = (() => {
 })();
 
 // De qual catálogo veio cada exercício (o mesmo equip quer dizer coisas diferentes: "barra" na academia é a barra olímpica)
-const ORIGEM = new Map([["ac", globalThis.FITAI_ACADEMIA], ["cal", globalThis.FITAI_CAL21], ["run", globalThis.FITAI_CORRIDA]].flatMap(([o, cat]) => (cat || []).map((e) => [e, o])));
+const ORIGEM = new Map([["ac", globalThis.FITAI_ACADEMIA], ["cal", globalThis.FITAI_CAL21], ["run", globalThis.FITAI_CORRIDA], ["xt", globalThis.FITAI_XTREME]].flatMap(([o, cat]) => (cat || []).map((e) => [e, o])));
 const INV = globalThis.FITAI_INVENTARIO;
 const ITENS_OK = new Set((INV?.ITENS || []).map((i) => i.id));
 // Arsenal da pessoa: o catálogo enviado ao Sensei só tem o que ela consegue fazer (sem inventário = catálogo inteiro)
@@ -109,6 +111,30 @@ ${ROTEIRO_FORTALECIMENTO}
 ${CALENDARIO_CALISTENICO}
 </calendario>`,
   },
+  xt: {
+    cat: globalThis.FITAI_XTREME || [], semanas: 0, maxEx: 14, ciclos: true,
+    sistema: `Você é o Coach AI do FIT.AI e monta o XTREME WORKOUT: treinos em CICLOS com halteres leves e barra fixa, no ritmo de HIIT, do estilo Ninja do app. A base é o material do treinador (<como_treinar> e <referencia>, as 21 fichas originais).
+Estrutura de cada treino (siga a referência):
+- Cada dia tem de 1 a 4 CICLOS. Um ciclo é um bloco de 2 a 8 exercícios feitos em sequência e repetido em voltas (em geral 4x) antes de passar ao próximo ciclo. Descreva os ciclos no campo "ciclos" do dia ([{ voltas, descanso }], descanso = pausa ao fim de cada volta, em segundos: 30 a 120) e diga em "ciclo" (0, 1, 2…) a que ciclo cada exercício pertence, na ordem em que são feitos.
+- "series" de cada exercício = voltas do ciclo dele. "descanso" do exercício = pausa até o próximo exercício: 0 nos ciclos por repetição e 10 no HIIT 20/10.
+- Varie os formatos como o treinador: ciclos por repetição (10 a 50 reps; "por perna" ou "por lado" no obs), ciclos de máximo ("máx"; isometrias com reps "máx" e o exercício de tempo), HIIT de ciclo único ("20 s" de trabalho e 10 s de descanso, 3 a 5 voltas, 90 a 120 s no fim de cada volta; quando o treinador repete o mesmo exercício 2x seguidas ou um lado de cada vez, escreva no obs, ex.: "2x seguidas" ou "direito e esquerdo") e, de vez em quando, uma escada 10, 9 … 1 (reps "10→1", 1 volta).
+- Não repita o mesmo id em ciclos diferentes do mesmo dia (escolha uma variação parecida).
+- O plano é SEMANAL (repete toda semana, o Coach revisa toda semana): um item em "dias" por dia de treino, sem o campo semana. Padrão do treinador: 3 dias (segunda, quarta e sexta), descanso entre eles. Se a pessoa pedir mais dias, intercale um dia de HIIT curto e não treine o mesmo grupo dois dias seguidos.
+- Monte a semana alternando grupos como nas fichas (ex.: peito e tríceps · costas e bíceps · ombro e pernas, com abdômen em quase todo treino) e um HIIT por semana.
+- Equipamento: o catálogo abaixo já só tem o que a pessoa consegue fazer com o arsenal dela. Sem caixa, use o equivalente (apoio regular no lugar do apoio na caixa, tríceps no banco ou cadeira no lugar do tríceps na caixa, agachamento com salto no lugar do salto na caixa, passada plyo no lugar da passada no banco); sem paralelas, tríceps no banco ou cadeira e prancha estática; com o Passe da Academia, pode usar tudo (o banco da academia serve de caixa).
+- Cargas: halteres leves (até 3 kg cada no material; mais pesados só para quem já treina e em exercícios lentos como remada, stiff e agachamento). Diga a carga sugerida no obs quando fizer sentido.
+- Nível: iniciante → 3 voltas, menos repetições (metade da referência), apoio com os joelhos no chão e barra com pulo ou isométrica; intermediário → como a referência; avançado → 4 a 5 voltas, mais "máx", HIIT 2x seguidas e escada.
+- Duração compatível com o tempo por treino informado (um ciclo de 3 exercícios em 4 voltas leva uns 8 a 10 minutos).
+${COMUM}
+
+<como_treinar>
+${XT_COMO}
+</como_treinar>
+
+<referencia>
+${XT_REF}
+</referencia>`,
+  },
 };
 for (const P of Object.values(PROGRAMAS)) P.ci = indice(P.cat);
 
@@ -137,6 +163,10 @@ const FERRAMENTA = {
                 foco: { type: "string", description: "Grupo principal em 1 ou 2 palavras" },
                 circuito: { type: "boolean", description: "Programa de 21 dias: true = circuito em voltas; false = séries tradicionais (força/habilidade)" },
                 rodadas: { type: "integer", minimum: 1, maximum: 6, description: "Voltas do circuito (só quando circuito = true)" },
+                ciclos: {
+                  type: "array", description: "Só no xTreme Workout: os ciclos do dia, em ordem.",
+                  items: { type: "object", properties: { voltas: { type: "integer", minimum: 1, maximum: 6 }, descanso: { type: "integer", description: "Descanso ao fim de cada volta, em segundos" } }, required: ["voltas", "descanso"] },
+                },
                 descansoRodada: { type: "integer", description: "Descanso entre as voltas, em segundos" },
                 exercicios: {
                   type: "array",
@@ -148,6 +178,7 @@ const FERRAMENTA = {
                       reps: { type: "string", description: "Ex.: '8-12', '15', 'máx', '30 s', '20 min' (cardio e corrida) ou '400 m' (tiro)" },
                       descanso: { type: "integer", description: "Descanso em segundos" },
                       obs: { type: "string", description: "Observação curta opcional" },
+                      ciclo: { type: "integer", minimum: 0, maximum: 3, description: "Só no xTreme Workout: índice do ciclo (0 = primeiro)" },
                     },
                     required: ["id", "series", "reps", "descanso"],
                   },
@@ -167,6 +198,22 @@ const FERRAMENTA = {
   },
 };
 
+// xTreme Workout: o dia é feito em ciclos ({ voltas, descanso }) e cada exercício diz o seu ciclo. Um id aparece uma vez por dia
+// (o registro de séries é por id); "series" = voltas do ciclo do exercício.
+function limparDiaCiclos(d, dia, P) {
+  const cs = (Array.isArray(d.ciclos) ? d.ciclos : []).slice(0, 4).map((c) => ({ voltas: num(c?.voltas, 1, 6, 4), descanso: num(c?.descanso, 0, 180, 60) }));
+  if (!cs.length) cs.push({ voltas: num(d.rodadas, 1, 6, 4), descanso: num(d.descansoRodada, 0, 180, 60) });
+  const ids = new Set();
+  const ex = (Array.isArray(d.exercicios) ? d.exercicios : []).filter((e) => P.ci[e?.id] && !ids.has(e.id) && ids.add(e.id)).slice(0, P.maxEx)
+    .map((e, i) => ({ e, i, c: num(e.ciclo, 0, cs.length - 1, 0) })).sort((a, b) => a.c - b.c || a.i - b.i)
+    .map(({ e, c }) => ({ id: e.id, ciclo: c, series: cs[c].voltas, reps: txt(e.reps, 20) || "10", descanso: num(e.descanso, 0, 60, 0), ...(txt(e.obs, 160) ? { obs: txt(e.obs, 160) } : {}) }));
+  if (!ex.length) return null;
+  // Renumera os ciclos que ficaram sem exercício
+  const usados = [...new Set(ex.map((e) => e.ciclo))], ciclos = usados.map((c) => cs[c]);
+  for (const e of ex) e.ciclo = usados.indexOf(e.ciclo);
+  return { dia, titulo: txt(d.titulo, 60) || `Treino de ${DIAS[dia]}`, foco: txt(d.foco, 20) || P.ci[ex[0].id].grupo, ciclos, exercicios: ex };
+}
+
 // Confere o plano devolvido pela IA: ids do catálogo, números dentro dos limites, um treino por dia (e por semana no 21 dias).
 function limparPlano(p, P) {
   if (!p || typeof p !== "object" || !Array.isArray(p.dias)) return null;
@@ -175,6 +222,7 @@ function limparPlano(p, P) {
     const dia = num(d?.dia, 0, 6, -1), semana = P.semanas ? num(d?.semana, 0, P.semanas - 1, -1) : null;
     const chave = `${semana}-${dia}`;
     if (dia < 0 || semana === -1 || vistos.has(chave)) return null;
+    if (P.ciclos) { const r = limparDiaCiclos(d, dia, P); if (r) vistos.add(chave); return r; }
     const circuito = P.semanas && d.circuito !== false && d.rodadas != null; // no 21 dias, dias de força/habilidade vêm sem voltas
     const rodadas = circuito ? num(d.rodadas, 1, 6, 3) : null;
     const ex = (Array.isArray(d.exercicios) ? d.exercicios : []).filter((e) => P.ci[e?.id]).slice(0, P.maxEx).map((e) => ({
