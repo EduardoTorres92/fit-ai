@@ -1,9 +1,9 @@
-// Coach AI do FIT.AI — função do Netlify que conversa com o Claude.
+// Coach AI do FIT.AI — rota /api/coach que conversa com o Claude.
 // Dois modos:
 //  - Dono (Eduardo): login com e-mail e senha do app (token próprio) ou com Google; o e-mail precisa ser ALLOWED_EMAIL.
 //    Usa o Claude Opus 5.5, sem limite.
 //  - Visitante do portfólio: Claude Haiku 5.5, só assuntos de treino, com limite por visitante
-//    e limite geral por dia (contadores no Netlify Blobs).
+//    e limite geral por dia (contadores no armazenamento em arquivo).
 // A chave da Anthropic fica só no servidor (variável ANTHROPIC_API_KEY), nunca no navegador.
 import Anthropic from "@anthropic-ai/sdk";
 import { cabeNoLimite, LIMITE_MEMBRO_DIA, LIMITE_VISITANTE_DIA } from "../lib/limite.mjs";

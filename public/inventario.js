@@ -3,7 +3,7 @@
    link = link de afiliado do Mercado Livre (meli.la, conta edu_t2014; vazio = "em breve").
    ART: ícones provisórios em pixel art (uma letra = uma cor de PAL). Para usar uma arte nova, ponha a imagem em
    assets/itens/<id>.webp e preencha img: "assets/itens/<id>.webp" no item.
-   Usado pelo app (public/app.js) e pelo servidor (netlify/functions/hiper.mjs). */
+   Usado pelo app (public/app.js) e pelo servidor (api/functions/hiper.mjs). */
 (function () {
   const ITENS = [
     { id: "barra", img: "assets/itens/barra.webp", nome: "Barra fixa de porta", curto: "Barra fixa", cat: "armas", eq: true, txt: "Libera barra, australiana na barra e os treinos de costas da calistenia.", link: "https://meli.la/2zJaiTp" },

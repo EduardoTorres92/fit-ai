@@ -1,16 +1,11 @@
-// getStore() que funciona na Netlify e fora dela.
-// - Na Netlify (padrão): usa o Netlify Blobs de verdade.
-// - Com FITAI_ARMAZENAMENTO=arquivo (o server.mjs liga isso, ex.: Hostinger): guarda cada chave como um arquivo
-//   JSON numa pasta do servidor, em DADOS_DIR (padrão: ~/fitai-dados, fora da pasta do app, para não sumir a
-//   cada novo deploy).
-// Implementa só o que o app usa: get, set, setJSON (com onlyIfNew) e delete.
+// Armazenamento em arquivo para contas, segredos e contadores do FIT.AI.
+// Cada chave vira um JSON em DADOS_DIR (padrão: ~/fitai-dados, fora da pasta do app).
+// O server.mjs define FITAI_ARMAZENAMENTO=arquivo ao subir.
+// Implementa o que o app usa: get, set, setJSON (com onlyIfNew) e delete.
 import { mkdir, readFile, writeFile, rm, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-
-const emArquivo = process.env.FITAI_ARMAZENAMENTO === "arquivo";
-const netlify = emArquivo ? null : await import("@netlify/blobs");
 
 const PASTA = process.env.DADOS_DIR || join(homedir(), "fitai-dados");
 
@@ -47,6 +42,5 @@ function lojaEmArquivo(nome) {
 }
 
 export function getStore(opcoes) {
-  if (netlify) return netlify.getStore(opcoes);
   return lojaEmArquivo(typeof opcoes === "string" ? opcoes : opcoes.name);
 }

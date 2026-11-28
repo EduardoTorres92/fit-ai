@@ -1,4 +1,4 @@
-// Contas de e-mail e senha do FIT.AI (guardadas no Netlify Blobs).
+// Contas de e-mail e senha do FIT.AI (armazenamento em arquivo no servidor).
 // - Senhas: nunca guardadas; só o hash scrypt com sal aleatório.
 // - Sessão: token assinado com HMAC (segredo aleatório criado uma vez e guardado no próprio Blobs).
 import { getStore } from "./blobs.mjs";

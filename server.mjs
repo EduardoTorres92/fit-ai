@@ -1,7 +1,7 @@
-// Servidor Node.js para hospedar o FIT.AI fora da Netlify (ex.: Hostinger).
+// Servidor Node.js do FIT.AI (ex.: Hostinger).
 // - Entrega os arquivos da pasta public/.
-// - /api/auth, /api/coach, /api/videos, /api/hiper, /api/agua (lembrete de água por push) e /api/wod (CrossFit: foto do quadro), /api/evolucao (evolução por foto), /api/telegram (bot do Telegram), /api/conta (excluir conta), /api/desafio (desafio do grupo a partir de um reel), /api/corrida (corrida pelo print): as mesmas funções da pasta netlify/functions, chamadas daqui.
-// - Contas, segredo de sessão e limites do Coach ficam em arquivos (ver netlify/lib/blobs.mjs).
+// - /api/auth, /api/coach, /api/videos, /api/hiper, /api/agua (lembrete de água por push) e /api/wod (CrossFit: foto do quadro), /api/evolucao (evolução por foto), /api/telegram (bot do Telegram), /api/conta (excluir conta), /api/desafio (desafio do grupo a partir de um reel), /api/corrida (corrida pelo print): handlers em api/functions, montados aqui.
+// - Contas, segredo de sessão e limites do Coach ficam em arquivos (ver api/lib/blobs.mjs).
 // Variáveis: ANTHROPIC_API_KEY (obrigatória para o Coach), ALLOWED_EMAIL, FITAI_INSANITY_VIDEOS, FITAI_VIDEOS_INSANITY, LIMITE_VISITANTE_DIA,
 // LIMITE_GERAL_DIA, DADOS_DIR, PORT, TELEGRAM_TOKEN (opcional: o dono também pode colar no app), FITAI_URL. Iniciar: npm start.
 import { createServer } from "node:http";
@@ -12,20 +12,20 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 process.env.FITAI_ARMAZENAMENTO = "arquivo";
-const { default: auth } = await import("./netlify/functions/auth.mjs");
-const { default: coach } = await import("./netlify/functions/coach.mjs");
-const { default: videos } = await import("./netlify/functions/videos.mjs");
-const { default: hiper } = await import("./netlify/functions/hiper.mjs");
-const { default: agua } = await import("./netlify/functions/agua.mjs");
-const { default: wod } = await import("./netlify/functions/wod.mjs");
-const { default: evolucao } = await import("./netlify/functions/evolucao.mjs");
-const { default: telegram } = await import("./netlify/functions/telegram.mjs");
-const { default: desafio } = await import("./netlify/functions/desafio.mjs");
-const { default: corrida } = await import("./netlify/functions/corrida.mjs");
-const { default: dupla } = await import("./netlify/functions/dupla.mjs");
-const { default: conta } = await import("./netlify/functions/conta.mjs");
-const { iniciarTelegram } = await import("./netlify/lib/telegram.mjs");
-const { iniciarAgendador } = await import("./netlify/lib/agua.mjs");
+const { default: auth } = await import("./api/functions/auth.mjs");
+const { default: coach } = await import("./api/functions/coach.mjs");
+const { default: videos } = await import("./api/functions/videos.mjs");
+const { default: hiper } = await import("./api/functions/hiper.mjs");
+const { default: agua } = await import("./api/functions/agua.mjs");
+const { default: wod } = await import("./api/functions/wod.mjs");
+const { default: evolucao } = await import("./api/functions/evolucao.mjs");
+const { default: telegram } = await import("./api/functions/telegram.mjs");
+const { default: desafio } = await import("./api/functions/desafio.mjs");
+const { default: corrida } = await import("./api/functions/corrida.mjs");
+const { default: dupla } = await import("./api/functions/dupla.mjs");
+const { default: conta } = await import("./api/functions/conta.mjs");
+const { iniciarTelegram } = await import("./api/lib/telegram.mjs");
+const { iniciarAgendador } = await import("./api/lib/agua.mjs");
 
 const RAIZ = fileURLToPath(new URL("./public/", import.meta.url));
 const PORTA = Number(process.env.PORT) || 3000;
@@ -55,7 +55,7 @@ async function lerCorpo(req) {
   return Buffer.concat(partes);
 }
 
-// Chama uma função no formato da Netlify (Request -> Response) e devolve a resposta pelo Node.
+// Chama um handler de API (Request -> Response) e devolve a resposta pelo Node.
 async function chamaFuncao(funcao, req, res) {
   const corpo = req.method === "GET" || req.method === "HEAD" ? undefined : await lerCorpo(req);
   const pedido = new Request(new URL(req.url, `http://${req.headers.host || "localhost"}`), {
