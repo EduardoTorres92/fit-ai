@@ -1403,6 +1403,62 @@
       ${lista.length ? `<p class="exx-res">Fora do card: ${lista.map((x, i) => `<span>${esc(x.nome)} ${x.sets.length}×${x.sets[0]?.r}${x.un === "s" ? "s" : ""}${x.sets[0]?.kg ? ` ${String(x.sets[0].kg).replace(".", ",")}kg` : ""} <button type="button" class="lnk-btn" data-exx-del="${alvo}|${i}" aria-label="Apagar ${esc(x.nome)}">✕</button></span>`).join("")}</p>` : ""}</div>`;
   }
   let exxChat = null;
+  /* ---------- Treino livre: a pessoa conta ao Sensei o treino que fez e ele vira treino do dia ----------
+     S.livres[dia] = [{ titulo, min, mod, texto, exs: [{ nome, un, sets }] }]. Conta XP, sequência, meta da semana,
+     missões (treino, minutos, séries), HP, recordes, chefes, incursões e o estilo (pela modalidade). */
+  const LIVRE_MOD = { hipertrofia: "Academia", calistenia: "Calistenia", cross: "Cross", corrida: "Corrida", cardio: "Cardio / HIIT" };
+  let livreChat = null; // { rascunho }
+  function livreModDe(t) {
+    const n = norm(t);
+    if (/corr|esteira|\bkm\b|trote|pace|maratona/.test(n)) return "corrida";
+    if (/\bwod\b|amrap|emom|for time|box jump|thruster|wall ?ball|kettlebell|kb swing|crossfit|cross\b|burpee over|du ?unders?/.test(n)) return "cross";
+    if (/insanity|hiit|polichinelo|cardio|aerobic|bike|eliptico|jump/.test(n)) return "cardio";
+    if (/supino|leg ?press|remada|puxada|rosca|triceps|halter|maquina|cadeira|smith|cross ?over|\bkg\b|academia|stiff|desenvolvimento|elevacao lateral|panturrilha/.test(n)) return "hipertrofia";
+    if (/flex|barra fixa|\bbarras?\b|dips|paralela|prancha|australiana|calistenia|pistol|muscle|handstand|parada de mao|agachamento livre|abdominal/.test(n)) return "calistenia";
+    return null;
+  }
+  function livreMinDe(t) {
+    const n = norm(t); let m = n.match(/(\d+)\s*h(?:oras?)?\s*(?:e\s*)?(\d+)?\s*(?:min)?/); if (m && /\d\s*h/.test(m[0])) return Math.min(600, +m[1] * 60 + (+m[2] || 0));
+    m = n.match(/(\d+)\s*(?:min|minutos)\b/); if (m) return Math.min(600, +m[1]);
+    m = n.match(/(?:durou|foram|em)\s*(\d+)\s*min/); return m ? Math.min(600, +m[1]) : 0;
+  }
+  function livreResumo(r) {
+    return `${r.exs.length ? r.exs.map((x) => `• <b>${esc(x.nome)}</b>: ${x.sets.length}×${x.sets[0].r}${x.un === "s" ? "s" : ""}${x.sets[0].kg ? ` com ${String(x.sets[0].kg).replace(".", ",")} kg` : ""}`).join("<br>") + "<br>" : ""}⏱️ ${r.min} min${r.minEst ? " (estimei pelas séries)" : ""} · ${esc(LIVRE_MOD[r.mod] || "escolha a modalidade")}`;
+  }
+  const livreChips = (r) => [...(r.mod ? ["Salvar treino"] : []), ...Object.entries(LIVRE_MOD).filter(([k]) => k !== r.mod).map(([, n]) => `É ${n.toLowerCase()}`), "Cancelar"];
+  function livreAbrirChat() {
+    livreChat = { rascunho: null }; exxChat = null; openChat();
+    addMsg(msgsEl, `Treinou por conta própria? Me conta o que você fez, do seu jeito, que eu conto como treino do dia (XP, missões, sequência e HP). 💪<br>Exemplos:<br>• <b>45 min de academia: 4x12 supino 40kg, 3x10 remada, 3x15 leg press 120kg</b><br>• <b>1h de calistenia: 5x10 flexão, 4x8 barras, 3x60s prancha</b><br>• <b>30 min de esteira, 5 km</b>`, false, chatLog);
+    setChips(chipsEl, ["Cancelar"]);
+    if (matchMedia("(hover: hover)").matches) $("#chat-input")?.focus();
+  }
+  function livreChatResposta(texto) {
+    const t = texto.trim(), r0 = livreChat.rascunho;
+    if (/^cancelar$/i.test(t)) { livreChat = null; addMsg(msgsEl, "Beleza, nada anotado. 👍", false, chatLog); setChips(chipsEl, CHIPS_PADRAO); return; }
+    if (r0) {
+      const mudaMod = Object.entries(LIVRE_MOD).find(([, n]) => new RegExp(`^é ${n.toLowerCase().replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}$`, "i").test(t));
+      if (mudaMod) { r0.mod = mudaMod[0]; addMsg(msgsEl, `Anotado como <b>${esc(mudaMod[1])}</b>.<br>${livreResumo(r0)}`, false, chatLog); setChips(chipsEl, livreChips(r0)); return; }
+      if (/^salvar( treino)?$/i.test(t) && r0.mod) {
+        S.livres = S.livres || {};
+        (S.livres[hojeKey] = S.livres[hojeKey] || []).push({ titulo: r0.titulo, min: r0.min, mod: r0.mod, texto: r0.texto, exs: r0.exs });
+        livreChat = null; save();
+        addMsg(msgsEl, `Treino livre salvo ✅ Conta como treino de hoje: XP, sequência, meta da semana, missões e HP.${r0.exs.length ? " As séries também valem para recordes, chefes e incursões." : ""} 🔥`, false, chatLog);
+        setChips(chipsEl, CHIPS_PADRAO); return;
+      }
+      const m = livreMinDe(t); if (m && /^(foram|durou|deu|em|tempo|na verdade)?[\s:]*\d+\s*(h|min)/i.test(norm(t))) { r0.min = m; r0.minEst = false; addMsg(msgsEl, `Ajustei o tempo.<br>${livreResumo(r0)}`, false, chatLog); setChips(chipsEl, livreChips(r0)); return; }
+    }
+    const corpo = t.includes(":") ? t.slice(t.indexOf(":") + 1) : t;
+    const exs = exxParse(corpo.replace(/\b\d+\s*(?:h(?:oras?)?|min(?:utos)?)\b/gi, " ").replace(/\d+\s*km\b/gi, " "));
+    let min = livreMinDe(t), minEst = false;
+    if (!min) { const series = soma(exs.map((x) => x.sets.length)); if (series) { min = Math.max(15, Math.round(series * 2.5)); minEst = true; } }
+    if (!min && !exs.length) { addMsg(msgsEl, "Não peguei o treino. 🤔 Me diz quanto tempo durou e o que você fez, por exemplo: <b>40 min: 4x12 supino 40kg, 3x10 remada</b>.", false, chatLog); return; }
+    const mod = livreModDe(t), km = (norm(t).match(/(\d+(?:[.,]\d+)?)\s*km/) || [])[1];
+    const r = { texto: t.slice(0, 400), exs: exs.filter((x) => !/^(min|minutos|km|h)$/i.test(x.nome)), min: min || 30, minEst: minEst || !min, mod,
+      titulo: mod === "corrida" && km ? `Corrida livre · ${km.replace(".", ",")} km` : `Treino livre${mod ? ` de ${LIVRE_MOD[mod].toLowerCase()}` : ""}` };
+    livreChat.rascunho = r;
+    addMsg(msgsEl, `Entendi assim:<br>${livreResumo(r)}<br>${r.mod ? "Está certo? Toque em <b>Salvar treino</b>, troque a modalidade ou me corrija o tempo (ex.: <b>foram 50 min</b>)." : "Qual foi a modalidade?"}`, false, chatLog);
+    setChips(chipsEl, livreChips(r));
+  }
   function exxParse(t) {
     const out = [];
     for (let p of String(t).split(/[,;\n+]|\s+e\s+/i)) {
@@ -1435,7 +1491,7 @@
     setChips(chipsEl, ["Cancelar"]);
     if (matchMedia("(hover: hover)").matches) $("#chat-input")?.focus();
   }
-  document.addEventListener("click", (e) => { const b = e.target.closest("[data-exx-chat]"); if (b) exxAbrirChat(b.dataset.exxChat); });
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-exx-chat]"); if (b) exxAbrirChat(b.dataset.exxChat); if (e.target.closest("[data-livre-chat]")) livreAbrirChat(); });
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-exx-del]"); if (!b) return;
     const [alvo, i] = b.dataset.exxDel.split("|"), l = exxLog(alvo); if (!l?.extra) return;
@@ -2423,8 +2479,9 @@
     const e = hpEstado();
     if (e.lendario && !l.some((t, i) => i > 0 && t - l[i - 1] <= HP_COMBO)) setTimeout(() => dlgGami(`<div class="hp-dlg"><p class="gami-k">Dois treinos seguidos</p><h2>✨ Modo Lendário</h2><span class="hbar hp lendario"><i style="width:100%"></i></span><p class="note">HP cheio e sem queda até o fim do dia. Lenda!</p></div>`, "Bora!"), 900);
     else if (l.length < n) toast(`❤️ +${HP_TREINO}% de HP e ${HP_PROTECAO / 60}h de proteção`, 2800);
-    if (location.hash.startsWith("#/home") || !location.hash) render();
+    if (location.hash.startsWith("#/home") || !location.hash) { if (document.getElementById("chat-input")?.offsetParent) hpPend = true; else render(); } // com o Sensei aberto, atualiza ao fechar
   }
+  let hpPend = false;
   function hpEstado(agora = new Date()) {
     const [ini, fim] = staminaJanela(), now = agora.getHours() * 60 + agora.getMinutes();
     const ts = [...((S.hpTreinos || {})[hojeKey] || [])].filter((t) => t <= now).sort((a, b) => a - b);
@@ -3169,6 +3226,11 @@
       out.push({ data: k, programa: pk, titulo: (t ? t.titulo : IA[pk].rotulo).slice(0, 120), concluido: !!l.done, minutos: Math.min(600, iaMin(pk, l)),
         detalhes: { d: l.d, ...(l.w != null ? { w: l.w } : {}), sets: l.sets || {}, done: !!l.done, ...(l.extra?.length ? { extra: l.extra } : {}) } });
     }
+    for (const [k, l] of Object.entries(S.livres || {})) for (const mod of Object.keys(LIVRE_MOD)) {
+      const it = (l || []).filter((t) => t.mod === mod); if (!it.length) continue;
+      out.push({ data: k, programa: `livre-${mod}`, titulo: (it.length > 1 ? `Treino livre (${it.length})` : it[0].titulo || "Treino livre").slice(0, 120), concluido: true, minutos: Math.min(600, soma(it.map((t) => Number(t.min) || 0))),
+        detalhes: { itens: it.map((t) => ({ titulo: t.titulo, min: t.min, mod, texto: (t.texto || "").slice(0, 400), exs: t.exs || [] })), done: true } });
+    }
     for (const [k, l] of Object.entries(S.extras || {})) for (const gr of Object.keys(EXTRA_GR)) {
       const it = (l || []).filter((a) => EXTRA_DE(a).gr === gr); if (!it.length) continue;
       out.push({ data: k, programa: `extra-${gr}`, titulo: it.map((a) => EXTRA_DE(a).nome).join(" + ").slice(0, 120), concluido: true, minutos: Math.min(600, soma(it.map((a) => Number(a.min) || 0))),
@@ -3296,6 +3358,11 @@
       if (r.programa === "corrida" && !S.corrida.logs[r.data] && Array.isArray(d.itens)) {
         const itens = d.itens.map(ativLimpa).filter(Boolean);
         if (itens.length) { S.corrida.logs[r.data] = { itens }; mudou = true; }
+      }
+      if (/^livre-/.test(r.programa) && Array.isArray(d.itens) && LIVRE_MOD[r.programa.slice(6)]) {
+        const mod = r.programa.slice(6), tem = (S.livres?.[r.data] || []).some((t) => t.mod === mod);
+        if (!tem) { const it = d.itens.slice(0, 6).map((t) => ({ titulo: String(t.titulo || "Treino livre").slice(0, 80), min: Math.min(600, Number(t.min) || 0), mod, texto: String(t.texto || "").slice(0, 400), exs: Array.isArray(t.exs) ? t.exs.slice(0, 20) : [] }));
+          if (it.length) { S.livres = S.livres || {}; S.livres[r.data] = [...(S.livres[r.data] || []), ...it]; mudou = true; } }
       }
       if (/^extra-/.test(r.programa) && Array.isArray(d.itens)) {
         const tem = (S.extras?.[r.data] || []).some((a) => EXTRA_DE(a).gr === r.programa.slice(6));
@@ -3585,7 +3652,9 @@
       <small>${ativLendo ? "O Coach está conferindo os números" : "Mande o print do Strava, do relógio ou da esteira e vira XP"}</small></div>
       <em class="btn btn-blue">${hojeIt.length ? "+ Outra" : "Enviar print"}</em><input type="file" accept="image/*" data-ativ-print hidden${ativLendo ? " disabled" : ""}></label>
       ${(() => { const ex = S.extras?.[hojeKey] || [];
-        return `<button type="button" class="emerg extra-home" data-extra-abrir><span>🏅</span><div><strong>${ex.length ? `Hoje: ${esc(ex.map((a) => EXTRA_DE(a).nome).join(" + "))} ✓` : "Fez aula, dança ou esporte?"}</strong><small>Aula de bike, dança, futebol, tênis, luta… vale como treino do dia</small></div><em class="btn btn-outline">${ex.length ? "+ Outra" : "Lançar"}</em></button>`; })()}`;
+        const lv = S.livres?.[hojeKey] || [];
+        return `<button type="button" class="emerg extra-home" data-livre-chat><span>📝</span><div><strong>${lv.length ? `Hoje: ${esc(lv.map((t) => t.titulo).join(" + "))} ✓` : "Treinou por conta própria?"}</strong><small>Conte ao Sensei o treino que você fez e ele vale como treino do dia</small></div><em class="btn btn-outline">${lv.length ? "+ Outro" : "Contar"}</em></button>
+        <button type="button" class="emerg extra-home" data-extra-abrir><span>🏅</span><div><strong>${ex.length ? `Hoje: ${esc(ex.map((a) => EXTRA_DE(a).nome).join(" + "))} ✓` : "Fez aula, dança ou esporte?"}</strong><small>Aula de bike, dança, futebol, tênis, luta… vale como treino do dia</small></div><em class="btn btn-outline">${ex.length ? "+ Outra" : "Lançar"}</em></button>`; })()}`;
   }
   function secaoAtividades() {
     const dias = Object.entries(S.corrida.logs).filter(([, l]) => l.itens?.length).sort((a, b) => b[0].localeCompare(a[0]));
@@ -5987,7 +6056,7 @@
 
   /* ---------- Chat (Coach AI) ---------- */
   const layer = $("#chat-layer"), msgsEl = $("#chat-msgs"), chipsEl = $("#chat-chips");
-  const CHIPS_PADRAO = ["Anotar meu treino", "Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
+  const CHIPS_PADRAO = ["Treino livre", "Anotar meu treino", "Treino de hoje", "Minha evolução", "Evolução por foto", "Como funciona o programa?"];
   const CHIPS_HOJE = ["Insanity", "Calistenia", "Hipertrofia", ...(window.FITAI_CORRIDA ? ["Corrida"] : []), "CrossFit", "Minha evolução", "Evolução por foto"];
   const CHIPS_NUTRI = ["O que comer antes do treino?", "O que comer depois do treino?", "Monte um cardápio para hoje", "Quanto de proteína eu preciso?"];
   let chatLog = [], chatPapel = "coach"; // "coach" ou "nutri" (Nutri AI): cada papel tem a sua conversa
@@ -6064,7 +6133,7 @@
     if (layer.hidden) return;
     if (instant) { layer.hidden = true; return; }
     layer.classList.add("closing");
-    setTimeout(() => { layer.hidden = true; layer.classList.remove("closing"); }, 200);
+    setTimeout(() => { layer.hidden = true; layer.classList.remove("closing"); if (hpPend) { hpPend = false; render(); } }, 200);
   }
   async function send(texto) {
     texto = texto.trim();
@@ -6072,6 +6141,8 @@
     const coach = chatPapel === "coach";
     if (coach && iaChat) { addMsg(msgsEl, esc(texto), true, chatLog); iaChatResposta(texto); return; }
     if (coach && exxChat) { addMsg(msgsEl, esc(texto), true, chatLog); exxChatResposta(texto); return; }
+    if (coach && livreChat) { addMsg(msgsEl, esc(texto), true, chatLog); livreChatResposta(texto); return; }
+    if (coach && /^treino livre$/i.test(texto)) { livreAbrirChat(); return; }
     if (coach && /^exerc[ií]cio extra$/i.test(texto)) { const pk = principal(); exxAbrirChat(IA[pk] ? pk : "cal"); return; }
     if (coach && (LINK_VIDEO.test(texto) || (desafioRascunho && /^(lançar na guilda|lançar em todas as guildas|editar antes de lançar)$/i.test(texto)))) { desafioNoChat(texto); return; }
     if (coach && atalhoHoje(texto)) return;
@@ -6804,7 +6875,7 @@
      Conta treinos, recordes, meta da semana, água, desafio da guilda e o desafio de 7 dias. O dos outros sai
      das linhas de treino e do que cada um sincronizou (perfis.config).
      ========================================================== */
-  const MOD_DE = (pr) => (pr === "extra-cardio" ? "insanity" : pr === "extra-coletivo" ? "cross" : pr === "extra-individual" ? "hibrido" : pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
+  const MOD_DE = (pr) => (/^livre-/.test(pr) ? (pr.slice(6) === "cardio" ? "insanity" : pr.slice(6)) : pr === "extra-cardio" ? "insanity" : pr === "extra-coletivo" ? "cross" : pr === "extra-individual" ? "hibrido" : pr === "cf" ? "cross" : VP[pr] ? "insanity" : pr === "hiper" ? "hipertrofia" : pr === "corrida" || pr === "run" ? "corrida" : pr === "calistenia" || pr === "c21" ? "calistenia" : null);
   const LIGA_T = {
     insanity: { nome: "Insanity", rot: "Canguru", img: "assets/chefes/canguru-rosto.webp" },
     cross: { nome: "Cross", rot: "Loba", img: "assets/chefes/loba-rosto.webp" },
@@ -7119,6 +7190,7 @@
       for (const x of s || []) { if (!x) continue; out.push({ data: k, nome: e.nome, kg: x.kg || 0, ...(un === "s" ? { s: x.r || 0 } : un === "reps" ? { reps: x.r || 0 } : {}) }); }
     }
     for (const [k, l] of [...Object.entries(S.logs), ...IAK.flatMap((pk) => Object.entries(S[pk].logs))]) for (const x of l.extra || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
+    for (const [k, l] of Object.entries(S.livres || {})) for (const t of l || []) for (const x of t.exs || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
     for (const pr of S.cf?.prs || []) out.push({ data: pr.k || hojeKey, nome: pr.mov || "", kg: pr.kg || 0, reps: pr.reps || 0 });
     for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (ehCorrida(a.tipo) && a.km) out.push({ data: k, nome: "corrida", km: a.km });
     return out;
@@ -7258,7 +7330,7 @@
 
   /* ---------- Missões do dia ---------- */
   const minutosDia = (k) => soma(linhasLocais().filter((r) => r.data === k).map((r) => r.minutos || 0));
-  const seriesDia = (k) => soma(Object.values(S.logs[k]?.sets || {}).map((s) => s.length)) + soma(IAK.map((pk) => soma(Object.values(S[pk].logs[k]?.sets || {}).map((s) => (s || []).filter(Boolean).length))));
+  const seriesDia = (k) => soma((S.livres?.[k] || []).flatMap((t) => (t.exs || []).map((x) => (x.sets || []).length))) + soma(Object.values(S.logs[k]?.sets || {}).map((s) => s.length)) + soma(IAK.map((pk) => soma(Object.values(S[pk].logs[k]?.sets || {}).map((s) => (s || []).filter(Boolean).length))));
   // Vídeos marcados no calendário de hoje (programa principal ou o de vídeo do híbrido); dia de descanso conta 1 (vale um avulso)
   const absDia = (k) => soma(VKEYS.map((p) => [...(S[p].logs[k]?.feitos || []), ...(S[p].logs[k]?.avulso || [])].filter((id) => INSV[id]?.tipo === "Abdômen").length));
   // Desafio da semana da guilda: pendente (ainda não cumprido) e cumprido naquele dia (para a missão não valer todo dia)
@@ -7282,7 +7354,7 @@
   }
   const videosDia = (k) => soma(VKEYS.map((p) => (S[p].logs[k]?.feitos || []).length));
   const MISSOES = {
-    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) || (S.extras?.[k] || []).length || VKEYS.some((p) => (S[p].logs[k]?.feitos || []).some((id) => INSV[id]?.tipo !== "Abdômen")) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
+    treino: { ic: "⚔️", t: "Conclua um treino", v: (k) => (feito(k) || (S.extras?.[k] || []).length || (S.livres?.[k] || []).length || VKEYS.some((p) => (S[p].logs[k]?.feitos || []).some((id) => INSV[id]?.tipo !== "Abdômen")) ? 1 : 0), alvo: () => 1, fmt: (v, a) => `${v}/${a}` },
     minutos: { ic: "⏱️", t: "Treine 30 minutos", v: minutosDia, alvo: () => 30, fmt: (v, a) => `${Math.min(v, a)}/${a} min` },
     series: { ic: "🔁", t: "Registre 15 séries", v: seriesDia, alvo: () => 15, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
     abs: { ic: "🔥", t: "Faça um vídeo de abdômen", v: absDia, alvo: () => 1, fmt: (v, a) => `${Math.min(v, a)}/${a}` },
