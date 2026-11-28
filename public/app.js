@@ -236,10 +236,12 @@
   const logHoje = () => S.logs[hojeKey];
   const ativoHoje = () => { const l = logHoje(); if (l) return { w: l.w, d: l.d }; const w = semanaDe(hoje); return { w: Math.max(w, 0), d: hojeDia }; };
   const soma = (a) => a.reduce((x, y) => x + y, 0);
-  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k)) || iaFeito(k) || !!S.cf?.logs[k]?.done || !!(S.livres?.[k] || []).length || !!(S.extras?.[k] || []).length;
+  const d7DataOk = (k) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
+  const d7DiaFeito = (k) => !!(S.d7 && !S.d7.espera && (S.d7.dias || []).some((x) => x?.em === k && d7DataOk(x.em)));
+  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k)) || iaFeito(k) || !!S.cf?.logs[k]?.done || !!(S.livres?.[k] || []).length || !!(S.extras?.[k] || []).length || d7DiaFeito(k);
   const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || VKEYS.some((p) => insParcial(p, k)) || iaParcial(k) || !!S.cf?.logs[k]?.wod;
   const diasVideo = () => [...VKEYS.flatMap((p) => Object.keys(S[p].logs)), ...iaDiasComLog(), ...Object.keys(S.cf?.logs || {})]; // dias dos programas fora da calistenia
-  const diasTreino = () => [...new Set([...Object.keys(S.logs), ...diasVideo(), ...Object.keys(S.livres || {}), ...Object.keys(S.extras || {})])];
+  const diasTreino = () => [...new Set([...Object.keys(S.logs), ...diasVideo(), ...Object.keys(S.livres || {}), ...Object.keys(S.extras || {}), ...(S.d7?.dias || []).map((x) => x?.em).filter(d7DataOk)])];
   const principal = () => (S.principal && progDe(S.principal) ? S.principal : "plano");
 
   // Sequência com folga: em todas as modalidades, 1 dia sem treino por semana (seg a dom) é descanso e não quebra a sequência
@@ -7190,10 +7192,14 @@
     save(); conferirXp(false, `${D7.recruta.nome} · dia ${e.dia}`);
     const D = D7.recruta, du = d7Dupla();
     if (du) d7Avisar(du.id, e.dia === 7 ? (du.venc === "eu" ? "venceu" : "dia") : e.dia === 6 ? "reta" : "dia", e.dia);
+    const seqD7 = () => { toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); convidarPost(); };
     if (e.dia === 7) {
       autoPost(`d7fim:${d.ini}`, du?.venc === "eu" ? `🏆 Completei o ${D.nome} antes da minha dupla, ${(pfDe(du.id)?.nome || "").split(" ")[0]}! Agora sou ${D.titulo}.` : `🎖️ Completei o ${D.nome}: 7 dias sem academia! Agora sou ${D.titulo}.`);
+      setTimeout(seqD7, 300);
       setTimeout(() => dlgGami(`<div class="gami-crest ch-crest">🎖️</div><p class="gami-k">${esc(D.chefe.nome)} derrotado</p><h2>${esc(D.titulo)}</h2><p class="note">Você completou os 7 dias do ${esc(D.nome)}.${du?.venc === "eu" ? ` E chegou antes de ${d7Nome(du.id)}! 🏆` : ""}</p>`), 1500);
-    } else if (e.dia === 6) setTimeout(() => toast(`${D.chefe.ic} ${D.chefe.nome} perdeu metade da vida! Amanhã é o golpe final.`), 1600);
+    } else if (e.dia === 6) { setTimeout(() => toast(`${D.chefe.ic} ${D.chefe.nome} perdeu metade da vida! Amanhã é o golpe final.`), 1600); setTimeout(seqD7, 1700); }
+    else seqD7();
+    render();
   }
   const d7Novo = (extra = {}) => ({ k: "recruta", ini: hojeKey, dias: [], dupla: null, fim: null, ...extra });
   document.addEventListener("click", (ev) => {
