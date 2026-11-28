@@ -715,8 +715,7 @@
           ${grupoHome()}
           ${desafioHome()}
           ${pesagemPendente() ? `<details class="ac-linha ac-det"><summary><span class="ac-li-ic">⚖️</span><span><b>Pesagem da semana</b><small>Anote o peso e veja a evolução · +${XP.pesagem} XP</small></span><em>Anotar</em></summary><div class="ac-pz">${pesagemForm(true)}</div></details>` : ""}
-          ${ativHome()}
-          ${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}
+          <div class="ac-acoes">${ativHome()}${w !== "E" ? `<a class="emerg" href="#/treino/E/0"><span>${icon("zap-blue.svg", 20)}</span><div><strong>Sem tempo hoje?</strong><small>Treino de emergência · 15 min · 100/100/100</small></div></a>` : ""}</div>
         </div></section>`;
     },
 
@@ -773,7 +772,7 @@
     },
 
 
-    dojo(p1) { setToolbar("dojo"); return DOJO_MOV[p1] ? dojoMovimento(DOJO_MOV[p1]) : dojoHome(); },
+    dojo(p1) { setToolbar("dojo"); return DOJO_MOV[p1] ? dojoMovimento(DOJO_MOV[p1]) : dojoHome(dojoAbas.has(p1) ? p1 : "como"); },
     evolucao() {
       setToolbar("evolucao");
       const seq = sequencia();
@@ -2567,7 +2566,7 @@
     let v = 80, t = 0, protegeAte = -1;
     for (const x of ts) { v = Math.max(0, v - cai(Math.max(t, protegeAte), x)); v = Math.min(100, v + HP_TREINO); protegeAte = Math.max(protegeAte, x + HP_PROTECAO); t = x; }
     v = Math.max(0, v - cai(Math.max(t, protegeAte), Math.max(now, Math.max(t, protegeAte))));
-    let extra = 0; try { extra = missoesDe(hojeKey).filter((m) => m.ok && m.id !== "treino" && m.id !== "minutos" && m.id !== "series").length * HP_MISSAO; } catch {}
+    let extra = 0; try { extra = missoesDe(hojeKey).filter((m) => m.ok && m.id !== "treino" && m.id !== "minutos" && m.id !== "series").length * HP_MISSAO + senseiMissaoDe(hojeKey).filter((m) => m.ok).length * 4; } catch {}
     v = Math.min(100, v + extra);
     if (lendario) v = 100;
     const protegido = !lendario && protegeAte > now ? protegeAte - now : 0;
@@ -3334,7 +3333,7 @@
   let syncTimer = null, sincronizando = false, deNovo = false;
   function agendarSync() {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { hpRegistrarTreinos(); verificarConquistas(); if (registrarMissoes()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) { sincronizar(); if (typeof incSincronizar === "function" && IG.lista) incSincronizar(); } }, 1200);
+    syncTimer = setTimeout(() => { hpRegistrarTreinos(); verificarConquistas(); let mud = registrarMissoes() || registrarSensei(); if (mud) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} } conferirXp(); if (uid) { sincronizar(); if (typeof incSincronizar === "function" && IG.lista) incSincronizar(); } }, 1200);
   }
   async function sincronizar() {
     if (!uid || !sb) return;
@@ -3371,7 +3370,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null, incXp: S.incXp || null, incCartas: S.incCartas || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, sensei: S.sensei || null, senseiN: S.senseiN || null, senseiXpAnt: S.senseiXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null, incXp: S.incXp || null, incCartas: S.incCartas || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -3641,7 +3640,7 @@
   // Uma sessão completa vale parecido em qualquer modalidade (~50 de base + volume), para o ranking ser justo entre trilhas.
   // Calibrado para o MAX:30 inteiro levar ao nível 10 e a formatura (+500) empurrar para Guerreiro (nível 11).
   const XP = { video: 50, pulse: 30, abs: 20, sessao: 50, volumeMax: 20, parcialSerie: 2, parcialMax: 40, metaEx: 5, metaExMax: 15, cf: 70,
-    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 60, fichaAntiga: 105, chefe: 100, missao: 25, missoesTodas: 50, veterano: 300, chefeBonus: 50, pesagem: 15, fimVideo: 50, fimTodos: 500 };
+    recorde: 25, recordeMax: 50, teste: 25, semana: 150, semanaSeguida: 10, semanaSeguidaMax: 50, agua: 5, desafio: 50, formatura: 500, ficha: 60, fichaAntiga: 105, chefe: 100, missao: 25, missoesTodas: 50, senseiMin: 5, senseiMax: 10, veterano: 300, chefeBonus: 50, pesagem: 15, fimVideo: 50, fimTodos: 500 };
   /* ---------- Corrida, caminhada e bike pelo print (a IA lê a captura; a imagem não é guardada) ---------- */
   // XP: base + por km (até o máximo). Sem distância no print, estima os km pelo tempo.
   const ATIV = {
@@ -3887,7 +3886,7 @@
     return { xp, nivel: n, classe: nome, slug, metal, ci, rank: ((n - 1) % 5) + 1, ini, fim, pct: fim > ini ? Math.max(0, Math.min(100, Math.round(((xp - ini) / (fim - ini)) * 100))) : 100 };
   }
   const meuXp = () => xpDe(linhasLocais(), aguaLinhas(), G.meusDesafios ?? S.desafiosN ?? 0, metaSemana())
-    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + arenaXp() + incXp() + missoesXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
+    + Object.keys(formaturas()).length * XP.formatura + (S.cf?.prs || []).length * XP.recorde + xpFicha() + chefesXp() + arenaXp() + incXp() + missoesXp() + senseiXp() + pesagemXp() + fimXp() + conqXp() + d7Xp() + (veterano() ? XP.veterano : 0);
   // Piso: o nível que a pessoa já tinha antes da curva nova (calculado uma vez pela curva antiga) ou o que a conta já mostrava
   function nivelPiso(xp) {
     if (S.nivelPiso == null) { let n = 1; if (S.ficha) while (n < NIVEL_MAX && xp >= xpParaAntigo(n + 1)) n++; S.nivelPiso = n; }
@@ -5714,6 +5713,9 @@
       if (perfil.config.missoes) { S.missoes = S.missoes || {}; for (const [k, n] of Object.entries(perfil.config.missoes)) S.missoes[k] = Math.max(S.missoes[k] || 0, Number(n) || 0); }
       if (perfil.config.missoesTot) S.missoesTot = { ...(S.missoesTot || {}), ...perfil.config.missoesTot };
       if (perfil.config.missoesXpAnt > (S.missoesXpAnt || 0)) S.missoesXpAnt = perfil.config.missoesXpAnt;
+      if (perfil.config.sensei && typeof perfil.config.sensei === "object") S.sensei = { ...perfil.config.sensei, ...(S.sensei || {}) };
+      if (perfil.config.senseiN) { S.senseiN = S.senseiN || {}; for (const [k, n] of Object.entries(perfil.config.senseiN)) S.senseiN[k] = Math.max(S.senseiN[k] || 0, Number(n) || 0); }
+      if (perfil.config.senseiXpAnt > (S.senseiXpAnt || 0)) S.senseiXpAnt = perfil.config.senseiXpAnt;
       if (perfil.config.principal) S.onboarded = true; // já escolheu o programa em outro aparelho
     }
     if (!S.logado || !S.user || S.user.id !== uid) entrar(user);
@@ -7289,6 +7291,11 @@
     for (const [k, l] of Object.entries(S.livres || {})) for (const t of l || []) for (const x of t.exs || []) for (const v of x.sets || []) out.push({ data: k, nome: x.nome, kg: v.kg || 0, ...(v.tot ? { tot: 1 } : {}), ...(x.un === "s" ? { s: v.r || 0 } : { reps: v.r || 0 }) });
     for (const pr of S.cf?.prs || []) out.push({ data: pr.k || hojeKey, nome: pr.mov || "", kg: pr.kg || 0, reps: pr.reps || 0 });
     for (const [k, l] of Object.entries(S.corrida?.logs || {})) for (const a of l.itens || []) if (ehCorrida(a.tipo) && a.km) out.push({ data: k, nome: "corrida", km: a.km });
+    for (const [k, map] of Object.entries(S.sensei || {})) for (const [id, hit] of Object.entries(map || {})) {
+      if (!hit) continue;
+      const m = SENSEI_DE[id]; if (!m) continue;
+      out.push({ data: k, nome: m.nome, ...(m.s ? { s: m.s } : { reps: m.reps }) });
+    }
     return out;
   }
   // Recordes que antes eram chefes: hoje são insígnias das ligas (o XP de quem já bateu continua)
@@ -7496,6 +7503,48 @@
   }
   const xpMissoesN = (n, tot = 3) => n * XP.missao + (n >= (tot || 3) ? XP.missoesTodas : 0);
   const missoesXp = () => soma(Object.entries(S.missoes || {}).map(([k, n]) => xpMissoesN(n, S.missoesTot?.[k]))) + (S.missoesXpAnt || 0);
+  /* Missões do Sensei: microdesafios do dia (cards na Energia do dia). 7/dia, 5–10 XP cada (~50 = 1 treino); incursão via registrosEx. */
+  const SENSEI_DIA = 7;
+  const SENSEI_CAT = [
+    { id: "corda100", ic: "🪢", t: "Pular 100 cordas ao longo do dia", reps: 100, nome: "pular corda", xp: 10 },
+    { id: "agacha25", ic: "🦵", t: "Fazer 25 agachamentos", reps: 25, nome: "agachamento livre", xp: 5 },
+    { id: "flex30", ic: "🌅", t: "30 flexões antes do almoço", reps: 30, nome: "flexões", xp: 7 },
+    { id: "flex100", ic: "💪", t: "100 flexões ao longo do dia", reps: 100, nome: "flexões", xp: 10 },
+    { id: "burpee15", ic: "⚡", t: "15 burpees", reps: 15, nome: "burpee", xp: 8 },
+    { id: "poli50", ic: "⭐", t: "50 polichinelos", reps: 50, nome: "polichinelo", xp: 5 },
+    { id: "prancha2", ic: "🛡️", t: "2 min de prancha (pode em partes)", s: 120, reps: 0, nome: "prancha", xp: 8 },
+    { id: "agacha50", ic: "🔻", t: "50 agachamentos no dia", reps: 50, nome: "agachamento livre", xp: 7 },
+    { id: "flex20", ic: "☀️", t: "20 flexões de manhã", reps: 20, nome: "flexões", xp: 5 },
+    { id: "abdominal20", ic: "🔥", t: "20 abdominais", reps: 20, nome: "abdominal", xp: 5 },
+    { id: "flex40", ic: "🎯", t: "40 flexões espalhadas no dia", reps: 40, nome: "flexões", xp: 7 },
+    { id: "agacha100", ic: "🏔️", t: "100 agachamentos no dia", reps: 100, nome: "agachamento livre", xp: 10 },
+  ];
+  const SENSEI_DE = Object.fromEntries(SENSEI_CAT.map((m) => [m.id, m]));
+  const senseiAlvo = (m) => (m.s ? `${Math.floor(m.s / 60)} min` : String(m.reps));
+  const senseiXpMissao = (m) => Math.max(XP.senseiMin, Math.min(XP.senseiMax, Number(m.xp) || XP.senseiMin));
+  function senseiMissaoDe(k) {
+    let h = 0; for (const ch of k + (S.user?.id || "local")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const pool = [...SENSEI_CAT], pick = [];
+    while (pick.length < SENSEI_DIA && pool.length) pick.push(pool.splice((h >>>= 3) % pool.length, 1)[0]);
+    const feito = S.sensei?.[k] || {};
+    return pick.map((m) => ({ ...m, xp: senseiXpMissao(m), ok: !!feito[m.id], pct: feito[m.id] ? 100 : 0 }));
+  }
+  const senseiXpDia = (k) => senseiMissaoDe(k).filter((m) => m.ok).reduce((s, m) => s + m.xp, 0);
+  const senseiXpMaxDia = (k) => senseiMissaoDe(k).reduce((s, m) => s + m.xp, 0);
+  const senseiNlegado = (v) => { const n = Number(v) || 0; return n > 0 && n <= SENSEI_DIA && Number.isInteger(n) ? n * 7 : n; };
+  function registrarSensei() {
+    const total = senseiXpDia(hojeKey);
+    S.senseiN = S.senseiN || {};
+    const ant = senseiNlegado(S.senseiN[hojeKey]);
+    if (total > ant) { S.senseiN[hojeKey] = total; return true; }
+    return false;
+  }
+  const senseiXp = () => {
+    let xp = S.senseiXpAnt || 0;
+    const dias = new Set([...Object.keys(S.sensei || {}), ...Object.keys(S.senseiN || {})]);
+    for (const k of dias) xp += (S.sensei?.[k] ? senseiXpDia(k) : 0) || senseiNlegado(S.senseiN?.[k]);
+    return xp;
+  };
   function renovaEm() { const m = Math.max(0, Math.round((addDays(hoje, 1) - Date.now()) / 60000)); return `${Math.floor(m / 60)}h${pad(m % 60)}`; }
   /* ---------- Pesagem da semana: peso e medidas, uma vez por semana (vale XP), com a evolução no Perfil ---------- */
   const CORPO_MED = [["cintura", "Cintura"], ["braco", "Braço"], ["peito", "Peito"], ["quadril", "Quadril"], ["coxa", "Coxa"]];
@@ -7560,6 +7609,22 @@
     toast(dp == null ? "Pesagem salva! ⚖️" : dp < 0 ? `${fmt1(-dp)} kg a menos desde ${ddmm(ant.d)}! 🔥` : dp > 0 ? `+${fmt1(dp)} kg desde ${ddmm(ant.d)}. Anotado ✍️` : "Mesmo peso da última vez. Anotado ✍️", 3500);
   });
   document.addEventListener("click", (e) => { if (e.target.closest("[data-pesagem-pular]")) { S.pesagemPulada = semanaKey(hojeKey); save(); render(); } });
+  document.addEventListener("click", (e) => {
+    const tr = e.target.closest("a[data-ac-scroll]");
+    if (tr) { const id = tr.dataset.acScroll; setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }
+    const b = e.target.closest("[data-sensei]");
+    if (!b) return;
+    const id = b.dataset.sensei, m = SENSEI_DE[id];
+    if (!m) return;
+    S.sensei = S.sensei || {};
+    S.sensei[hojeKey] = S.sensei[hojeKey] || {};
+    S.sensei[hojeKey][id] = !S.sensei[hojeKey][id];
+    save();
+    registrarSensei();
+    conferirXp(false, S.sensei[hojeKey][id] ? `Missão do Sensei · ${m.t}` : "");
+    render();
+    if (uid) { sincronizar(); if (typeof incSincronizar === "function" && IG.lista) incSincronizar(); }
+  });
   function missoesHome() {
     const ms = missoesDe(hojeKey), feitas = ms.filter((m) => m.ok).length, cs = chefes(), mortos = cs.filter((c) => c.derrotado).length;
     const prox = cs.filter((c) => c.tem && !c.derrotado).sort((a, b) => a.hp - b.hp)[0];
@@ -7570,7 +7635,10 @@
       ${LIGAS_CHEFES ? `<a class="ms-chefes" href="#/chefes"><span>⚔️ Chefes <b>${mortos}/${cs.length}</b></span><span>${prox ? `${prox.img ? `<img class="ms-ch-img" src="${prox.img}" alt="">` : prox.ic || ""} ${esc(prox.nome)} · HP ${prox.hp}%` : "Ver batalhas"} ›</span></a>` : ""}
     </div>`;
   }
-  setInterval(() => { const el = document.querySelector("[data-renova]"); if (el) el.textContent = `renovam em ${renovaEm()}`; }, 30000);
+  setInterval(() => {
+    const t = renovaEm();
+    document.querySelectorAll("[data-renova]").forEach((el) => { el.textContent = `renovam em ${t}`; });
+  }, 30000);
 
   /* ==========================================================
      Quiz de entrada (uma pergunta por tela, XP por resposta) e Ficha de atleta.
@@ -7813,31 +7881,105 @@
   /* ---------- Dojo: técnica dos movimentos, guiada pelo Sensei do seu estilo ---------- */
   const DOJO = window.FITAI_DOJO || { trilhas: [], grupos: {}, movimentos: [] };
   const DOJO_MOV = Object.fromEntries(DOJO.movimentos.map((m) => [m.id, m]));
+  const DOJO_ABAS = { como: "Como fazer", sensei: "Missões do Sensei", treinos: "Treinos", caminho: "Mudar meu caminho", evolucao: "Minha evolução" };
+  const DOJO_ABA_IC = { como: "📖", sensei: "🥋", treinos: "⚔️", caminho: "🛤️", evolucao: "📈" };
+  const dojoAbas = new Set(Object.keys(DOJO_ABAS));
   let dojoFiltro = "meu";
   function senseiDe() {
     const e = ESTILO_DA_TRILHA[trilha()] || "ninja", E = ESTILOS[e], g = S.mestreG === "f" || S.mestreG === "m" ? S.mestreG : sexoArte();
     return { e, E, g, nome: E.mestre[g], carta: `assets/estilos/${e}-${g}.webp` };
   }
-  function dojoHome() {
+  function dojoBanner() {
+    const s = senseiDe();
+    return `<div class="dj-banner">
+      <picture>
+        <source media="(min-width: 768px)" srcset="assets/dojo/hero-desktop.jpg">
+        <img src="assets/dojo/hero-mobile.jpg" alt="">
+      </picture>
+      <div class="dj-banner-cap">
+        <p class="qz-kicker">⛩️ Dojo · ${s.E.ic} ${esc(s.E.nome)}</p>
+        <h1>Sensei ${esc(s.nome)}</h1>
+        <p class="dj-banner-fala">“Domine o movimento. O resto vem no treino.”</p>
+      </div>
+    </div>`;
+  }
+  function dojoMenu(aba) {
+    return `<nav class="dj-menu" aria-label="Áreas do dojo">${Object.entries(DOJO_ABAS).map(([k, nome]) => `<a class="dj-menu-btn${aba === k ? " on" : ""}" href="#/dojo/${k}"><span class="dj-menu-ic">${DOJO_ABA_IC[k]}</span><span class="dj-menu-txt">${esc(nome)}</span></a>`).join("")}</nav>`;
+  }
+  function dojoPainelComo() {
     const s = senseiDe(), T = DOJO.trilhas[0] || { nome: "Fundamentos", ic: "⛩️", desc: "" };
     const lista = DOJO.movimentos.filter((m) => dojoFiltro === "todos" || m.estilos.includes(s.e));
     const card = (m) => `<a class="dj-card" href="#/dojo/${m.id}">
         <span class="dj-thumb">${m.anim ? `<img src="assets/anim/${m.anim}.jpg" alt="" loading="lazy">` : `<span class="dj-sem">🪢</span>`}</span>
         <span class="dj-nome">${esc(m.nome)}</span><span class="dj-grupo">${esc(DOJO.grupos[m.grupo] || "")}</span></a>`;
+    return `<div class="dj-panel">
+      <div class="sec-head"><h2>${T.ic} ${esc(T.nome)}</h2><span>${lista.length} movimentos</span></div>
+      <p class="note">${esc(T.desc)}</p>
+      <div class="seg dj-filtro"><button type="button" class="${dojoFiltro === "meu" ? "on" : ""}" data-dj-filtro="meu">${s.E.ic} Base ${esc(s.E.nome)}</button><button type="button" class="${dojoFiltro === "todos" ? "on" : ""}" data-dj-filtro="todos">Todos os estilos</button></div>
+      <div class="dj-grid">${lista.map(card).join("")}</div>
+      <p class="note small">Toque num movimento para ver o passo a passo, erros comuns e falar com o Sensei.</p>
+    </div>`;
+  }
+  function dojoPainelSensei() {
+    const sn = senseiMissaoDe(hojeKey), ganho = senseiXpDia(hojeKey), max = senseiXpMaxDia(hojeKey);
+    return `<div class="dj-panel dj-panel-sensei">
+      <div class="sec-head"><h2>🥋 Missões do Sensei</h2><span>+${ganho}/${max} XP</span></div>
+      <p class="note">Marque no card quando fizer. Cada missão vale 5–10 XP; juntas, chegam perto de um treino (50 XP) e contam na incursão ⚔️</p>
+      <div class="ac-cols ac-cols-sensei ac-cols-scroll dj-sensei-cols" style="--n:${sn.length}">${sn.map((m) => `<button type="button" class="ac-col ac-col-sensei ac-sensei-btn${m.ok ? " ok" : ""}" data-sensei="${m.id}" aria-pressed="${m.ok}">
+        <span class="ac-col-ic">${m.ok ? "✓" : m.ic}</span>
+        <b>${esc(m.ok ? `+${m.xp} XP` : senseiAlvo(m))}</b>
+        <small>${esc(m.t)}</small>
+        ${m.ok ? "" : `<em class="ac-col-xp">+${m.xp}</em>`}
+        <span class="ac-mini"><i style="width:${m.pct}%"></i></span>
+      </button>`).join("")}</div>
+      <a class="lnk-btn dj-lnk" href="#/home" data-ac-scroll="ac-energia">Ver na Energia do dia ›</a>
+    </div>`;
+  }
+  function dojoPainelTreinos() {
+    const pk = principal(), prog = progDe(pk), { w, d } = ativoHoje(), fe = feito(hojeKey);
+    const a = (() => { try { return tgDia(hoje); } catch { return null; } })(), T = TRILHAS[trilha()];
+    const planoHref = pk === "plano" ? "#/plano" : `#/${pk}`;
+    const itens = [
+      { href: fe ? "#/home" : linkBora(w, d), ic: "📅", t: fe ? "Treino de hoje · feito ✓" : (a?.titulo || "Treino de hoje"), s: fe ? "Hidrate e cuide da recuperação" : (a?.descanso ? "Descanso ativo" : "Abrir o dia no calendário") },
+      { href: planoHref, ic: T.ic, t: prog?.nome || VP[pk]?.nome || NOME_PROG, s: "Plano e calendário do seu caminho" },
+      { href: "#/treino/E/0", ic: "⚡", t: "Treino de emergência", s: "15 min · 100/100/100" },
+      { href: "#/coach", ic: "✨", t: "Falar com o Sensei", s: "Dúvidas de execução ou montagem" },
+    ];
+    return `<div class="dj-panel"><div class="sec-head"><h2>⚔️ Treinos</h2><span>${esc(T.nome)}</span></div>
+      <div class="dj-links">${itens.map((x) => `<a class="dj-link" href="${x.href}"><span class="dj-link-ic">${x.ic}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span><em>›</em></a>`).join("")}</div></div>`;
+  }
+  function dojoPainelCaminho() {
+    const at = etapaAtual(), T = TRILHAS[trilha()];
+    return `<div class="dj-panel">
+      <div class="sec-head"><h2>🛤️ Mudar meu caminho</h2><span>${T.ic} ${esc(T.nome)}</span></div>
+      <p class="note">Troque de trilha quando quiser: o seu XP e as formaturas ficam. O Sensei acompanha o estilo novo.</p>
+      ${trilhaHtml()}
+      <p class="note small">Etapa atual: <b>${esc(at.nome)}</b> · ${at.i + 1} de ${at.n}</p>
+      <a class="btn btn-outline dj-btn-full" href="#/vilarejo">Explorar o vilarejo</a>
+    </div>`;
+  }
+  function dojoPainelEvolucao() {
+    const n = meuNivel(), seq = sequencia();
+    return `<div class="dj-panel">
+      <div class="sec-head"><h2>📈 Minha evolução</h2><span>Nível ${n.nivel}</span></div>
+      <div class="dj-evoresumo">
+        <div class="dj-evostat"><b>${seq}</b><small>sequência ${seq === 1 ? "dia" : "dias"}</small></div>
+        <div class="dj-evostat"><b>${n.xp}</b><small>XP total</small></div>
+        <div class="dj-evostat"><b>${esc(n.classe)}</b><small>${n.pct}% p/ nível ${n.nivel + 1}</small></div>
+      </div>
+      ${fichaMini()}
+      <a class="btn btn-blue dj-btn-full" href="#/evolucao">Abrir evolução completa</a>
+      <a class="btn btn-outline dj-btn-full" href="#/ficha">Ficha de atleta</a>
+    </div>`;
+  }
+  const dojoPainel = { como: dojoPainelComo, sensei: dojoPainelSensei, treinos: dojoPainelTreinos, caminho: dojoPainelCaminho, evolucao: dojoPainelEvolucao };
+  function dojoHome(aba = "como") {
+    const painel = dojoPainel[aba] || dojoPainelComo;
     return `<section class="screen has-toolbar dojo">
-      <header class="header"><span class="logo-txt dark">Fit.ai</span></header>
-      <div class="dj-hero">
-        <img class="dj-sensei" src="${s.carta}" alt="Carta de ${esc(s.nome)}">
-        <div><p class="qz-kicker">⛩️ Dojo</p><h1>Técnica primeiro.</h1>
-          <p class="dj-fala"><b>Sensei ${esc(s.nome)}</b> ${s.E.ic}: “Antes de buscar variações, domine os fundamentos. Repetição bem feita vale mais que repetição a mais.”</p></div>
-      </div>
-      <div class="section">
-        <div class="sec-head"><h2>${T.ic} ${esc(T.nome)}</h2><span>${lista.length} movimentos</span></div>
-        <p class="note">${esc(T.desc)}</p>
-        <div class="seg dj-filtro"><button class="${dojoFiltro === "meu" ? "on" : ""}" data-dj-filtro="meu">${s.E.ic} Base ${esc(s.E.nome)}</button><button class="${dojoFiltro === "todos" ? "on" : ""}" data-dj-filtro="todos">Todos os estilos</button></div>
-        <div class="dj-grid">${lista.map(card).join("")}</div>
-      </div>
-      <div class="section"><p class="note small">Em breve no Dojo: habilidades de cada estilo e mobilidade. As dicas são de apoio e não substituem um profissional de educação física.</p></div>
+      ${dojoBanner()}
+      ${dojoMenu(aba)}
+      <div class="section dj-corpo">${painel()}</div>
+      <p class="note small dj-rodape">Dicas do Dojo são apoio educativo — não substituem um profissional de educação física.</p>
     </section>`;
   }
   function dojoMovimento(m) {
@@ -8698,16 +8840,33 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     </div>`;
   }
   function acampEnergia() {
-    const ms = missoesDe(hojeKey), ok = ms.filter((m) => m.ok).length, pct = Math.round(soma(ms.map((m) => Math.min(100, m.pct || 0))) / Math.max(1, ms.length));
+    const ms = missoesDe(hojeKey), sn = senseiMissaoDe(hojeKey), todos = [...ms, ...sn];
+    const okM = ms.filter((m) => m.ok).length, okS = sn.filter((m) => m.ok).length;
+    const xpS = senseiXpDia(hojeKey), xpSMax = senseiXpMaxDia(hojeKey);
+    const pct = Math.round(soma(todos.map((m) => Math.min(100, m.pct || 0))) / Math.max(1, todos.length));
     const nivel = pct >= 100 ? ["COMPLETA", "alta"] : pct >= 50 ? ["MÉDIA", "media"] : ["BAIXA", "baixa"];
     const falta = ms.find((m) => !m.ok);
     const R = 30, C = 2 * Math.PI * R;
-    return `<div class="ac-card ac-energia">
+    const legPront = () => {
+      if (okM >= ms.length && okS >= sn.length) return `Tudo fechado hoje · +${XP.missoesTodas} XP bônus e +${xpS} XP Sensei ⚔️`;
+      if (okM >= ms.length) return `Missão do Sensei: ${okS}/${sn.length} · +${xpS} de ${xpSMax} XP (≈ um treino)`;
+      if (!falta && okS < sn.length) return `Sensei: ${okS}/${sn.length} micro missões · toque nos cards 🥋`;
+      return `${esc(falta?.t || "")} · Sensei ${okS}/${sn.length} · feche as ${ms.length} missões e +${XP.missoesTodas} XP`;
+    };
+    return `<div class="ac-card ac-energia" id="ac-energia">
       <p class="ac-k">⚡ Energia do dia <span data-renova>renovam em ${renovaEm()}</span></p>
-      <div class="ac-cols" style="--n:${ms.length}">${ms.map((m) => `<div class="ac-col${m.ok ? " ok" : ""}"><span class="ac-col-ic">${m.ok ? "✓" : m.ic}</span><b>${esc(m.ok ? `+${XP.missao} XP` : m.fmt(m.valor, m.alvoV))}</b><small>${esc(m.t)}</small><span class="ac-mini"><i style="width:${Math.min(100, m.pct || 0)}%"></i></span></div>`).join("")}</div>
+      <div class="ac-cols ac-cols-macros" style="--n:${ms.length}">${ms.map((m) => `<div class="ac-col${m.ok ? " ok" : ""}"><span class="ac-col-ic">${m.ok ? "✓" : m.ic}</span><b>${esc(m.ok ? `+${XP.missao} XP` : m.fmt(m.valor, m.alvoV))}</b><small>${esc(m.t)}</small><span class="ac-mini"><i style="width:${Math.min(100, m.pct || 0)}%"></i></span></div>`).join("")}</div>
+      <p class="ac-subk">🥋 Missão do Sensei <span>+${xpS}/${xpSMax} XP hoje · conta na incursão</span></p>
+      <div class="ac-cols ac-cols-sensei ac-cols-scroll" style="--n:${sn.length}">${sn.map((m) => `<button type="button" class="ac-col ac-col-sensei ac-sensei-btn${m.ok ? " ok" : ""}" data-sensei="${m.id}" aria-pressed="${m.ok}" title="${esc(m.t)}">
+        <span class="ac-col-ic">${m.ok ? "✓" : m.ic}</span>
+        <b>${esc(m.ok ? `+${m.xp} XP` : senseiAlvo(m))}</b>
+        <small>${esc(m.t)}</small>
+        ${m.ok ? "" : `<em class="ac-col-xp">+${m.xp}</em>`}
+        <span class="ac-mini"><i style="width:${m.pct}%"></i></span>
+      </button>`).join("")}</div>
       <div class="ac-pront">
         <span class="ac-pront-ic">🛡️</span>
-        <div><b>Prontidão: <em class="${nivel[1]}">${nivel[0]}</em></b><small>${ok >= ms.length ? `Todas cumpridas: +${XP.missoesTodas} XP de bônus! 🏆` : `${esc(falta?.t || "")} · feche as ${ms.length} e ganhe +${XP.missoesTodas} XP`}</small></div>
+        <div><b>Prontidão: <em class="${nivel[1]}">${nivel[0]}</em></b><small>${legPront()}</small></div>
         <svg class="ac-anel ${nivel[1]}" viewBox="0 0 72 72" aria-label="${pct}%"><circle cx="36" cy="36" r="${R}" class="fundo"/><circle cx="36" cy="36" r="${R}" class="valor" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/><text x="36" y="41">${pct}%</text></svg>
       </div>
     </div>`;
@@ -8736,12 +8895,17 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0
     // Desafio do Recruta
     if (S.d7 && !S.d7.espera && !S.d7.fim) out.push({ ic: "🎯", t: D7.recruta.nome, sub: `Dia ${Math.min(7, d7Feitos(S.d7) + 1)} de 7`, pct: Math.round((d7Feitos(S.d7) / 7) * 100), fim: "🎖️", href: "#/recruta" });
     else if (!S.d7Feito) out.push({ ic: "🎯", t: D7.recruta.nome, sub: "7 dias sem academia · sozinho ou em dupla", pct: 0, fim: "🎖️", href: "#/recruta", cta: "Começar" });
+    // Missão do Sensei (micro missões do dia — mesma faixa das trilhas)
+    (() => {
+      const sn = senseiMissaoDe(hojeKey), ok = sn.filter((m) => m.ok).length, ganho = senseiXpDia(hojeKey), max = senseiXpMaxDia(hojeKey);
+      out.push({ ic: "🥋", t: "Missão do Sensei", sub: ok >= sn.length ? `Hoje completo · +${ganho} XP` : `${ok} de ${sn.length} · +${ganho} de ${max} XP`, pct: max ? Math.round((ganho / max) * 100) : 0, fim: "⚔️", href: "#/home", scroll: "ac-energia" });
+    })();
     // Meta de 30 dias da ficha
     if (S.ficha) { const f = fichaAtual(), iM = LETRAS.indexOf(S.ficha.meta), alvo = RANK_MIN[iM] || 1;
       out.push({ ic: "📜", t: `Rank ${f.rank} → ${S.ficha.meta}`, sub: LETRAS.indexOf(f.rank) >= iM ? "Meta batida! 🎉" : `Faltam ${Math.max(0, alvo - f.media)} pontos de atributo`, pct: Math.min(100, Math.round((f.media / alvo) * 100)), fim: S.ficha.meta, href: "#/ficha" }); }
     if (!out.length) return "";
     return `<div class="section ac-trilhas"><p class="ac-k">Trilhas de progresso</p>
-      ${out.map((x) => `<a class="ac-trilha" href="${x.href}"><span class="ac-tr-ic">${x.ic}</span><span class="ac-tr-txt"><b>${esc(x.t)}</b><small>${esc(x.sub)}</small>
+      ${out.map((x) => `<a class="ac-trilha" href="${x.href}"${x.scroll ? ` data-ac-scroll="${x.scroll}"` : ""}><span class="ac-tr-ic">${x.ic}</span><span class="ac-tr-txt"><b>${esc(x.t)}</b><small>${esc(x.sub)}</small>
         <span class="ac-tr-linha"><i style="width:${x.pct}%"></i><em style="left:${x.pct}%"></em></span></span>${x.cta ? `<strong class="ac-tr-cta">${x.cta} ›</strong>` : `<span class="ac-tr-fim">${esc(x.fim)}</span>`}</a>`).join("")}
     </div>`;
   }
