@@ -8254,7 +8254,7 @@
     { k: "cla-cross", img: "valquiria", nome: "Valquíria Furiosa", meta: 90, un: "min de cross", dias: 7, modo: "cla", f: "min:cross" },
   ];
   const INC_DE = Object.fromEntries([...INC, ...INC_CLA].map((x) => [x.k, x]));
-  const incImg = (i) => arCarta(INC_DE[i.chefe]?.img || i.chefe);
+  const incImg = (i) => incArte(i.chefe) || arCarta(INC_DE[i.chefe]?.img || i.chefe); // a carta da incursão, quando existe; senão a carta do chefe
   /* Cartas de incursão: arte bônus (assets/incursoes/<k>.webp) para quem causou dano numa incursão em que o chefe caiu.
      S.incCartas = { <chefe>: data em que ganhou } (sincroniza em perfis.config.incCartas). */
   const INC_ARTE = INC.filter((x) => x.arte);
@@ -8344,18 +8344,34 @@
         <ol class="inc-rank">${e.gs.filter((gg) => gg.tot > 0).slice(0, 5).map((gg, n) => `<li><b>${n === 0 ? "👑" : n + 1}</b><span>${nome(gg.usuario_id)}</span><em>${incFmt(x, gg.tot)}</em></li>`).join("") || `<li class="vazio">Ninguém atacou ainda.</li>`}</ol>
         ${i.modo === "dupla" ? `<p class="inc-sub">${nome(i.criado_por)} + ${nome(i.dupla)}</p>` : ""}
         ${posso ? `<div class="inc-acoes">${!e.meu && i.modo === "grupo" ? `<button type="button" class="btn btn-blue" data-inc-entrar="${i.id}">Entrar na incursão</button>` : `<button type="button" class="btn btn-blue" data-inc-golpe="${i.id}">Lançar golpe</button>`}</div>` : ""}
-        ${incAtiva(i) && !e.caiu ? `<button type="button" class="lnk-btn inc-compart" data-inc-compart="${i.id}">📲 Compartilhar incursão</button>` : ""}
+        ${incAtiva(i) && !e.caiu ? (incPrepArquivo(i.chefe), `<button type="button" class="lnk-btn inc-compart" data-inc-compart="${i.id}">📲 Compartilhar incursão</button>`) : ""}
         ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b>${e.caiu && incCartaTem(i.chefe) ? ` e a <button type="button" class="lnk-btn" data-inc-carta="${i.chefe}">🃏 carta da incursão</button>` : ""}</p>` : ""}
       </div></article>`;
   }
+  // A carta da incursão como arquivo JPEG para compartilhar (null quando não há arte ou o navegador não converte)
+  async function incArquivoCarta(k) {
+    const src = incArte(k); if (!src) return null;
+    try {
+      const bmp = await createImageBitmap(await (await fetch(src)).blob());
+      const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height;
+      c.getContext("2d").drawImage(bmp, 0, 0);
+      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.88));
+      return blob ? new File([blob], `fitai-incursao-${k}.jpg`, { type: "image/jpeg" }) : null;
+    } catch { return null; }
+  }
+  const INC_ARQ = {};
+  function incPrepArquivo(k) { if (k in INC_ARQ || !incArte(k) || !matchMedia("(pointer: coarse)").matches) return; INC_ARQ[k] = null; incArquivoCarta(k).then((f) => { INC_ARQ[k] = f; }); }
   function incCompartilhar(id) {
     const i = (IG.lista || []).find((x) => x.id === id); if (!i) return;
     const e = incEstado(i), x = e.x, g = i.cla ? null : (G.grupos || []).find((gg) => gg.id === i.grupo_id);
     const link = i.cla ? `${location.origin}/#/cla` : `${location.origin}/#/grupo/missoes/${i.grupo_id}`;
     const falta = Math.max(0, i.hp - e.dano);
     const txt = `👹 ${x.nome} invadiu ${i.cla ? `o ${CLAS[i.cla]?.nome || "clã"}` : `a guilda${g ? ` "${g.nome}"` : ""}`}! Faltam ${incFmt(x, falta)} para derrubar o chefe e ${e.diasRest === 1 ? "hoje é o último dia" : `restam ${e.diasRest} dias`}. ${i.modo === "dupla" ? "Bora fechar essa dupla" : "Entra e ataca comigo"} no FIT.AI ⚔️ ${link}${g ? `\nAinda não está na guilda? Código ${g.codigo}` : ""}`;
-    if (navigator.share && matchMedia("(pointer: coarse)").matches) navigator.share({ title: x.nome, text: txt }).catch(() => {});
-    else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Incursão copiada. Cole no WhatsApp. 📲"), () => prompt("Copie a mensagem:", txt));
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+      // Com arte: manda a carta junto (em JPEG, que o WhatsApp aceita sempre); sem suporte a arquivo, só o texto
+      const f = INC_ARQ[i.chefe]; // preparado quando o card apareceu: o Safari só abre o compartilhar logo depois do toque
+      navigator.share(f && navigator.canShare?.({ files: [f] }) ? { title: x.nome, text: txt, files: [f] } : { title: x.nome, text: txt }).catch(() => {});
+    } else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast("Incursão copiada. Cole no WhatsApp. 📲"), () => prompt("Copie a mensagem:", txt));
     else prompt("Copie a mensagem:", txt);
   }
   document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-inc-compart]"); if (b) incCompartilhar(b.dataset.incCompart); });
