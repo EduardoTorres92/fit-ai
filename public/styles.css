@@ -2206,9 +2206,9 @@ button.alb-it:active { transform: scale(0.96); }
 /* Carta no nível */
 .ar-carta { position: relative; border-radius: 10px; overflow: hidden; }
 .ar-carta img { display: block; width: 100%; height: auto; }
-.ar-carta.t0 img { filter: brightness(0) contrast(1); opacity: .85; }
+.ar-carta.t0 img { filter: grayscale(1) brightness(.5) contrast(1.15); opacity: 1; }
 .ar-carta.t0 { background: #120d22; }
-.ar-q { position: absolute; inset: 0; display: grid; place-items: center; font: 700 46px "Pixelify Sans", sans-serif; color: #7a6aa8; }
+.ar-q { position: absolute; right: 6px; top: 6px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: rgba(12, 10, 29, .8); box-shadow: 0 0 0 1px rgba(255,255,255,.18); font: 700 14px/1 "Pixelify Sans", sans-serif; color: #c9bff0; }
 /* A arte mantém as cores em todos os níveis: o nível aparece na moldura de metal em volta e num brilho que passa */
 .ar-carta.t1, .ar-carta.t2, .ar-carta.t3 { padding: 5px; }
 .ar-carta.t1 { background: linear-gradient(135deg, #6b3a1a, #e0995a 30%, #8a4a22 55%, #f0b070 75%, #6b3a1a); box-shadow: 0 0 12px rgba(210, 130, 60, .35); }
