@@ -236,9 +236,10 @@
   const logHoje = () => S.logs[hojeKey];
   const ativoHoje = () => { const l = logHoje(); if (l) return { w: l.w, d: l.d }; const w = semanaDe(hoje); return { w: Math.max(w, 0), d: hojeDia }; };
   const soma = (a) => a.reduce((x, y) => x + y, 0);
-  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k)) || iaFeito(k) || !!S.cf?.logs[k]?.done;
+  const feito = (k) => !!(S.logs[k] && S.logs[k].done) || VKEYS.some((p) => insFeito(p, k)) || iaFeito(k) || !!S.cf?.logs[k]?.done || !!(S.livres?.[k] || []).length || !!(S.extras?.[k] || []).length;
   const parcial = (k) => !!(S.logs[k] && Object.values(S.logs[k].sets || {}).some((s) => s.length)) || VKEYS.some((p) => insParcial(p, k)) || iaParcial(k) || !!S.cf?.logs[k]?.wod;
   const diasVideo = () => [...VKEYS.flatMap((p) => Object.keys(S[p].logs)), ...iaDiasComLog(), ...Object.keys(S.cf?.logs || {})]; // dias dos programas fora da calistenia
+  const diasTreino = () => [...new Set([...Object.keys(S.logs), ...diasVideo(), ...Object.keys(S.livres || {}), ...Object.keys(S.extras || {})])];
   const principal = () => (S.principal && progDe(S.principal) ? S.principal : "plano");
 
   // Sequência com folga: em todas as modalidades, 1 dia sem treino por semana (seg a dom) é descanso e não quebra a sequência
@@ -257,8 +258,8 @@
     const atual = run + (tem(hojeKey) ? 1 : 0);
     return { atual: run || tem(hojeKey) ? atual : 0, melhor: Math.max(melhor, run || tem(hojeKey) ? atual : 0) };
   }
-  const sequencia = () => seqFolga(feito, [...new Set([...Object.keys(S.logs), ...diasVideo(), hojeKey])]).atual;
-  const treinosFeitos = () => [...new Set([...Object.keys(S.logs), ...diasVideo()])].filter(feito).length;
+  const sequencia = () => seqFolga(feito, [...new Set([...diasTreino(), hojeKey])]).atual;
+  const treinosFeitos = () => diasTreino().filter(feito).length;
   const tempoTotal = () => soma(Object.values(S.logs).map((l) => l.dur || 0)) + soma(VKEYS.flatMap((p) => Object.values(S[p].logs)).map((l) => minVideo(l) * 60)) + iaMinTotal() * 60;
   function taxaConclusao() {
     const corridos = diffDays(parseKey(S.inicio), hoje) + (feito(hojeKey) ? 1 : 0), dias = corridos - Math.floor(corridos / 7); // 1 descanso por semana
@@ -272,7 +273,7 @@
   const menorMelhor = (id) => EXI[id] && EXI[id].un === "tiro";
   const anterior = (id) => historico(id).filter((h) => h.k < hojeKey).pop();
   const recorde = (id) => { const b = historico(id).map((h) => h.best); return b.length ? (menorMelhor(id) ? Math.min(...b) : Math.max(...b)) : 0; };
-  function ultimoTreino() { const ks = [...new Set([...Object.keys(S.logs), ...diasVideo()])].filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
+  function ultimoTreino() { const ks = diasTreino().filter(feito).sort(); return ks.length ? ks[ks.length - 1] : null; }
   const fmtDur = (seg) => { const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60); return h ? `${h}h${pad(m)}m` : `${m}min`; };
 
   /* ---------- Programas em vídeo: funções (p = chave do programa; IDs dos vídeos vêm de /api/videos) ---------- */
@@ -1480,9 +1481,10 @@
       if (/^salvar( treino)?$/i.test(t) && r0.mod) {
         S.livres = S.livres || {};
         (S.livres[hojeKey] = S.livres[hojeKey] || []).push({ titulo: r0.titulo, min: r0.min, mod: r0.mod, texto: r0.texto, exs: r0.exs });
-        livreChat = null; save();
+        livreChat = null; save(); render();
         addMsg(msgsEl, `Treino livre salvo ✅ Conta como treino de hoje: XP, sequência, meta da semana, missões e HP.${r0.exs.length ? " As séries também valem para recordes, chefes e incursões." : ""} 🔥`, false, chatLog);
-        setChips(chipsEl, CHIPS_PADRAO); return;
+        setChips(chipsEl, CHIPS_PADRAO);
+        toast(`Treino concluído! 🔥 ${sequencia()} ${sequencia() === 1 ? "dia" : "dias"} seguidos`); convidarPost(); return;
       }
       const m = livreMinDe(t); if (m && /^(foram|durou|deu|em|tempo|na verdade)?[\s:]*\d+\s*(h|min)/i.test(norm(t))) { r0.min = m; r0.minEst = false; addMsg(msgsEl, `Ajustei o tempo.<br>${livreResumo(r0)}`, false, chatLog); setChips(chipsEl, livreChips(r0)); return; }
     }
