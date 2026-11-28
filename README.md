@@ -44,7 +44,7 @@ App de treino em formato de **RPG em pixel art**, com um **Coach de IA** (Claude
 
 - **Front-end:** HTML, CSS e JavaScript puro, sem framework e sem build. É um PWA leve, feito para celular.
 - **Artes:** pixel art própria: 120 cartas (6 estilos × 10 classes × 2 versões), personagens animados em WebP, mestres e cenários.
-- **Back-end:** Node.js (`server.mjs`) servindo `public/` e as rotas de `netlify/functions`:
+- **Back-end:** Node.js (`server.mjs`) servindo `public/` e as rotas em `api/functions`:
   - `coach`, `corrida`, `wod`, `evolucao`, `desafio`, `dupla`, `hiper`, `agua`, `telegram`, `auth` e `videos`.
   - A chave da Anthropic fica só no servidor, nunca no navegador.
 - **Dados:** Supabase (Auth com Google ou e-mail, Postgres com RLS em todas as tabelas, Storage para fotos). O app grava no aparelho e sincroniza quando há conexão.
