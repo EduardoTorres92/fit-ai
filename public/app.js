@@ -3367,7 +3367,7 @@
         const { error } = await sb.from("agua").upsert(aguaPend.map((r) => ({ usuario_id: uid, data: r.data, ml: Math.min(20000, r.ml), meta: Math.min(10000, Math.max(500, r.meta)), atualizado_em: new Date().toISOString() })));
         if (!error) { aguaPend.forEach((r) => (enviados[`${uid}|agua|${r.data}`] = `${r.ml}/${r.meta}`)); guardarEnviados(); }
       }
-      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null, incXp: S.incXp || null };
+      const cfg = { inicio: S.inicio, ...Object.fromEntries(VKEYS.map((p) => [p, S[p].inicio])), principal: S.principal || null, nivel: S.nivel || null, ...(() => { const n = meuNivel(); return { xp: n.xp, nivel_xp: n.nivel, classe: n.slug, estilo: estiloAtual().slug, trilha: trilha(), forca: S.forca || null, formaturas: formaturas() }; })(), quiz: S.quiz || null, ficha: S.ficha || null, missoes: S.missoes || null, missoesTot: S.missoesTot || null, missoesXpAnt: S.missoesXpAnt || 0, meta: metaSemana(), d7: S.d7 || null, d7Feito: S.d7Feito || null, d7Recusa: S.d7Recusa || null, arte: S.arte || null, album: S.album || null, pesagemPulada: S.pesagemPulada || null, inventario: Array.isArray(S.inventario) ? S.inventario : null, arena: S.arena || null, arenaVisto: S.arenaVisto || null, incXp: S.incXp || null, incCartas: S.incCartas || null };
       if (enviados[`${uid}|cfg`] !== JSON.stringify(cfg)) {
         const { error } = await sb.from("perfis").update({ config: cfg }).eq("id", uid);
         if (!error) { enviados[`${uid}|cfg`] = JSON.stringify(cfg); guardarEnviados(); }
@@ -5685,6 +5685,7 @@
       if (perfil.config.principal && !S.principal) S.principal = perfil.config.principal;
       if (perfil.config.nivel && !S.nivel) S.nivel = perfil.config.nivel;
       if (perfil.config.incXp && typeof perfil.config.incXp === "object" && !S.incXp) S.incXp = perfil.config.incXp;
+      if (perfil.config.incCartas && typeof perfil.config.incCartas === "object") S.incCartas = { ...perfil.config.incCartas, ...(S.incCartas || {}) };
       if (perfil.config.arena && typeof perfil.config.arena === "object" && !S.arena) { S.arena = perfil.config.arena; S.arenaVisto = perfil.config.arenaVisto || S.arenaVisto; }
       if (Array.isArray(perfil.config.inventario) && !Array.isArray(S.inventario)) S.inventario = perfil.config.inventario.filter((x) => typeof x === "string").slice(0, 30);
       if (perfil.config.nutri && !S.nutri) S.nutri = perfil.config.nutri;
@@ -7375,6 +7376,11 @@
       <div class="alb-sec"><div class="alb-h"><span>⚔️ Chefes da Arena</span><small>${arena().filter((c) => c.nivel).length}/${ARENA.length} derrotados</small></div>
         <p class="alb-d">Cada nível vencido muda a cor da carta: Bronze, Prata, Ouro e Diamante holográfico.</p>
         <div class="alb-grade">${arena().map((c) => `<button type="button" class="alb-it ar-alb" data-ar="${c.k}" aria-label="${esc(c.nome)}">${arCartaHtml(c)}</button>`).join("")}</div></div>
+      ${INC_ARTE.length ? `<div class="alb-sec"><div class="alb-h"><span>🛡️ Cartas de incursão</span><small>${INC_ARTE.filter((x) => incCartaTem(x.k)).length}/${INC_ARTE.length}</small></div>
+        <p class="alb-d">Ajude a guilda a derrubar o chefe de uma incursão e leve a carta dela.</p>
+        <div class="alb-grade">${INC_ARTE.map((x) => incCartaTem(x.k)
+          ? `<button type="button" class="alb-it" data-inc-carta="${x.k}" aria-label="Abrir a carta ${esc(x.nome)}"><img src="${incArte(x.k)}" alt="" loading="lazy"></button>`
+          : `<div class="alb-it off" title="Ajude a derrubar o chefe da incursão ${esc(x.nome)}"><img src="${incArte(x.k)}" alt="" loading="lazy"><span class="carta-lock">🔒</span><small>${esc(x.nome)}</small></div>`).join("")}</div></div>` : ""}
     </section>`;
   };
   if (LIGAS_CHEFES) telas.chefes = () => {
@@ -8226,15 +8232,15 @@
      ========================================================== */
   const INC = [
     { k: "goblin", nome: "Invasão dos Goblins", meta: 60, un: "flexões", dias: 3, modo: "grupo", f: "goblin" },
-    { k: "lobo", nome: "Encontro da Matilha", meta: 8, un: "km", dias: 5, modo: "grupo", f: "km" },
-    { k: "kobold", nome: "Ninho do Kobold", meta: 40, un: "burpees", dias: 3, modo: "dupla", f: "kobold" },
+    { k: "lobo", nome: "Encontro da Matilha", meta: 8, un: "km", dias: 5, modo: "grupo", f: "km", arte: true },
+    { k: "kobold", nome: "Ninho do Kobold", meta: 40, un: "burpees", dias: 3, modo: "dupla", f: "kobold", arte: true },
     { k: "minotauro", nome: "Labirinto do Minotauro", meta: 150, un: "agachamentos", dias: 5, modo: "grupo", f: "minotauro" },
-    { k: "sentinela", nome: "Vigília da Sentinela", meta: 5, un: "min de prancha", dias: 3, modo: "dupla", f: "prancha" },
-    { k: "troll", nome: "Ponte do Troll", meta: 25, un: "barras", dias: 5, modo: "grupo", f: "troll", req: ["barra", "passe"] },
-    { k: "gargula", nome: "Telhado das Gárgulas", meta: 50, un: "dips", dias: 5, modo: "dupla", f: "gargula" },
-    { k: "shinobi", nome: "Noite dos Shinobi", meta: 200, un: "polichinelos", dias: 3, modo: "grupo", f: "shinobi" },
+    { k: "sentinela", nome: "Vigília da Sentinela", meta: 5, un: "min de prancha", dias: 3, modo: "dupla", f: "prancha", arte: true },
+    { k: "troll", nome: "Ponte do Troll", meta: 25, un: "barras", dias: 5, modo: "grupo", f: "troll", req: ["barra", "passe"], arte: true },
+    { k: "gargula", nome: "Telhado das Gárgulas", meta: 50, un: "dips", dias: 5, modo: "dupla", f: "gargula", arte: true },
+    { k: "shinobi", nome: "Noite dos Shinobi", meta: 200, un: "polichinelos", dias: 3, modo: "grupo", f: "shinobi", arte: true },
     { k: "ogro", nome: "Forja do Ogro", meta: 100, un: "swings", dias: 5, modo: "dupla", f: "ogro", req: ["kettlebell", "passe"] },
-    { k: "valquiria", nome: "Salão das Valquírias", meta: 75, un: "wall balls", dias: 5, modo: "grupo", f: "valquiria" },
+    { k: "valquiria", nome: "Salão das Valquírias", meta: 75, un: "wall balls", dias: 5, modo: "grupo", f: "valquiria", arte: true },
     { k: "cavaleiro-sem-cabeca", nome: "Estrada do Cavaleiro Sem Cabeça", meta: 30, un: "km de bike", dias: 7, modo: "grupo", f: "bikeKm" },
     { k: "automato", nome: "Fornalha do Autômato", meta: 60, un: "min de ergométrica", dias: 5, modo: "dupla", f: "bikeMin" },
     { k: "rei-demonio", nome: "Marcha do Rei Demônio", meta: 15, un: "km", dias: 7, modo: "grupo", f: "km", dificil: true },
@@ -8249,6 +8255,16 @@
   ];
   const INC_DE = Object.fromEntries([...INC, ...INC_CLA].map((x) => [x.k, x]));
   const incImg = (i) => arCarta(INC_DE[i.chefe]?.img || i.chefe);
+  /* Cartas de incursão: arte bônus (assets/incursoes/<k>.webp) para quem causou dano numa incursão em que o chefe caiu.
+     S.incCartas = { <chefe>: data em que ganhou } (sincroniza em perfis.config.incCartas). */
+  const INC_ARTE = INC.filter((x) => x.arte);
+  const incArte = (k) => (INC_DE[k]?.arte ? `assets/incursoes/${k}.webp` : null);
+  const incCartaTem = (k) => !!S.incCartas?.[k];
+  const incCartaHtml = (k) => `<div class="gami-carta alb-grande inc-carta"><img src="${incArte(k)}" alt="Carta da incursão ${esc(INC_DE[k]?.nome || "")}"></div>`;
+  function incAbrirCarta(k) {
+    const x = INC_DE[k]; if (!x || !incArte(k)) return;
+    dlgGami(`${incCartaHtml(k)}<p class="gami-k">Carta de incursão</p><h2>${esc(x.nome)}</h2><p class="note">Conquistada ao derrubar o chefe com a guilda${S.incCartas?.[k] ? ` em ${ddmm(S.incCartas[k])}` : ""}.</p>`, "Fechar");
+  }
   const incHp = (x, membros) => Math.round(x.meta * (x.modo === "dupla" ? 2 : Math.max(2, Math.ceil(membros / 2))));
   const incFmt = (x, v) => `${String(Math.round(v * 10) / 10).replace(".", ",")} ${x.un}`;
   // Quanto eu somei no período, pelos treinos registrados
@@ -8303,13 +8319,15 @@
   }
   // XP das incursões (guardado em S.incXp para não sumir quando a incursão sai da lista)
   function incXpAtualizar() {
-    let mud = false;
+    let mud = false, nova = null;
     for (const i of IG.lista || []) {
       const e = incEstado(i); if (!e.meu || e.meu.tot <= 0 || (!e.caiu && !e.acabou)) continue;
       const xp = e.caiu ? 100 + (e.gs[0]?.usuario_id === uid ? 50 : 0) : 25;
       if ((S.incXp?.[i.id] || 0) !== xp) { S.incXp = { ...(S.incXp || {}), [i.id]: xp }; mud = true; }
+      if (e.caiu && incArte(i.chefe) && !incCartaTem(i.chefe)) { S.incCartas = { ...(S.incCartas || {}), [i.chefe]: i.fim < hojeKey ? i.fim : hojeKey }; mud = true; nova = i.chefe; }
     }
     if (mud) save();
+    if (nova && !document.getElementById("gami-dlg")?.open) dlgGami(`${incCartaHtml(nova)}<p class="gami-k">🃏 Nova carta de incursão!</p><h2>${esc(INC_DE[nova].nome)}</h2><p class="note">Você ajudou a derrubar o chefe e ganhou esta carta. Ela fica no seu álbum.</p>`, "Bora!");
   }
   const incXp = () => soma(Object.values(S.incXp || {}));
   function incCard(i) {
@@ -8327,7 +8345,7 @@
         ${i.modo === "dupla" ? `<p class="inc-sub">${nome(i.criado_por)} + ${nome(i.dupla)}</p>` : ""}
         ${posso ? `<div class="inc-acoes">${!e.meu && i.modo === "grupo" ? `<button type="button" class="btn btn-blue" data-inc-entrar="${i.id}">Entrar na incursão</button>` : `<button type="button" class="btn btn-blue" data-inc-golpe="${i.id}">Lançar golpe</button>`}</div>` : ""}
         ${incAtiva(i) && !e.caiu ? `<button type="button" class="lnk-btn inc-compart" data-inc-compart="${i.id}">📲 Compartilhar incursão</button>` : ""}
-        ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b></p>` : ""}
+        ${e.meu && (e.caiu || e.acabou) ? `<p class="inc-sub">Você ganhou <b>+${S.incXp?.[i.id] || 0} XP</b>${e.caiu && incCartaTem(i.chefe) ? ` e a <button type="button" class="lnk-btn" data-inc-carta="${i.chefe}">🃏 carta da incursão</button>` : ""}</p>` : ""}
       </div></article>`;
   }
   function incCompartilhar(id) {
@@ -8421,11 +8439,12 @@
     document.getElementById("gami-dlg")?.close();
     await incCarregar(true);
     const e = incEstado(i);
-    if (e.caiu) dlgGami(`<div class="ar-dlg"><div class="ar-carta t3"><img src="${incImg(i)}" alt=""></div><p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">A guilda venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}.</p></div>`, "Bora!");
+    if (e.caiu) { incXpAtualizar(); dlgGami(`<div class="ar-dlg">${incArte(i.chefe) ? incCartaHtml(i.chefe) : `<div class="ar-carta t3"><img src="${incImg(i)}" alt=""></div>`}<p class="gami-k">⚔️ Chefe derrotado!</p><h2>${esc(x.nome)}</h2><p class="note">A guilda venceu a incursão. Cada um que atacou ganha <b>+100 XP</b>${e.gs[0]?.usuario_id === uid ? " e você, que mais causou dano, leva <b>+50</b>" : ""}${incArte(i.chefe) ? " e a <b>carta da incursão</b> para o álbum" : ""}.</p></div>`, "Bora!"); }
     else toast(`Golpe de ${incFmt(x, v)}! HP do chefe: ${e.hpPct}%.`, 3000);
   }
   document.addEventListener("click", (e) => {
     const t = e.target.closest?.("[data-inc-nova]"); if (t) { incNova(); return; }
+    const ca = e.target.closest?.("[data-inc-carta]"); if (ca) { incAbrirCarta(ca.dataset.incCarta); return; }
     const g = e.target.closest?.("[data-inc-g]"); if (g) { const [gid, k] = g.dataset.incG.split("|"); incNova(gid, k || undefined); return; }
     const es = e.target.closest?.("[data-inc-esc]"); if (es) { const [gid, k] = es.dataset.incEsc.split("|"); incNova(gid, k); return; }
     const cr = e.target.closest?.("[data-inc-criar]"); if (cr) { const [gid, k, d] = cr.dataset.incCriar.split("|"); cr.disabled = true; incCriar(gid, k, d); return; }
